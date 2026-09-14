@@ -1,0 +1,1123 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { storage } from '../services/storage';
+import { pairWallaaButton, startWallaaMonitor, stopBleScan } from '../services/ble';
+import { getCurrentLocation, requestLocationPermission, watchLiveLocation } from '../services/location';
+import { sendWallaaAlert } from '../services/alert';
+import { closeLiveAlert, deleteWallaaAccount, sendDeviceHeartbeat, updateLiveLocation, sendLiveProtectionLocation } from '../services/liveAlert';
+import {
+  createQrDataUrl, claimWallaaDevice, getWallaaNetwork, getWallaaContacts, getWallaaAccount, getWallaaAlerts, getNetworkAlert, loginWallaaAccount, logoutWallaaAccount, registerWallaaAccount, registerWallaaIdentity, removeWallaaLink, rotateWallaaQr, scanQrWithCamera, scanWallaaCode, syncWallaaContacts, getWallaaNotificationHistory, acknowledgeActiveNetworkAlerts } from '../services/network';
+import { clearDeliveredWallaaNotifications, initWallaaPush, playWallaaAlarm, stopPushListeners, stopWallaaAlarm } from '../services/push';
+import { detectDeviceLanguage, translate } from '../i18n';
+import { ensureLocalNotificationPermission, feedbackWarning, showLocalSafetyNotification } from '../services/nativeFeedback';
+import { getWallaaSystemHealth, sendWallaaTestEmail } from '../services/system';
+import { CONFIG, triggerMatches } from '../config';
+
+function makeId() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function newNetworkIdentity() {
+  return { installationId: makeId(), userId: '', authToken: '', qrToken: '', qrPayload: '' };
+}
+
+function normalizeContact(input = {}) {
+  return {
+    id: input.id || makeId(),
+    name: String(input.name || '').trim(),
+    email: String(input.email || '').trim(),
+    phone: String(input.phone || '').trim(),
+    role: input.role === 'primary' ? 'primary' : 'guardian',
+    permissions: {
+      sosAlerts: input.permissions?.sosAlerts !== false,
+      liveLocation: input.permissions?.liveLocation !== false,
+      disconnectAlerts: input.permissions?.disconnectAlerts !== false
+    }
+  };
+}
+
+function profileName(profile = {}) {
+  return [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim() || profile.name || '';
+}
+
+export function useWallaaSafe() {
+  const ACTIVITY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+function pruneActivities(items = []) {
+  const cutoff = Date.now() - ACTIVITY_RETENTION_MS;
+  return (items || []).filter((item) => {
+    const when = new Date(item?.at || 0).getTime();
+    return Number.isFinite(when) && when >= cutoff;
+  }).slice(0, 150);
+}
+
+const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
+  const [loaded, setLoaded] = useState(false);
+  const [profile, setProfile] = useState({ customerId: '', name: '', firstName: '', lastName: '', email: '', phone: '', countryCode: '+39', safetyWord: '', language: defaultLanguage, plan: 'basic', sosLocationEnabled: true, liveProtectionEnabled: false, onboardingComplete: false });
+  const [contacts, setContacts] = useState([]);
+  const [device, setDevice] = useState(null);
+  const [armed, setArmedState] = useState(true);
+  const [trigger, setTriggerState] = useState('double_press');
+  const [activities, setActivities] = useState([]);
+  const [telemetry, setTelemetry] = useState({ battery: null, rssi: null, seenAt: null });
+  const [pairingState, setPairingState] = useState('idle');
+  const [busy, setBusy] = useState(false);
+  const [dispatchingAlert, setDispatchingAlert] = useState(false);
+  const [dispatchStage, setDispatchStage] = useState('idle');
+  const [toast, setToast] = useState(null);
+  const [lastAlert, setLastAlert] = useState(null);
+  const [activeAlert, setActiveAlert] = useState(null);
+  const [resolvedAlert, setResolvedAlert] = useState(null);
+  const [networkIdentity, setNetworkIdentity] = useState(null);
+  const [networkState, setNetworkState] = useState({ status: 'loading', guardians: [], following: [], pushPermission: 'unknown' });
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [incomingAlert, setIncomingAlert] = useState(null);
+  const [sentinelOffer, setSentinelOffer] = useState(null);
+  const [connectionGuard, setConnectionGuardState] = useState({ enabled: true, delaySeconds: 60 });
+  const [appearance, setAppearanceState] = useState({ mode: 'system' });
+  const [systemHealth, setSystemHealth] = useState({ status: 'idle' });
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [locationStatus, setLocationStatus] = useState('idle');
+  const [clock, setClock] = useState(Date.now());
+  const [appVisible, setAppVisible] = useState(() => typeof document === 'undefined' ? true : document.visibilityState !== 'hidden');
+
+  const armedRef = useRef(armed);
+  const triggerRef = useRef(trigger);
+  const contactsRef = useRef(contacts);
+  const profileRef = useRef(profile);
+  const deviceRef = useRef(device);
+  const telemetryRef = useRef(telemetry);
+  const connectionGuardRef = useRef(connectionGuard);
+  const activeAlertRef = useRef(activeAlert);
+  const busyRef = useRef(false);
+  const networkIdentityRef = useRef(null);
+  const disconnectNotifiedRef = useRef(false);
+  const lastHeartbeatStatusRef = useRef('');
+  const pushInitializedRef = useRef(false);
+  const profileSyncTimerRef = useRef(null);
+  const deviceClaimMigrationRef = useRef(false);
+
+  const currentLanguage = useCallback(() => profileRef.current?.language || defaultLanguage, [defaultLanguage]);
+  const tx = useCallback((key, vars) => translate(currentLanguage(), key, vars), [currentLanguage]);
+
+  useEffect(() => { armedRef.current = armed; }, [armed]);
+  useEffect(() => { triggerRef.current = trigger; }, [trigger]);
+  useEffect(() => { contactsRef.current = contacts; }, [contacts]);
+  useEffect(() => { profileRef.current = profile; }, [profile]);
+  useEffect(() => { deviceRef.current = device; }, [device]);
+  useEffect(() => { telemetryRef.current = telemetry; }, [telemetry]);
+  useEffect(() => { connectionGuardRef.current = connectionGuard; }, [connectionGuard]);
+  useEffect(() => { activeAlertRef.current = activeAlert; }, [activeAlert]);
+  useEffect(() => { networkIdentityRef.current = networkIdentity; }, [networkIdentity]);
+
+  // Give ownership of foreground BLE scanning to the JS monitor and background BLE
+  // scanning to the native restoration manager. Leaving both CBCentralManagers scanning
+  // while the app is backgrounded can make advertisement delivery less predictable.
+  useEffect(() => {
+    const syncVisibility = () => setAppVisible(document.visibilityState !== 'hidden');
+    syncVisibility();
+    document.addEventListener('visibilitychange', syncVisibility);
+    globalThis.addEventListener?.('pageshow', syncVisibility);
+    globalThis.addEventListener?.('focus', syncVisibility);
+    globalThis.addEventListener?.('blur', syncVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', syncVisibility);
+      globalThis.removeEventListener?.('pageshow', syncVisibility);
+      globalThis.removeEventListener?.('focus', syncVisibility);
+      globalThis.removeEventListener?.('blur', syncVisibility);
+    };
+  }, []);
+
+
+  // Keep a native-readable safety snapshot in UserDefaults. The Swift CoreBluetooth
+  // monitor uses this while the WebView is suspended (screen locked / another app open).
+  useEffect(() => {
+    if (!loaded) return;
+    const config = {
+      version: 2,
+      armed: Boolean(armed),
+      trigger,
+      apiUrl: CONFIG.apiUrl,
+      deviceId: device?.id || '',
+      hardwareId: device?.hardwareId || '',
+      claimToken: device?.claimToken || '',
+      profile: {
+        firstName: profile?.firstName || '', lastName: profile?.lastName || '', name: profile?.name || '',
+        phone: profile?.phone || '', safetyWord: profile?.safetyWord || '', language: profile?.language || 'en'
+      },
+      contacts: (contacts || []).map((c) => ({
+        name: c.name || '', email: c.email || '', phone: c.phone || '', role: c.role || 'guardian',
+        permissions: c.permissions || { sosAlerts: true, liveLocation: true, disconnectAlerts: true }
+      })),
+      identity: {
+        installationId: networkIdentity?.installationId || '',
+        authToken: networkIdentity?.authToken || ''
+      },
+      savedAt: new Date().toISOString()
+    };
+    storage.setBackgroundConfig(config).catch(() => {});
+  }, [loaded, armed, trigger, device?.id, device?.hardwareId, device?.claimToken, profile, contacts, networkIdentity?.installationId, networkIdentity?.authToken]);
+
+  // If a hardware SOS was sent natively while Wallaa was in background, restore the
+  // active alert immediately when the WebView becomes visible again.
+  useEffect(() => {
+    if (!loaded) return undefined;
+    let cancelled = false;
+    const consumeNativeAlert = async () => {
+      const nativeAlert = await storage.getNativeAlert();
+      if (cancelled || !nativeAlert?.id) return;
+      const restored = { ...nativeAlert, active: nativeAlert.active !== false };
+      setLastAlert(restored);
+      if (restored.active) {
+        setActiveAlert(restored);
+        activeAlertRef.current = restored;
+        await storage.setActiveAlert(restored);
+      }
+      await storage.clearNativeAlert();
+    };
+    consumeNativeAlert().catch(() => {});
+    const onVisibility = () => { if (document.visibilityState === 'visible') consumeNativeAlert().catch(() => {}); };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { cancelled = true; document.removeEventListener('visibilitychange', onVisibility); };
+  }, [loaded]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setClock(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const media = globalThis.matchMedia?.('(prefers-color-scheme: dark)');
+    const apply = () => {
+      const systemDark = Boolean(media?.matches);
+      const mode = appearance.mode === 'system' ? 'dark' : appearance.mode;
+      document.documentElement.dataset.theme = mode;
+      document.documentElement.dataset.themePreference = appearance.mode;
+      document.documentElement.style.colorScheme = mode;
+    };
+    const refreshIfVisible = () => { if (document.visibilityState !== 'hidden') apply(); };
+    apply();
+    media?.addEventListener?.('change', apply);
+    document.addEventListener('visibilitychange', refreshIfVisible);
+    globalThis.addEventListener?.('pageshow', apply);
+    globalThis.addEventListener?.('focus', apply);
+    return () => {
+      media?.removeEventListener?.('change', apply);
+      document.removeEventListener('visibilitychange', refreshIfVisible);
+      globalThis.removeEventListener?.('pageshow', apply);
+      globalThis.removeEventListener?.('focus', apply);
+    };
+  }, [appearance.mode]);
+
+  const pushActivity = useCallback(async (entry) => {
+    const row = { id: makeId(), at: new Date().toISOString(), ...entry };
+    setActivities((current) => {
+      const next = pruneActivities([row, ...current]);
+      storage.setActivities(next).catch(() => {});
+      return next;
+    });
+    return row;
+  }, []);
+
+  const refreshNetwork = useCallback(async (identity = networkIdentityRef.current) => {
+    if (!identity?.authToken) return null;
+    try {
+      const state = await getWallaaNetwork(identity);
+      setNetworkState((current) => ({ ...current, ...state, status: 'ready' }));
+      if (state.qrPayload) setQrDataUrl(await createQrDataUrl(state.qrPayload));
+      return state;
+    } catch (error) {
+      setNetworkState((current) => ({ ...current, status: 'offline', error: error.message }));
+      return null;
+    }
+  }, []);
+
+
+
+  const refreshCurrentLocation = useCallback(async () => {
+    setLocationStatus('checking');
+    try {
+      const location = await getCurrentLocation();
+      setCurrentLocation(location);
+      setLocationStatus('ready');
+      return location;
+    } catch (error) {
+      setLocationStatus('error');
+      setToast({ type: 'error', text: error.message || 'Posizione non disponibile.' });
+      throw error;
+    }
+  }, []);
+
+  const refreshSystemHealth = useCallback(async () => {
+    if (!networkIdentityRef.current?.authToken) { setSystemHealth({ status: 'idle' }); return null; }
+    setSystemHealth((current) => ({ ...current, status: 'checking', error: '' }));
+    try {
+      const health = await getWallaaSystemHealth(networkIdentityRef.current);
+      const next = { ...health, status: 'ready' };
+      setSystemHealth(next);
+      return next;
+    } catch (error) {
+      const next = { status: 'offline', error: error.message || 'Backend Wallaa non raggiungibile.' };
+      setSystemHealth(next);
+      return null;
+    }
+  }, []);
+
+  const testAlarmSound = useCallback(() => {
+    playWallaaAlarm({ loop: false });
+  }, []);
+
+  const sendTestEmail = useCallback(async () => {
+    const email = profileRef.current?.email?.trim();
+    if (!email) throw new Error(tx('v401.services.emailMissing'));
+    try {
+      const result = await sendWallaaTestEmail(networkIdentityRef.current, {
+        email,
+        name: profileName(profileRef.current) || 'Utente Wallaa'
+      });
+      setToast({ type: 'success', text: tx('v401.services.emailSent', { email }) });
+      await refreshSystemHealth();
+      return result;
+    } catch (error) {
+      setToast({ type: 'error', text: error.message || tx('v401.services.emailFailed') });
+      throw error;
+    }
+  }, [refreshSystemHealth, tx]);
+
+  const syncNetworkIdentity = useCallback(async ({ pushToken = null, baseIdentity = networkIdentityRef.current, nextProfile = profileRef.current } = {}) => {
+    const identity = baseIdentity || newNetworkIdentity();
+    if (!identity?.authToken) return identity;
+    const displayName = profileName(nextProfile) || 'Utente Wallaa';
+    try {
+      const registered = await registerWallaaIdentity({
+        identity, displayName, pushToken, platform: Capacitor.getPlatform(), profile: nextProfile
+      });
+      const next = {
+        ...identity,
+        userId: registered.userId || identity.userId,
+        qrToken: registered.qrToken || identity.qrToken,
+        qrPayload: registered.qrPayload || identity.qrPayload
+      };
+      setNetworkIdentity(next); networkIdentityRef.current = next;
+      await storage.setNetworkIdentity(next);
+      if (registered.profile) {
+        const mergedProfile = { ...profileRef.current, ...registered.profile, safetyWord: profileRef.current?.safetyWord || '', sosLocationEnabled: profileRef.current?.sosLocationEnabled !== false };
+        mergedProfile.name = profileName(mergedProfile);
+        setProfile(mergedProfile); profileRef.current = mergedProfile;
+        await storage.setProfile(mergedProfile);
+      }
+      if (registered.qrPayload) setQrDataUrl(await createQrDataUrl(registered.qrPayload));
+      await refreshNetwork(next);
+      // WALLAA_V4_0_58_QR_CONTACT_REFRESH
+      await syncCloudContacts(networkIdentityRef.current).catch((error)=>console.warn('[WALLAA][QR] Guardian refresh failed',error?.message||error));
+      return next;
+    } catch (error) {
+      setNetworkState((current) => ({ ...current, status: 'offline', error: error.message }));
+      return identity;
+    }
+  }, [refreshNetwork]);
+
+  const syncCloudContacts = useCallback(async (identity = networkIdentityRef.current) => {
+    if (!identity?.authToken) return contactsRef.current;
+    try {
+      const cloud = await getWallaaContacts(identity);
+      const cloudContacts = Array.isArray(cloud?.contacts) ? cloud.contacts.map(normalizeContact) : [];
+      if (cloudContacts.length) {
+        setContacts(cloudContacts);
+        contactsRef.current = cloudContacts;
+        await storage.setContacts(cloudContacts);
+        return cloudContacts;
+      }
+      if (contactsRef.current.length) {
+        const seeded = await syncWallaaContacts(identity, contactsRef.current);
+        const seededContacts = Array.isArray(seeded?.contacts) ? seeded.contacts.map(normalizeContact) : contactsRef.current;
+        setContacts(seededContacts); contactsRef.current = seededContacts; await storage.setContacts(seededContacts);
+        return seededContacts;
+      }
+    } catch (error) {
+      console.warn('Wallaa contacts cloud sync skipped:', error?.message || error);
+    }
+    return contactsRef.current;
+  }, []);
+
+  const initializeAccountServices = useCallback(async (baseIdentity = networkIdentityRef.current, nextProfile = profileRef.current) => {
+    if (!baseIdentity?.authToken) return baseIdentity;
+    const synced = await syncNetworkIdentity({ baseIdentity, nextProfile });
+    await syncCloudContacts(synced);
+    await refreshSystemHealth();
+    if (pushInitializedRef.current) return synced;
+    pushInitializedRef.current = true;
+    try {
+      const push = await initWallaaPush({
+        onToken: (token) => syncNetworkIdentity({ pushToken: token, baseIdentity: networkIdentityRef.current, nextProfile: profileRef.current }),
+        onAlert: (alert) => {
+          playWallaaAlarm(); setIncomingAlert(alert);
+          pushActivity({ type: 'network-alert', status: 'error', titleKey: 'activity.networkSos', titleVars: { name: alert.ownerName }, location: alert.location }).catch(() => {});
+        },
+        onSentinelOffer: (offer) => setSentinelOffer(offer),
+        onAlertClosed: (alertId) => {
+          stopWallaaAlarm();
+          setIncomingAlert((current) => (!alertId || current?.id === alertId) ? null : current);
+          const ownAlert = activeAlertRef.current;
+          if (ownAlert?.id && (!alertId || ownAlert.id === alertId)) {
+            const resolved = { ...ownAlert, active: false, status: 'closed', resolvedBy: 'operating-center', resolvedAt: new Date().toISOString() };
+            setResolvedAlert(resolved);
+            setActiveAlert(null); activeAlertRef.current = null;
+            storage.setActiveAlert(null).catch(() => {});
+          }
+          clearDeliveredWallaaNotifications().catch(() => {});
+          pushActivity({ type: 'network-alert-closed', status: 'success', title: 'Allarme terminato' }).catch(() => {});
+        },
+        onError: (error) => setToast({ type: 'error', text: error?.message || tx('error.pushUnavailable') })
+      });
+      setNetworkState((current) => ({ ...current, pushPermission: push.permission }));
+    } catch {
+      pushInitializedRef.current = false;
+      if (profileSyncTimerRef.current) clearTimeout(profileSyncTimerRef.current);
+      setNetworkState((current) => ({ ...current, pushPermission: 'error' }));
+    }
+    return synced;
+  }, [pushActivity, refreshSystemHealth, syncCloudContacts, syncNetworkIdentity, tx]);
+
+  const fireAlert = useCallback(async (event = 'manual_test', meta = {}) => {
+    if (busyRef.current) return null;
+    busyRef.current = true;
+    setBusy(true);
+    if (event !== 'manual_test') {
+      setDispatchStage('sending');
+      setDispatchingAlert(true);
+    }
+
+    await pushActivity({
+      type: 'trigger',
+      status: 'success',
+      titleKey: event === 'manual_test' ? 'activity.testStarted' : 'activity.buttonDetected',
+      trigger: event
+    });
+
+    try {
+      const result = await sendWallaaAlert({
+        profile: profileRef.current,
+        contacts: contactsRef.current,
+        trigger: event,
+        device: deviceRef.current,
+        networkIdentity: networkIdentityRef.current,
+        eventPacketId: meta?.packetId ?? null,
+        locationEnabled: profileRef.current?.sosLocationEnabled !== false,
+        onProgress: event === 'manual_test' ? null : (stage) => setDispatchStage(stage)
+      });
+
+      const alertResult = {
+        id: result.alertId || makeId(),
+        at: new Date().toISOString(),
+        trigger: event,
+        location: result.location,
+        delivered: result.delivered || [],
+        failed: result.failed || [],
+        pushDelivered: result.pushDelivered || [],
+        pushFailed: result.pushFailed || [],
+        noPersonalGuardians: Boolean(result.noPersonalGuardians),
+        operatingCenterDelivered: Boolean(result.operatingCenterDelivered),
+        liveToken: result.liveToken || '',
+        liveUrl: result.liveUrl || '',
+        active: Boolean(result.alertId && event !== 'manual_test')
+      };
+      setLastAlert(alertResult);
+
+      if (alertResult.active) {
+        setActiveAlert(alertResult);
+        activeAlertRef.current = alertResult;
+        await storage.setActiveAlert(alertResult);
+      }
+
+      await pushActivity({
+        type: 'alert', status: 'success', titleKey: 'activity.alertSent', trigger: event,
+        location: result.location,
+        deliveredCount: alertResult.delivered.length,
+        pushDeliveredCount: alertResult.pushDelivered.length,
+        failedCount: alertResult.failed.length + alertResult.pushFailed.length
+      });
+
+      if (event !== 'manual_test' && result.noPersonalGuardians) {
+        setToast({ type: 'warning', text: result.operatingCenterDelivered ? tx('v410.toast.noGuardiansCenterSent') : tx('v410.toast.noGuardians') });
+      } else {
+        setToast({ type: 'success', text: tx('toast.alertSuccess') });
+      }
+      if (event !== 'manual_test') {
+        setDispatchStage('complete');
+        await new Promise((resolve) => setTimeout(resolve, 700));
+      }
+      return alertResult;
+    } catch (error) {
+      await pushActivity({ type: 'alert', status: 'error', titleKey: 'activity.alertFailed', trigger: event, detail: error.message });
+      setToast({ type: error?.code === 'NO_GUARDIANS' ? 'warning' : 'error', text: error?.code === 'NO_GUARDIANS' ? tx(event === 'manual_test' ? 'v410.toast.noGuardiansTest' : 'v410.toast.noGuardians') : (error.message || 'Invio non riuscito.') });
+      throw error;
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+      if (event !== 'manual_test') {
+        setDispatchingAlert(false);
+        setDispatchStage('idle');
+      }
+    }
+  }, [pushActivity, tx]);
+
+  // Keep a Guardian's incoming SOS position live while the app is open.
+  // The initial push can arrive before the protected person's first GPS fix, so
+  // this authenticated poll refreshes the same alert every 3 seconds.
+  useEffect(() => {
+    if (!loaded || !networkIdentity?.authToken || !incomingAlert?.remote || !incomingAlert?.id) return undefined;
+    let stopped = false;
+    const refreshIncomingAlert = async () => {
+      try {
+        const result = await getNetworkAlert(networkIdentityRef.current, incomingAlert.id);
+        if (stopped || !result?.alert) return;
+        const remote = result.alert;
+        setIncomingAlert((current) => {
+          if (!current || current.id !== incomingAlert.id) return current;
+          return {
+            ...current,
+            ownerName: remote.ownerName || current.ownerName,
+            at: remote.at || current.at,
+            locationShared: remote.locationShared !== false,
+            liveUrl: remote.liveUrl || current.liveUrl || '',
+            location: remote.location?.latitude != null && remote.location?.longitude != null ? {
+              latitude: Number(remote.location.latitude),
+              longitude: Number(remote.location.longitude),
+              accuracy: remote.location.accuracy == null ? null : Number(remote.location.accuracy),
+              mapsUrl: remote.location.mapsUrl || `https://www.google.com/maps?q=${encodeURIComponent(`${remote.location.latitude},${remote.location.longitude}`)}`
+            } : current.location
+          };
+        });
+      } catch (error) {
+        // 404 after cleanup or a transient connection failure is retried on the next cycle.
+      }
+    };
+    refreshIncomingAlert();
+    const timer = setInterval(refreshIncomingAlert, 3000);
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshIncomingAlert(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { stopped = true; clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+  }, [loaded, networkIdentity?.authToken, incomingAlert?.id, incomingAlert?.remote]);
+
+  const resetLocalSession = useCallback(async () => {
+    const currentIdentity = networkIdentityRef.current;
+    await stopBleScan().catch(() => {});
+    await stopPushListeners().catch(() => {});
+    pushInitializedRef.current = false;
+    if (profileSyncTimerRef.current) { clearTimeout(profileSyncTimerRef.current); profileSyncTimerRef.current = null; }
+    await storage.clearAll();
+
+    const emptyProfile = { customerId:'',name:'',firstName:'',lastName:'',email:'',phone:'',countryCode:'+39',safetyWord:'',language:currentLanguage(),plan:'basic',sosLocationEnabled:true,liveProtectionEnabled:false,privacyAccepted:false,termsAccepted:false,onboardingComplete:false };
+    const identity = { installationId: currentIdentity?.installationId || makeId(), userId:'', authToken:'', qrToken:'', qrPayload:'' };
+    await storage.setProfile(emptyProfile);
+    await storage.setNetworkIdentity(identity);
+
+    setProfile(emptyProfile); profileRef.current = emptyProfile;
+    setNetworkIdentity(identity); networkIdentityRef.current = identity;
+    setContacts([]); contactsRef.current = [];
+    setDevice(null); deviceRef.current = null;
+    setActivities([]);
+    setActiveAlert(null); activeAlertRef.current = null;
+    setResolvedAlert(null);
+    setLastAlert(null);
+    setIncomingAlert(null);
+    setTelemetry({ battery:null, rssi:null, seenAt:null });
+    setPairingState('idle');
+    setQrDataUrl('');
+    setNetworkState({ status:'signed-out', guardians:[], following:[], pushPermission:'unknown' });
+    setSystemHealth({ status:'idle' });
+    setArmedState(true); armedRef.current = true;
+    setTriggerState('double_press'); triggerRef.current = 'double_press';
+    disconnectNotifiedRef.current = false;
+    lastHeartbeatStatusRef.current = '';
+  }, [currentLanguage]);
+
+  const closeActiveAlert = useCallback(async () => {
+    const alert = activeAlertRef.current;
+    if (!alert?.id) return;
+    try {
+      await closeLiveAlert(networkIdentityRef.current, alert.id);
+    } catch (error) {
+      setToast({ type: 'error', text: error.message });
+      throw error;
+    }
+    await pushActivity({ type: 'alert-closed', status: 'success', title: 'Allarme terminato' });
+    const resolved = { ...alert, active:false, status:'closed', resolvedBy:'user', resolvedAt:new Date().toISOString() };
+    setResolvedAlert(resolved);
+    setActiveAlert(null);
+    activeAlertRef.current = null;
+    await storage.setActiveAlert(null);
+    setToast({ type: 'success', text: 'Allarme terminato. La rete Wallaa è stata aggiornata.' });
+  }, [pushActivity]);
+
+  useEffect(() => {
+    if (!loaded || !networkIdentity?.authToken) return undefined;
+    let cancelled=false;
+    let invalidating=false;
+    const refreshAccount=async()=>{
+      try {
+        const result=await getWallaaAccount(networkIdentityRef.current);
+        if(cancelled || !result?.profile) return;
+        const merged={...profileRef.current,...result.profile,safetyWord:profileRef.current?.safetyWord||'',sosLocationEnabled:profileRef.current?.sosLocationEnabled!==false};
+        setProfile(merged); profileRef.current=merged; await storage.setProfile(merged);
+      } catch (error) {
+        if (!cancelled && !invalidating && (error?.status === 401 || error?.status === 404 || error?.code === 'SESSION_INVALID')) {
+          invalidating=true;
+          await resetLocalSession();
+          setToast({ type:'warning', text:'Il tuo account o la sessione non sono più disponibili. Accedi o registrati nuovamente.' });
+        }
+        // Other network failures are transient and retried.
+      }
+    };
+    refreshAccount();
+    const timer=setInterval(refreshAccount,15000);
+    const onVisibility=()=>{ if(document.visibilityState === 'visible') refreshAccount(); };
+    document.addEventListener('visibilitychange',onVisibility);
+    return()=>{cancelled=true;clearInterval(timer);document.removeEventListener('visibilitychange',onVisibility);};
+  }, [loaded, networkIdentity?.authToken, resetLocalSession]);
+
+  // Keep the app synchronized with closures performed by the Operating Console.
+  // Push notifications are the fast path; this authenticated poll is the reliable fallback.
+  useEffect(() => {
+    if (!loaded || !networkIdentity?.authToken || !activeAlert?.id) return undefined;
+    let stopped = false;
+    const checkStatus = async () => {
+      try {
+        const result = await getWallaaAlerts(networkIdentityRef.current);
+        if (stopped) return;
+        const remote = (result?.alerts || []).find((item) => item.id === activeAlertRef.current?.id);
+        if (!remote || remote.status === 'active') return;
+        const current = activeAlertRef.current;
+        if (!current) return;
+        const resolved = { ...current, active:false, status:remote.status || 'closed', resolvedBy:'operating-center', resolvedAt:remote.closedAt || new Date().toISOString() };
+        setResolvedAlert(resolved);
+        setActiveAlert(null); activeAlertRef.current = null;
+        await storage.setActiveAlert(null);
+        await pushActivity({ type:'alert-closed-remote', status:'success', title:'Allarme chiuso dalla Centrale Wallaa' });
+      } catch { /* transient network failure: next check retries */ }
+    };
+    checkStatus();
+    const timer = setInterval(checkStatus, 5000);
+    const onVisible = () => { if (document.visibilityState === 'visible') checkStatus(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { stopped = true; clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+  }, [loaded, networkIdentity?.authToken, activeAlert?.id, pushActivity]);
+
+  useEffect(() => {
+    if (!loaded || !networkIdentity?.authToken || profile?.plan !== 'pro' || !profile?.liveProtectionEnabled) return undefined;
+    let stopped=false; let stopWatch=null; let lastSent=0;
+    requestLocationPermission().catch(()=>{}).finally(()=>{
+      if(stopped) return;
+      watchLiveLocation({
+        onLocation: async(location)=>{
+          setCurrentLocation(location); setLocationStatus('ready');
+          const now=Date.now(); if(now-lastSent<5000) return; lastSent=now;
+          try { await sendLiveProtectionLocation(networkIdentityRef.current,location,telemetryRef.current?.battery??null); } catch { /* retry on next sample */ }
+        },
+        onError:()=>setLocationStatus('error')
+      }).then(stop=>{if(stopped){stop?.();}else stopWatch=stop;}).catch(()=>setLocationStatus('error'));
+    });
+    return()=>{stopped=true;stopWatch?.();};
+  }, [loaded, networkIdentity?.authToken, profile?.plan, profile?.liveProtectionEnabled]);
+
+  useEffect(() => {
+    if (!activeAlert?.id || !activeAlert.active || profileRef.current?.plan !== 'pro') return undefined;
+    let stopped = false;
+    let stopWatch = null;
+    let lastPublishedAt = 0;
+    let publishing = false;
+
+    const onLocation = async (location) => {
+      if (stopped) return;
+      setActiveAlert((current) => current ? { ...current, location } : current);
+      const now = Date.now();
+      if (publishing || now - lastPublishedAt < 2000) return;
+      publishing = true;
+      try {
+        await updateLiveLocation(networkIdentityRef.current, activeAlert.id, location);
+        lastPublishedAt = now;
+        console.info('[WALLAA][LIVE] uploaded', activeAlert.id, location.latitude, location.longitude, location.capturedAt);
+      } catch (error) {
+        console.warn('[WALLAA][LIVE] upload failed', activeAlert.id, error?.message || error);
+        // Keep the local live position and retry on the next location sample.
+      } finally {
+        publishing = false;
+      }
+    };
+
+    watchLiveLocation({ onLocation, onError: () => {} })
+      .then((stop) => { if (stopped) stop?.(); else stopWatch = stop; })
+      .catch(() => {});
+
+    return () => {
+      stopped = true;
+      stopWatch?.();
+    };
+  }, [activeAlert?.id, activeAlert?.active]);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const [savedProfile, savedContacts, savedDevice, savedArmed, savedTrigger, savedActivities, savedIdentity, savedGuard, savedAppearance, savedActiveAlert] = await Promise.all([
+        storage.getProfile(), storage.getContacts(), storage.getDevice(), storage.getArmed(), storage.getTrigger(), storage.getActivities(),
+        storage.getNetworkIdentity(), storage.getConnectionGuard(), storage.getAppearance(), storage.getActiveAlert()
+      ]);
+
+      if (!active) return;
+      const identity = savedIdentity || newNetworkIdentity();
+      const legacyHasName = Boolean(savedProfile?.name?.trim());
+      const normalizedProfile = {
+        name: '', firstName: '', lastName: '', email: '', phone: '', countryCode: '+39', safetyWord: '', plan: 'basic', sosLocationEnabled: true, liveProtectionEnabled: false, privacyAccepted: false, termsAccepted: false,
+        ...savedProfile,
+        language: savedProfile?.language || defaultLanguage,
+        onboardingComplete: savedProfile?.onboardingComplete ?? legacyHasName
+      };
+      if (!normalizedProfile.name) normalizedProfile.name = profileName(normalizedProfile);
+      const normalizedContacts = (savedContacts || []).map(normalizeContact);
+
+      // Validate a persisted authenticated session before restoring hardware state.
+      // If an operator deleted the account, do not briefly re-arm an old paired button.
+      let bootProfile = normalizedProfile;
+      let sessionInvalid = false;
+      if (identity.authToken && normalizedProfile.onboardingComplete) {
+        try {
+          const remote = await getWallaaAccount(identity);
+          if (remote?.profile) {
+            bootProfile = { ...normalizedProfile, ...remote.profile, safetyWord: normalizedProfile.safetyWord || '', sosLocationEnabled: normalizedProfile.sosLocationEnabled !== false };
+            bootProfile.name = profileName(bootProfile);
+          }
+        } catch (error) {
+          sessionInvalid = error?.status === 401 || error?.status === 404 || error?.code === 'SESSION_INVALID';
+        }
+      }
+
+      if (sessionInvalid) {
+        networkIdentityRef.current = identity;
+        await resetLocalSession();
+        setLoaded(true);
+        setToast({ type:'warning', text:'Il tuo account non è più disponibile. Effettua una nuova registrazione o accedi con un altro account.' });
+        return;
+      }
+
+      setProfile(bootProfile); profileRef.current = bootProfile;
+      if (bootProfile !== normalizedProfile) await storage.setProfile(bootProfile);
+      setContacts(normalizedContacts); contactsRef.current = normalizedContacts;
+      setDevice(savedDevice ? { ...savedDevice, name: 'Wallaa Button', monitorMode: savedDevice.monitorMode || 'event-only' } : null);
+      setArmedState(savedArmed);
+      setTriggerState(savedTrigger);
+      const retainedActivities = pruneActivities(savedActivities);
+      setActivities(retainedActivities);
+      if (retainedActivities.length !== (savedActivities || []).length) storage.setActivities(retainedActivities).catch(() => {});
+      setNetworkIdentity(identity); networkIdentityRef.current = identity;
+      if (identity.qrPayload) {
+        try { setQrDataUrl(await createQrDataUrl(identity.qrPayload)); } catch { /* cached QR can be rebuilt after sync */ }
+      }
+      setConnectionGuardState(savedGuard || { enabled: true, delaySeconds: 60 });
+      setAppearanceState(savedAppearance || { mode: 'system' });
+      setActiveAlert(savedActiveAlert?.active ? savedActiveAlert : null);
+      activeAlertRef.current = savedActiveAlert?.active ? savedActiveAlert : null;
+      await storage.setNetworkIdentity(identity);
+      setLoaded(true);
+      requestLocationPermission().catch(() => {});
+      if (identity.authToken && bootProfile.onboardingComplete) {
+        await initializeAccountServices(identity, bootProfile);
+      } else {
+        setNetworkState((current) => ({ ...current, status: 'signed-out', pushPermission: 'unknown' }));
+      }
+    })();
+
+    return () => {
+      active = false;
+      stopBleScan().catch(() => {});
+      stopPushListeners().catch(() => {});
+      pushInitializedRef.current = false;
+    };
+  }, [defaultLanguage, initializeAccountServices, resetLocalSession]);
+
+  useEffect(() => {
+    if (!loaded || !device?.id || !armed || !appVisible) {
+      stopBleScan().catch(() => {});
+      return undefined;
+    }
+
+    startWallaaMonitor({
+      deviceId: device.id,
+      onTelemetry: (data) => {
+        setTelemetry((prev) => ({ ...prev, battery:data.battery, rssi:data.rssi, seenAt:data.seenAt }));
+        const current = deviceRef.current;
+        const identity = networkIdentityRef.current;
+        if (!deviceClaimMigrationRef.current && current?.id && !current?.claimToken && data?.portableIdentity && data?.hardwareId && identity?.authToken) {
+          deviceClaimMigrationRef.current = true;
+          claimWallaaDevice(identity, {
+            ...current,
+            hardwareId:data.hardwareId,
+            advertisedName:data.advertisedName || '',
+            identitySource:data.identitySource || 'advertised-serial',
+            portableIdentity:true
+          }).then(async (claim) => {
+            const upgraded = {
+              ...current,
+              hardwareId:claim.hardwareId || data.hardwareId,
+              advertisedName:data.advertisedName || current.advertisedName || '',
+              identitySource:data.identitySource || current.identitySource || 'advertised-serial',
+              portableIdentity:true,
+              claimToken:claim.claimToken,
+              permanentOwnership:true
+            };
+            setDevice(upgraded);
+            deviceRef.current = upgraded;
+            await storage.setDevice(upgraded);
+            setToast({ type:'success', text:'Wallaa Button registrato. Questo dispositivo appartiene ora al tuo account.' });
+          }).catch((error) => {
+            if (error?.code === 'DEVICE_ALREADY_OWNED') {
+              setToast({ type:'error', text:'Questo Wallaa Button è già registrato e non può essere associato a questo account.' });
+            }
+          }).finally(() => {
+            deviceClaimMigrationRef.current = false;
+          });
+        }
+      },
+      onEvent: async (evt) => {
+        const currentDevice = deviceRef.current;
+        const pairedAtMs = currentDevice?.pairedAt ? new Date(currentDevice.pairedAt).getTime() : 0;
+        const isPairingPacket = currentDevice?.pairingPacketId != null && evt.packetId != null && Number(currentDevice.pairingPacketId) === Number(evt.packetId);
+        // The physical press used to pair the button is often advertised repeatedly for a few seconds.
+        // It must never be interpreted as the user's first SOS.
+        if (isPairingPacket && pairedAtMs && Date.now() - pairedAtMs < 15000) return;
+
+        await pushActivity({ type: 'button', status: 'success', titleKey: 'activity.buttonPress', trigger: evt.event, battery: evt.battery });
+        if (armedRef.current && triggerMatches(triggerRef.current, evt.event)) fireAlert(evt.event, { packetId: evt.packetId }).catch(() => {});
+      },
+      onError: (error) => setToast({ type: 'error', text: error.message || 'Errore Bluetooth.' })
+    }).catch((error) => setToast({ type: 'error', text: error.message || 'Impossibile avviare il monitor Bluetooth.' }));
+
+    return () => { stopBleScan().catch(() => {}); };
+  }, [loaded, device?.id, armed, appVisible, fireAlert, pushActivity]);
+
+  const lastSignalAgeSeconds = useMemo(() => telemetry.seenAt ? Math.max(0, Math.round((clock - new Date(telemetry.seenAt).getTime()) / 1000)) : null, [telemetry.seenAt, clock]);
+
+  const eventOnlyButton = Boolean(device?.id && (device.monitorMode || 'event-only') === 'event-only');
+
+  const connectionStatus = useMemo(() => {
+    if (!device?.id) return 'absent';
+    if (eventOnlyButton) {
+      // Shelly BLU Button Tough is normally silent and advertises when an event occurs.
+      // Silence must never be interpreted as a disconnect.
+      if (lastSignalAgeSeconds != null && lastSignalAgeSeconds <= 20) return 'connected';
+      return 'standby';
+    }
+    if (lastSignalAgeSeconds == null) return 'searching';
+    if (lastSignalAgeSeconds <= 25) return 'connected';
+    if (lastSignalAgeSeconds <= 60) return 'weak';
+    return 'disconnected';
+  }, [device?.id, eventOnlyButton, lastSignalAgeSeconds]);
+
+  const guardExceeded = useMemo(() => Boolean(
+    !eventOnlyButton && device?.id && connectionGuard.enabled && lastSignalAgeSeconds != null && lastSignalAgeSeconds >= connectionGuard.delaySeconds
+  ), [eventOnlyButton, device?.id, connectionGuard.enabled, connectionGuard.delaySeconds, lastSignalAgeSeconds]);
+
+  // Persist only state transitions. Advertising reception itself remains passive and is not polled.
+  useEffect(() => {
+    if (!loaded || !device?.id || !networkIdentityRef.current?.authToken) return;
+    if (!['connected', 'weak', 'standby', 'disconnected'].includes(connectionStatus)) return;
+    if (lastHeartbeatStatusRef.current === connectionStatus) return;
+    lastHeartbeatStatusRef.current = connectionStatus;
+    sendDeviceHeartbeat(networkIdentityRef.current, {
+      deviceId: device.id,
+      hardwareId: device.hardwareId || '',
+      claimToken: device.claimToken || '',
+      status: connectionStatus,
+      battery: telemetryRef.current.battery,
+      rssi: telemetryRef.current.rssi,
+      lastSeenAt: telemetryRef.current.seenAt,
+      notifyGuardians: false
+    }).catch(() => {});
+  }, [loaded, device?.id, connectionStatus]);
+
+  useEffect(() => {
+    if (!loaded || !device?.id || !guardExceeded || disconnectNotifiedRef.current) return;
+    disconnectNotifiedRef.current = true;
+    const delay = connectionGuard.delaySeconds;
+    const language = profileRef.current?.language || 'en';
+    const delayLabel = translate(language, delay === 30 ? 'v4.device.delay30' : delay === 60 ? 'v4.device.delay60' : 'v4.device.delay300');
+    const guardTitle = translate(language, 'v4.guard.disconnectActivity');
+    const guardBody = translate(language, 'v4.guard.disconnectToast', { delay: delayLabel });
+    setToast({ type: 'error', text: guardBody });
+    feedbackWarning();
+    showLocalSafetyNotification({ title: guardTitle, body: guardBody, extra: { type: 'connection-guard', deviceId: device.id } }).catch(() => {});
+    pushActivity({ type: 'disconnect', status: 'error', title: guardTitle, detail: `Connection Guard: ${delay}s` }).catch(() => {});
+    const recipients = contactsRef.current
+      .filter((c) => c.email?.trim() && c.permissions?.disconnectAlerts !== false)
+      .map((c) => ({ name: c.name, email: c.email, phone: c.phone }));
+    sendDeviceHeartbeat(networkIdentityRef.current, {
+      deviceId: device.id,
+      hardwareId: device.hardwareId || '',
+      claimToken: device.claimToken || '',
+      status: 'disconnected',
+      battery: telemetryRef.current.battery,
+      rssi: telemetryRef.current.rssi,
+      lastSeenAt: telemetryRef.current.seenAt,
+      notifyGuardians: true,
+      contacts: recipients
+    }).catch(() => {});
+  }, [loaded, device?.id, guardExceeded, connectionGuard.delaySeconds, pushActivity]);
+
+  useEffect(() => {
+    if (!['connected', 'standby'].includes(connectionStatus) || !disconnectNotifiedRef.current) return;
+    disconnectNotifiedRef.current = false;
+    const language = profileRef.current?.language || 'en';
+    setToast({ type: 'success', text: translate(language, 'v4.guard.reconnectToast') });
+    pushActivity({ type: 'reconnect', status: 'success', title: translate(language, 'v4.guard.reconnectActivity') }).catch(() => {});
+  }, [connectionStatus, pushActivity]);
+
+  const signalQuality = useMemo(() => {
+    const rssi = telemetry.rssi;
+    if (connectionStatus === 'standby') return 'Standby';
+    if (connectionStatus === 'disconnected' || connectionStatus === 'absent') return 'No Signal';
+    if (rssi == null) return connectionStatus === 'searching' ? 'Searching' : '—';
+    if (rssi >= -60) return 'Excellent';
+    if (rssi >= -72) return 'Good';
+    if (rssi >= -82) return 'Weak';
+    return 'Very Weak';
+  }, [telemetry.rssi, connectionStatus]);
+
+  const ready = useMemo(() => {
+    const hasEmail = contacts.some((c) => c.email?.trim() && c.permissions?.sosAlerts !== false);
+    const hasWallaaGuardian = (networkState.guardians?.length || 0) > 0;
+    return Boolean(armed && device?.id && (hasEmail || hasWallaaGuardian));
+  }, [armed, device, contacts, networkState.guardians]);
+
+  const safetyLevel = useMemo(() => {
+    let score = 0;
+    if (armed) score += 20;
+    if (device?.id) score += 30;
+
+    // Event-only buttons are expected to be silent between presses. A recent packet
+    // confirms operation but prolonged silence does not reduce protection readiness.
+    if (connectionStatus === 'connected') score += 10;
+    else if (connectionStatus === 'standby') score += 10;
+    else if (connectionStatus === 'weak') score += 5;
+
+    if (telemetry.battery == null) score += 5;
+    else if (telemetry.battery >= 25) score += 10;
+    else if (telemetry.battery >= 10) score += 5;
+
+    if (contacts.some((c) => c.email?.trim() && c.permissions?.sosAlerts !== false) || networkState.guardians?.length) score += 15;
+    if (networkState.status === 'ready') score += 10;
+    if (networkState.pushPermission === 'granted') score += 5;
+
+    if (connectionStatus === 'disconnected') score = Math.min(score, 55);
+    if (connectionStatus === 'absent') score = Math.min(score, 25);
+    return Math.max(0, Math.min(100, score));
+  }, [armed, device?.id, connectionStatus, telemetry.battery, contacts, networkState.guardians, networkState.status, networkState.pushPermission]);
+
+  const setArmed = useCallback(async (value) => { setArmedState(value); await storage.setArmed(value); }, []);
+  const setTrigger = useCallback(async (value) => { setTriggerState(value); await storage.setTrigger(value); }, []);
+
+  const saveProfile = useCallback(async (next) => {
+    const normalized = { ...next, name: profileName(next) || next.name || '' };
+    setProfile(normalized); profileRef.current = normalized;
+    await storage.setProfile(normalized);
+    if (profileSyncTimerRef.current) clearTimeout(profileSyncTimerRef.current);
+    profileSyncTimerRef.current = setTimeout(() => {
+      syncNetworkIdentity({ nextProfile: profileRef.current }).catch(() => {});
+    }, 650);
+  }, [syncNetworkIdentity]);
+
+  const setGuardianMode = useCallback(async (enabled) => {
+    if (profileRef.current?.plan !== 'pro' && enabled) throw new Error('Guardian Mode è disponibile con Wallaa Pro.');
+    const next = { ...profileRef.current, liveProtectionEnabled: Boolean(enabled) };
+    setProfile(next); profileRef.current = next; await storage.setProfile(next);
+    await syncNetworkIdentity({ nextProfile: next });
+    if (enabled) {
+      await requestLocationPermission();
+      setToast({ type:'success', text:'Guardian Mode attivata. La tua posizione viene condivisa in tempo reale con i soggetti autorizzati.' });
+    } else {
+      setToast({ type:'success', text:'Guardian Mode terminata.' });
+    }
+    return next;
+  }, [syncNetworkIdentity]);
+
+  const dismissResolvedAlert = useCallback(() => setResolvedAlert(null), []);
+
+  const completeOnboarding = useCallback(async ({ password, confirmPassword: _confirmPassword, ...next }) => {
+    if (!next.firstName?.trim() || !next.lastName?.trim() || !next.email?.trim() || !next.phone?.trim()) throw new Error(tx('v405.auth.completeFields'));
+    if (!next.privacyAccepted || !next.termsAccepted || !next.safetyNoticeAccepted) throw new Error(tx('v405.auth.acceptLegal'));
+    if (!password || password.length < 8) throw new Error(tx('v405.auth.passwordLength'));
+    const baseIdentity = networkIdentityRef.current || newNetworkIdentity();
+    const draftProfile = { ...profileRef.current, ...next, privacyPolicyVersion: CONFIG.privacyPolicyVersion, termsVersion: CONFIG.termsVersion, safetyNoticeVersion: CONFIG.safetyNoticeVersion, name: `${next.firstName} ${next.lastName}`.trim(), plan: 'basic', sosLocationEnabled: true, liveProtectionEnabled: false, onboardingComplete: true };
+    const registered = await registerWallaaAccount({ installationId: baseIdentity.installationId, profile: draftProfile, password, platform: Capacitor.getPlatform() });
+    if (registered?.pendingVerification) return registered;
+    const identity = { ...baseIdentity, userId: registered.userId, authToken: registered.authToken, qrToken: registered.qrToken || '', qrPayload: registered.qrPayload || '' };
+    const normalized = { ...draftProfile, ...(registered.profile || {}), safetyWord: draftProfile.safetyWord || '', name: profileName(registered.profile || draftProfile), onboardingComplete: true };
+    setProfile(normalized); profileRef.current = normalized; await storage.setProfile(normalized);
+    setNetworkIdentity(identity); networkIdentityRef.current = identity; await storage.setNetworkIdentity(identity);
+    if (identity.qrPayload) setQrDataUrl(await createQrDataUrl(identity.qrPayload));
+    await initializeAccountServices(identity, normalized);
+    return normalized;
+  }, [initializeAccountServices, tx]);
+
+  const loginAccount = useCallback(async ({ identifier, password }) => {
+    if (!identifier?.trim() || !password) throw new Error(tx('v415.auth.identifierPassword'));
+    const baseIdentity = networkIdentityRef.current || newNetworkIdentity();
+    const logged = await loginWallaaAccount({ installationId: baseIdentity.installationId, identifier: identifier.trim(), password, platform: Capacitor.getPlatform() });
+    const identity = { ...baseIdentity, userId: logged.userId, authToken: logged.authToken, qrToken: logged.qrToken || '', qrPayload: logged.qrPayload || '' };
+    const normalized = { customerId:'', name:'', firstName:'', lastName:'', email:'', phone:'', countryCode:'+39', safetyWord:'', language:defaultLanguage, plan:'basic', sosLocationEnabled:true, ...(logged.profile || {}), onboardingComplete:true };
+    normalized.name = profileName(normalized);
+    await stopBleScan().catch(() => {});
+    setContacts([]); contactsRef.current=[]; await storage.setContacts([]);
+    setDevice(null); deviceRef.current=null; await storage.setDevice(null);
+    setActivities([]); await storage.setActivities([]);
+    setActiveAlert(null); activeAlertRef.current=null; setResolvedAlert(null); await storage.setActiveAlert(null);
+    setTelemetry({ battery:null,rssi:null,seenAt:null });
+    setProfile(normalized); profileRef.current=normalized; await storage.setProfile(normalized);
+    setNetworkIdentity(identity); networkIdentityRef.current=identity; await storage.setNetworkIdentity(identity);
+    if (identity.qrPayload) setQrDataUrl(await createQrDataUrl(identity.qrPayload));
+    await initializeAccountServices(identity, normalized);
+    return normalized;
+  }, [defaultLanguage, initializeAccountServices, tx]);
+
+  const signOut = useCallback(async () => {
+    const currentIdentity = networkIdentityRef.current;
+    try { await logoutWallaaAccount(currentIdentity); } catch { /* local sign-out still proceeds */ }
+    await resetLocalSession();
+  }, [resetLocalSession]);
+
+  const addOrUpdateContact = useCallback(async (input) => {
+    const contact = normalizeContact(input);
+    if (!contact.name || !contact.email) throw new Error(tx('error.contactRequired'));
+    const isNew = !input.id;
+    const limit = profileRef.current?.plan === 'pro' ? 5 : 2;
+    if (isNew && contactsRef.current.length >= limit) {
+      const error = new Error(tx(profileRef.current?.plan === 'pro' ? 'v412.contacts.proLimit' : 'v412.contacts.basicLimit', { count: limit }));
+      error.code = 'CONTACT_LIMIT';
+      throw error;
+    }
+    const next = input.id ? contactsRef.current.map((c) => c.id === input.id ? contact : c) : [...contactsRef.current, contact];
+    if (contact.role === 'primary') next.forEach((c) => { if (c.id !== contact.id) c.role = 'guardian'; });
+    setContacts(next); contactsRef.current = next; await storage.setContacts(next);
+    if (networkIdentityRef.current?.authToken) {
+      try { await syncWallaaContacts(networkIdentityRef.current, next); } catch (error) { setToast({ type:'warning', text: tx('v416.contacts.cloudPending') }); }
+    }
+  }, [tx]);
+
+  const removeContact = useCallback(async (id) => {
+    const next = contactsRef.current.filter((c) => c.id !== id);
+    setContacts(next); contactsRef.current = next; await storage.setContacts(next);
+    if (networkIdentityRef.current?.authToken) { try { await syncWallaaContacts(networkIdentityRef.current, next); } catch { /* local copy retained */ } }
+  }, []);
+
+  const pairDevice = useCallback(async () => {
+    setPairingState('scanning');
+    try {
+      const paired = await pairWallaaButton({ onProgress: (state) => setPairingState(state === 'found' ? 'press-detected' : state) });
+      if (!paired.portableIdentity || !paired.hardwareId) {
+        const identityError = new Error('Questo Wallaa Button non espone ancora un codice hardware permanente. Contatta l’assistenza Wallaa prima di associarlo.');
+        identityError.code = 'DEVICE_IDENTITY_NOT_STABLE';
+        throw identityError;
+      }
+      const claim = await claimWallaaDevice(networkIdentityRef.current, paired);
+      const wallaaDevice = {
+        ...paired,
+        hardwareId: claim.hardwareId || paired.hardwareId,
+        claimToken: claim.claimToken,
+        permanentOwnership: true,
+        name: 'Wallaa Button',
+        monitorMode: 'event-only'
+      };
+      setDevice(wallaaDevice); deviceRef.current = wallaaDevice; await storage.setDevice(wallaaDevice);
+      await pushActivity({ type: 'device', status: 'success', titleKey: 'activity.devicePaired' });
+      setPairingState('done'); setToast({ type: 'success', text: claim.message || 'Wallaa Button registrato. Questo dispositivo appartiene ora al tuo account.' });
+      if (connectionGuardRef.current.enabled) ensureLocalNotificationPermission().catch(() => {});
+      return wallaaDevice;
+    } catch (error) {
+      setPairingState('idle'); setToast({ type: 'error', text: error.message || 'Pairing non riuscito.' }); throw error;
+    }
+  }, [pushActivity, tx]);
+
+  const disconnectDevice = useCallback(async () => {
+    await stopBleScan(); setDevice(null); deviceRef.current = null; disconnectNotifiedRef.current = false; lastHeartbeatStatusRef.current = '';
+    setTelemetry({ battery: null, rssi: null, seenAt: null }); await storage.setDevice(null);
+    await pushActivity({ type: 'device', status: 'success', titleKey: 'activity.deviceDisconnected' });
+  }, [pushActivity]);
+
+  const setConnectionGuard = useCallback(async (next) => {
+    if (next.enabled && !connectionGuardRef.current.enabled) await ensureLocalNotificationPermission();
+    setConnectionGuardState(next); connectionGuardRef.current = next; await storage.setConnectionGuard(next);
+  }, []);
+
+  const setAppearance = useCallback(async (mode) => {
+    const next = { mode };
+    setAppearanceState(next); await storage.setAppearance(next);
+  }, []);
+
+  const scanNetworkQr = useCallback(async () => {
+    const identity = networkIdentityRef.current;
+    if (!identity?.authToken) throw new Error(tx('error.networkNotReady'));
+    const code = await scanQrWithCamera();
+    const result = await scanWallaaCode(identity, code);
+    setToast({ type: 'success', text: tx('toast.qrConnectedBilateral', { name: result.protectedUser.displayName }) });
+    await refreshNetwork(identity);
+    return result;
+  }, [refreshNetwork, tx]);
+
+
+  // Keep both sides of Wallaa Network in sync. A QR connection is mutual from v4.0.46,
+  // so the person whose QR was scanned should see the new relationship without having
+  // to close/reopen the app or press Refresh.
+  useEffect(() => {
+    if (!loaded || !appVisible || !networkIdentity?.authToken) return undefined;
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      await refreshNetwork(networkIdentityRef.current);
+    };
+    const timer = setInterval(tick, 8000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [loaded, appVisible, networkIdentity?.authToken, refreshNetwork]);
+
+  const rotateQr = useCallback(async () => {
+    const identity = networkIdentityRef.current;
+    const result = await rotateWallaaQr(identity);
+    const next = { ...identity, qrToken: result.qrToken, qrPayload: result.qrPayload };
+    setNetworkIdentity(next); networkIdentityRef.current = next; await storage.setNetworkIdentity(next);
+    setQrDataUrl(await createQrDataUrl(result.qrPayload));
+    setToast({ type: 'success', text: tx('toast.newQr') });
+  }, [tx]);
+
+  const removeNetworkLink = useCallback(async (linkId) => {
+    await removeWallaaLink(networkIdentityRef.current, linkId);
+    await refreshNetwork(networkIdentityRef.current);
+  }, [refreshNetwork]);
+
+  const clearActivities = useCallback(async () => {
+    setActivities([]);
+    await storage.setActivities([]);
+  }, []);
+
+  const clearData = useCallback(async () => {
+    await stopBleScan().catch(() => {});
+    setContacts([]); contactsRef.current=[]; await storage.setContacts([]);
+    setDevice(null); deviceRef.current=null; await storage.setDevice(null);
+    setActivities([]); await storage.setActivities([]);
+    setTelemetry({ battery:null,rssi:null,seenAt:null });
+    setLastAlert(null); setActiveAlert(null); activeAlertRef.current=null; await storage.setActiveAlert(null);
+    setConnectionGuardState({enabled:true,delaySeconds:60}); await storage.setConnectionGuard({enabled:true,delaySeconds:60});
+    disconnectNotifiedRef.current=false; lastHeartbeatStatusRef.current='';
+    setToast({ type:'success', text:tx('toast.resetDone') });
+  }, [tx]);
+
+  const deleteAccount = useCallback(async () => {
+    try { await deleteWallaaAccount(networkIdentityRef.current); } catch (error) { if (networkIdentityRef.current?.authToken) throw error; }
+    await resetLocalSession();
+  }, [resetLocalSession]);
+
+  return {
+    loaded, profile, contacts, device, armed, trigger, activities, telemetry, pairingState, busy, dispatchingAlert, dispatchStage, ready, toast, lastAlert,
+    networkIdentity, networkState, qrDataUrl, incomingAlert, sentinelOffer, connectionGuard, appearance, connectionStatus, lastSignalAgeSeconds,
+    signalQuality, safetyLevel, activeAlert, resolvedAlert, systemHealth, currentLocation, locationStatus, authenticated: Boolean(networkIdentity?.authToken && profile?.onboardingComplete),
+    setToast, setArmed, setTrigger, saveProfile, setGuardianMode, dismissResolvedAlert, completeOnboarding, loginAccount, signOut, addOrUpdateContact, removeContact, pairDevice, disconnectDevice,
+    fireAlert, closeActiveAlert, clearActivities, clearData, deleteAccount, refreshNetwork, scanNetworkQr, rotateQr, removeNetworkLink,
+    setIncomingAlert, clearSentinelOffer: () => setSentinelOffer(null), setConnectionGuard, setAppearance, refreshSystemHealth, sendTestEmail, testAlarmSound, refreshCurrentLocation
+  };
+}

@@ -1,0 +1,31 @@
+const alertUrl = import.meta.env.VITE_ALERT_API_URL || 'http://localhost:8787/api/alert';
+
+export const CONFIG = {
+  apiUrl: alertUrl,
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || alertUrl.replace(/\/api\/alert\/?$/, ''),
+  demoMode: String(import.meta.env.VITE_DEMO_MODE || 'false').toLowerCase() === 'true',
+  privacyPolicyUrl: import.meta.env.VITE_PRIVACY_POLICY_URL || 'https://wallaasafety.com/privacy-policy',
+  termsUrl: import.meta.env.VITE_TERMS_URL || 'https://wallaasafety.com/terms-and-conditions',
+  privacyChoicesUrl: import.meta.env.VITE_PRIVACY_CHOICES_URL || 'https://wallaasafety.com/privacy-choices',
+  privacyContactEmail: import.meta.env.VITE_PRIVACY_CONTACT_EMAIL || 'safety@wallaasafety.com',
+  privacyPolicyVersion: import.meta.env.VITE_PRIVACY_POLICY_VERSION || '2026-09-07',
+  termsVersion: import.meta.env.VITE_TERMS_VERSION || '2026-09-07',
+  safetyNoticeVersion: import.meta.env.VITE_SAFETY_NOTICE_VERSION || '2026-09-07'
+};
+
+export const TRIGGERS = [
+  { value: 'press', label: '1 click', short: 'Singolo' },
+  { value: 'double_press', label: '2 click', short: 'Doppio' },
+  { value: 'triple_press', label: '3 click', short: 'Triplo' },
+  { value: 'long_press', label: 'Pressione continua', short: 'Continua' },
+  { value: 'any_press', label: 'Click casuali', short: 'Qualsiasi' }
+];
+
+export function triggerMatches(configured, event) {
+  if (!event) return false;
+  if (configured === 'any_press') return ['press','double_press','triple_press','long_press','long_double_press','long_triple_press','hold_press'].includes(event);
+  return configured === event;
+}
+
+export const BTHOME_UUID = '0000fcd2-0000-1000-8000-00805f9b34fb';
+export const QR_PREFIX = 'WALLAA:PAIR:';

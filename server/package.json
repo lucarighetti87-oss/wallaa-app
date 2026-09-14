@@ -1,0 +1,23 @@
+{
+  "name": "wallaa-safe-alert-server",
+  "version": "4.0.28",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.1",
+    "helmet": "^8.1.0",
+    "nodemailer": "^7.0.6",
+    "pg": "^8.16.3",
+    "jose": "^6.1.0",
+    "stripe": "^18.5.0"
+  },
+  "engines": {
+    "node": ">=22 <23"
+  }
+}

@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: wallaa-safe-button-api
+    runtime: node
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.18.0
+      - key: EMAIL_ENABLED
+        value: "true"
+      - key: SMTP_HOST
+        value: authsmtp.securemail.pro
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_SECURE
+        value: "true"
+      - key: SMTP_USER
+        value: info@wallaa.it
+      - key: SMTP_FROM
+        value: Wallaa <info@wallaa.it>
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      - key: MAX_CONTACTS
+        value: "5"
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: APP_API_KEY
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: PGSSL
+        value: "false"
+      - key: APNS_TEAM_ID
+        sync: false
+      - key: APNS_KEY_ID
+        sync: false
+      - key: APNS_BUNDLE_ID
+        value: it.wallaa.safebutton
+      - key: APNS_PRIVATE_KEY
+        sync: false

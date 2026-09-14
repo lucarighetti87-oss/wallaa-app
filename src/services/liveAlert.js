@@ -1,0 +1,60 @@
+import { CONFIG } from '../config';
+
+function headers(identity) {
+  return {
+    'Content-Type': 'application/json',
+    ...(identity?.installationId ? { 'x-wallaa-installation-id': identity.installationId } : {}),
+    ...(identity?.authToken ? { 'x-wallaa-install-token': identity.authToken } : {})
+  };
+}
+
+async function request(path, { method = 'POST', identity, body } = {}) {
+  const response = await fetch(`${CONFIG.apiBaseUrl}${path}`, {
+    method,
+    headers: headers(identity),
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {})
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `Wallaa API ${response.status}`);
+  return payload;
+}
+
+export function getSentinelWorkerState(identity) {
+  return request('/api/sentinel/me', { method: 'GET', identity });
+}
+
+export function sendSentinelPresence(identity, location) {
+  return request('/api/sentinel/presence', { identity, body: { location } });
+}
+
+export function sendUniversalSentinelHeartbeat(identity, location = null) {
+  return request('/api/sentinel/heartbeat', { identity, body: location ? { location } : {} });
+}
+
+export function updateLiveLocation(identity, alertId, location) {
+  return request(`/api/alerts/${encodeURIComponent(alertId)}/location`, { identity, body: { location } });
+}
+
+export function sendAuthorizedLocationSnapshot(identity, location, battery = null) {
+  return request('/api/account/location-snapshot', { identity, body: { location, battery } });
+}
+
+export function sendLiveProtectionLocation(identity, location, battery = null) {
+  return request('/api/account/live-location', { identity, body: { location, battery } });
+}
+
+export function closeLiveAlert(identity, alertId) {
+  return request(`/api/alerts/${encodeURIComponent(alertId)}/close`, { identity, body: {} });
+}
+
+export function sendDeviceHeartbeat(identity, payload) {
+  return request('/api/device/heartbeat', { identity, body: payload });
+}
+
+export function sendDisconnectEvent(identity, payload) {
+  return request('/api/device/disconnect', { identity, body: { ...payload, status: 'disconnected', notifyGuardians: true } });
+}
+
+export function deleteWallaaAccount(identity) {
+  return request('/api/account', { method: 'DELETE', identity });
+}

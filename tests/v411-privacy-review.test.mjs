@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const onboarding=readFileSync(new URL('../src/screens/OnboardingScreen.jsx',import.meta.url),'utf8');
+const privacy=readFileSync(new URL('../src/screens/PrivacyCenterScreen.jsx',import.meta.url),'utf8');
+const manifest=readFileSync(new URL('../ios/App/App/PrivacyInfo.xcprivacy',import.meta.url),'utf8');
+const server=readFileSync(new URL('../server/server.js',import.meta.url),'utf8');
+const push=readFileSync(new URL('../src/services/push.js',import.meta.url),'utf8');
+test('registration transparently acknowledges privacy, terms and SOS data sharing',()=>{assert.match(onboarding,/safetyNoticeAccepted/);assert.match(onboarding,/privacyAccepted/);assert.match(onboarding,/termsAccepted/);});
+test('in-app Privacy Center exposes legal documents and account deletion',()=>{assert.match(privacy,/privacyPolicyUrl/);assert.match(privacy,/termsUrl/);assert.match(privacy,/privacyChoicesUrl/);assert.match(privacy,/onDeleteAccount/);});
+test('iOS privacy manifest declares no tracking and UserDefaults required reason',()=>{assert.match(manifest,/NSPrivacyTracking/);assert.match(manifest,/<false\/>/);assert.match(manifest,/NSPrivacyAccessedAPICategoryUserDefaults/);assert.match(manifest,/CA92\.1/);});
+test('backend records legal versions and enforces retention limits',()=>{assert.match(server,/privacy_policy_version/);assert.match(server,/safety_notice_accepted_at/);assert.match(server,/LOCATION_HISTORY_RETENTION_DAYS/);assert.match(server,/runPrivacyRetentionCleanup/);});
+test('guardian notification lifecycle can clear delivered iOS notifications',()=>{assert.match(push,/removeAllDeliveredNotifications/);assert.match(push,/wallaa_safe/);});

@@ -1,0 +1,45 @@
+import { useEffect } from 'react';
+import { BellRing, ExternalLink, MapPin, Phone, ShieldAlert, Volume2, X } from 'lucide-react';
+import { formatDateTime } from '../utils/format';
+import { clearDeliveredWallaaNotifications, stopWallaaAlarm } from '../services/push';
+
+export default function IncomingAlert({ alert, onClose, t, language }) {
+  useEffect(() => {
+    if (!alert) stopWallaaAlarm();
+    return () => stopWallaaAlarm();
+  }, [alert?.id]);
+  if (!alert) return null;
+  const lat = Number(alert.location?.latitude);
+  const lng = Number(alert.location?.longitude);
+  const valid = Number.isFinite(lat) && Number.isFinite(lng);
+  const mapsUrl = alert.location?.mapsUrl || (valid ? `https://www.google.com/maps?q=${lat},${lng}` : '#');
+  const liveUrl = String(alert.liveUrl || '').trim();
+  const owner = alert.ownerName || 'Wallaa';
+  const phone = String(alert.ownerPhone || '').trim();
+  const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : '';
+  const acknowledge = async () => { stopWallaaAlarm(); await clearDeliveredWallaaNotifications(); onClose?.(); };
+
+  return (
+    <div className="incoming-alert-backdrop" role="alertdialog" aria-modal="true" aria-label={t('incoming.kicker')}>
+      <section className="incoming-alert-card">
+        <button className="incoming-close" onClick={acknowledge} aria-label={t('common.close')}><X size={19} /></button>
+        <div className="incoming-siren" aria-hidden="true"><i /><i /><i /></div>
+        <div className="incoming-alert-icon"><ShieldAlert size={38} /></div>
+        <span className="incoming-kicker"><BellRing size={14} /> {t('incoming.kicker')}</span>
+        <h2>{t('incoming.needsYou', { name: owner })}</h2>
+        <div className="incoming-audible-status"><Volume2 size={15}/><span>{t('incoming.audible')}</span></div>
+        <p>{t('incoming.body')}</p>
+        <div className="incoming-location-card">
+          <div className="incoming-map-art"><span className="incoming-map-grid" /><span className="incoming-map-pin"><MapPin size={25} /></span><span className="incoming-map-pulse" /></div>
+          <div><small>{t('incoming.sosLocation')}</small><strong>{valid ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : (liveUrl ? 'Posizione live in acquisizione…' : t('incoming.positionAvailable'))}</strong><span>{formatDateTime(alert.at, language)}</span></div>
+        </div>
+        <div className="incoming-action-grid">
+          {phoneHref && <a className="incoming-call-cta" href={phoneHref}><Phone size={18}/>{t('incoming.call')}</a>}
+          {liveUrl ? <a className="incoming-map-cta" href={liveUrl} target="_blank" rel="noreferrer"><MapPin size={18} /> Posizione live <ExternalLink size={15} /></a> : (valid && <a className="incoming-map-cta" href={mapsUrl} target="_blank" rel="noreferrer"><MapPin size={18} /> {t('common.openPosition')} <ExternalLink size={15} /></a>)}
+        </div>
+        <button className="incoming-dismiss" onClick={acknowledge}>{t('incoming.seen')}</button>
+        <small className="incoming-disclaimer">{t('incoming.disclaimer')}</small>
+      </section>
+    </div>
+  );
+}
