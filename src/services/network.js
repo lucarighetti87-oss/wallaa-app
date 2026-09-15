@@ -43,6 +43,7 @@ export async function registerWallaaAccount({ installationId, profile, password,
         email: profile?.email || '',
         phone: profile?.phone || '',
         countryCode: profile?.countryCode || '+39',
+        dateOfBirth: profile?.dateOfBirth || '',
         privacyAccepted: Boolean(profile?.privacyAccepted),
         termsAccepted: Boolean(profile?.termsAccepted),
         safetyNoticeAccepted: Boolean(profile?.safetyNoticeAccepted),
@@ -76,6 +77,31 @@ export async function logoutWallaaAccount(identity) {
 
 export async function getWallaaAccount(identity) {
   return api('/api/account/profile', { identity });
+}
+
+export async function getWallaaLegalStatus(identity) {
+  return api('/api/account/privacy-status', { identity });
+}
+
+export async function acceptWallaaLegalDocuments(identity, {
+  privacyAccepted = false,
+  termsAccepted = false,
+  safetyNoticeAccepted = false,
+  language = 'en'
+} = {}) {
+  return api('/api/account/legal-acceptance', {
+    method: 'POST',
+    identity,
+    body: {
+      privacyAccepted: Boolean(privacyAccepted),
+      termsAccepted: Boolean(termsAccepted),
+      safetyNoticeAccepted: Boolean(safetyNoticeAccepted),
+      privacyPolicyVersion: CONFIG.privacyPolicyVersion,
+      termsVersion: CONFIG.termsVersion,
+      safetyNoticeVersion: CONFIG.safetyNoticeVersion,
+      language
+    }
+  });
 }
 
 export async function claimWallaaDevice(identity, device) {
@@ -114,8 +140,13 @@ export async function registerWallaaIdentity({ identity, displayName, pushToken 
       platform,
       ...(profile ? { profile: {
         firstName: profile.firstName || '', lastName: profile.lastName || '', email: profile.email || '',
-        phone: profile.phone || '', countryCode: profile.countryCode || '+39', language: profile.language || 'en',
-        privacyAccepted: Boolean(profile.privacyAccepted), termsAccepted: Boolean(profile.termsAccepted), liveProtectionEnabled: Boolean(profile.liveProtectionEnabled)
+        phone: profile.phone || '',
+        countryCode: profile.countryCode || '+39',
+        dateOfBirth: profile.dateOfBirth || '',
+        language: profile.language || 'en',
+        privacyAccepted: Boolean(profile.privacyAccepted),
+        termsAccepted: Boolean(profile.termsAccepted),
+        liveProtectionEnabled: Boolean(profile.liveProtectionEnabled)
       } } : {})
     }
   });
@@ -186,4 +217,52 @@ export async function scanQrWithCamera() {
   if (!code) throw new Error('Nessun QR rilevato.');
   if (!code.startsWith(QR_PREFIX)) throw new Error('Questo non è un QR Wallaa Safe Button valido.');
   return code;
+}
+
+export async function getWallaaMessageUsers(identity, query) {
+  return api(`/api/messages/users?q=${encodeURIComponent(query || '')}`, {
+    identity
+  });
+}
+
+export async function getWallaaConversations(identity) {
+  return api('/api/messages/conversations', {
+    identity
+  });
+}
+
+export async function createWallaaConversation(identity, userId) {
+  return api('/api/messages/conversations', {
+    method: 'POST',
+    identity,
+    body: { userId }
+  });
+}
+
+export async function getWallaaConversationMessages(identity, conversationId) {
+  return api(
+    `/api/messages/conversations/${encodeURIComponent(conversationId)}`,
+    { identity }
+  );
+}
+
+export async function sendWallaaMessage(identity, conversationId, body) {
+  return api(
+    `/api/messages/conversations/${encodeURIComponent(conversationId)}/messages`,
+    {
+      method: 'POST',
+      identity,
+      body: { body }
+    }
+  );
+}
+
+export async function deleteWallaaConversation(identity, conversationId) {
+  return api(
+    `/api/messages/conversations/${encodeURIComponent(conversationId)}`,
+    {
+      method: 'DELETE',
+      identity
+    }
+  );
 }

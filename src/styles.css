@@ -5471,3 +5471,1682 @@ html,body,#root{scroll-behavior:auto!important}
   .sentinel-status-card h2{font-size:22px}
   .sentinel-section-title h2{font-size:22px}
 }
+
+/* WALLAA Sentinel — real intervention map */
+.sentinel-live-map{
+  position:relative;
+  height:390px;
+  margin-top:16px;
+  overflow:hidden;
+  border:1px solid rgba(43,208,255,.58);
+  border-radius:26px;
+  background:#02121f;
+  box-shadow:
+    0 24px 70px rgba(0,0,0,.42),
+    0 0 38px rgba(0,181,255,.09),
+    inset 0 1px 0 rgba(255,255,255,.07);
+  isolation:isolate;
+}
+
+.sentinel-live-map-empty{
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:9px;
+  color:#53dcff;
+}
+
+.sentinel-live-map-tiles{
+  position:absolute;
+  width:768px;
+  height:768px;
+}
+
+.sentinel-live-map-tiles img{
+  position:absolute;
+  width:256px;
+  height:256px;
+  user-select:none;
+  -webkit-user-drag:none;
+  filter:
+    brightness(.43)
+    saturate(.60)
+    contrast(1.48)
+    hue-rotate(158deg);
+}
+
+.sentinel-live-map-grade{
+  position:absolute;
+  inset:0;
+  z-index:2;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at center,transparent 0 35%,rgba(0,6,13,.30) 76%),
+    linear-gradient(180deg,rgba(0,62,100,.10),rgba(0,7,15,.30));
+  box-shadow:inset 0 0 70px rgba(0,0,0,.38);
+}
+
+.sentinel-live-route{
+  position:absolute;
+  z-index:4;
+  height:4px;
+  border-radius:999px;
+  transform-origin:0 50%;
+  background:#24d8ff;
+  box-shadow:
+    0 0 8px #20d5ff,
+    0 0 18px rgba(0,110,255,.85);
+}
+
+.sentinel-live-self,
+.sentinel-live-target{
+  position:absolute;
+  z-index:6;
+  transform:translate(-50%,-50%);
+}
+
+.sentinel-live-self{
+  width:50px;
+  height:50px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:#078fff;
+  border:4px solid rgba(232,250,255,.96);
+  box-shadow:
+    0 0 0 10px rgba(31,207,255,.14),
+    0 0 30px rgba(26,201,255,.75);
+}
+
+.sentinel-live-self span{
+  color:#fff;
+  font-size:10px;
+  font-weight:950;
+  letter-spacing:.04em;
+}
+
+.sentinel-live-target{
+  width:54px;
+  height:54px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  color:#fff;
+  background:#f12648;
+  border:3px solid rgba(255,242,245,.95);
+  box-shadow:
+    0 0 0 10px rgba(241,38,72,.16),
+    0 0 34px rgba(241,38,72,.85);
+}
+
+.sentinel-live-target i{
+  position:absolute;
+  inset:-14px;
+  border:1px solid rgba(255,65,94,.45);
+  border-radius:50%;
+}
+
+.sentinel-live-map-copy{
+  position:absolute;
+  left:14px;
+  right:14px;
+  bottom:16px;
+  z-index:8;
+  padding:14px 16px;
+  border:1px solid rgba(47,211,255,.42);
+  border-radius:18px;
+  background:rgba(1,15,26,.90);
+  backdrop-filter:blur(15px);
+  -webkit-backdrop-filter:blur(15px);
+  box-shadow:0 12px 35px rgba(0,0,0,.34);
+}
+
+.sentinel-live-map-copy small,
+.sentinel-live-map-copy strong,
+.sentinel-live-map-copy span{
+  display:block;
+}
+
+.sentinel-live-map-copy small{
+  color:#42d8ff;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.15em;
+}
+
+.sentinel-live-map-copy strong{
+  margin-top:5px;
+  color:#fff;
+  font-size:25px;
+  line-height:1;
+}
+
+.sentinel-live-map-copy span{
+  margin-top:5px;
+  color:#91adbd;
+  font-size:12px;
+}
+
+.sentinel-live-map-attribution{
+  position:absolute;
+  right:7px;
+  top:7px;
+  z-index:8;
+  padding:3px 6px;
+  border-radius:6px;
+  background:rgba(0,10,18,.70);
+  color:#9eb5c3;
+  font-size:7px;
+}
+
+/* WALLAA Activity v39 — aligned with Notifications */
+
+.aa-activity-screen-v39{
+  min-height:calc(100dvh - 98px);
+  padding:24px 22px 38px;
+  color:#f6fbff;
+  background:
+    radial-gradient(circle at 84% 6%,rgba(0,134,255,.16),transparent 27%),
+    transparent;
+}
+
+.aa-activity-head-v39{
+  display:grid;
+  grid-template-columns:54px minmax(0,1fr) 54px;
+  gap:14px;
+  align-items:start;
+}
+
+.aa-activity-head-symbol,
+.aa-activity-count-v39{
+  width:50px;
+  height:50px;
+  border-radius:18px;
+  border:1px solid rgba(44,210,255,.42);
+  background:rgba(3,29,47,.92);
+  color:#44d9ff;
+  display:grid;
+  place-items:center;
+  position:relative;
+  box-shadow:
+    0 14px 35px rgba(0,0,0,.23),
+    inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+.aa-activity-head-symbol svg,
+.aa-activity-count-v39 svg{
+  width:23px;
+  height:23px;
+}
+
+.aa-activity-count-v39 b{
+  position:absolute;
+  right:-4px;
+  top:-5px;
+  min-width:20px;
+  height:20px;
+  padding:0 5px;
+  border-radius:10px;
+  background:#ff3755;
+  color:#fff;
+  font-size:10px;
+  display:grid;
+  place-items:center;
+  border:2px solid #00101d;
+}
+
+.aa-activity-metrics-v39{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin:22px 0 12px;
+}
+
+.aa-activity-metrics-v39>div{
+  min-width:0;
+  min-height:82px;
+  padding:13px 14px;
+  border-radius:21px;
+  border:1px solid rgba(42,195,245,.32);
+  background:
+    linear-gradient(
+      145deg,
+      rgba(5,34,54,.96),
+      rgba(2,18,30,.98)
+    );
+  display:flex;
+  align-items:center;
+  gap:11px;
+  box-shadow:
+    0 16px 40px rgba(0,0,0,.28),
+    inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+.aa-activity-metrics-v39 i{
+  width:42px;
+  height:42px;
+  flex:0 0 42px;
+  border-radius:14px;
+  display:grid;
+  place-items:center;
+  color:#3bd7ff;
+  background:#092a40;
+  font-style:normal;
+}
+
+.aa-activity-metrics-v39>div:nth-child(2) i{
+  color:#3ee5b0;
+}
+
+.aa-activity-metrics-v39 span{
+  min-width:0;
+}
+
+.aa-activity-metrics-v39 small,
+.aa-activity-metrics-v39 strong{
+  display:block;
+}
+
+.aa-activity-metrics-v39 small{
+  color:#86a3b6;
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.10em;
+}
+
+.aa-activity-metrics-v39 strong{
+  margin-top:5px;
+  color:#fff;
+  font-size:22px;
+  line-height:1;
+}
+
+.aa-activity-tools-v39{
+  margin-top:0!important;
+}
+
+.aa-activity-row-v39{
+  min-height:92px;
+}
+
+.aa-activity-row-v39.success>i{
+  color:#44deb0;
+  background:rgba(5,88,70,.42);
+}
+
+.aa-activity-row-v39.error>i{
+  color:#ff667c;
+  background:rgba(112,2,24,.60);
+}
+
+@media(max-width:430px){
+  .aa-activity-screen-v39{
+    padding-left:14px;
+    padding-right:14px;
+  }
+
+  .aa-activity-head-v39{
+    grid-template-columns:50px minmax(0,1fr) 50px;
+    gap:11px;
+  }
+
+  .aa-activity-head-symbol,
+  .aa-activity-count-v39{
+    width:46px;
+    height:46px;
+    border-radius:16px;
+  }
+
+  .aa-activity-screen-v39 .aa-notifications-titleblock>h1{
+    font-size:30px!important;
+  }
+
+  .aa-activity-screen-v39 .aa-notifications-titleblock>p{
+    font-size:11px!important;
+  }
+
+  .aa-activity-metrics-v39{
+    gap:9px;
+  }
+
+  .aa-activity-metrics-v39>div{
+    padding:11px;
+  }
+
+  .aa-activity-metrics-v39 i{
+    width:38px;
+    height:38px;
+    flex-basis:38px;
+  }
+}
+
+
+/* ============================================================
+   WALLAA SOS — SENTINEL LIVE ARRIVAL
+   ============================================================ */
+
+.aa-sentinel-arrival{
+  margin:0 0 18px;
+  border:1px solid rgba(39,213,255,.56);
+  border-radius:28px;
+  overflow:hidden;
+  background:
+    linear-gradient(145deg,rgba(4,34,55,.97),rgba(1,14,25,.98));
+  box-shadow:
+    0 24px 70px rgba(0,0,0,.48),
+    inset 0 1px 0 rgba(255,255,255,.08),
+    0 0 36px rgba(30,203,255,.08);
+}
+
+.aa-sentinel-arrival-head{
+  padding:17px;
+  display:grid;
+  grid-template-columns:52px 1fr;
+  gap:13px;
+  align-items:center;
+  border-bottom:1px solid rgba(41,194,244,.22);
+}
+
+.aa-sentinel-shield{
+  width:50px;
+  height:50px;
+  border-radius:18px;
+  display:grid;
+  place-items:center;
+  color:#002319;
+  background:linear-gradient(145deg,#39f2bd,#0bc895);
+  box-shadow:0 0 26px rgba(18,230,169,.30);
+}
+
+.aa-sentinel-shield svg{
+  width:28px;
+  height:28px;
+}
+
+.aa-sentinel-arrival-head>div:last-child{
+  min-width:0;
+}
+
+.aa-sentinel-arrival-head small{
+  display:block;
+  color:#42d9ff;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.24em;
+}
+
+.aa-sentinel-arrival-head h2{
+  margin:4px 0 5px!important;
+  font-size:23px!important;
+  color:#fff!important;
+  letter-spacing:-.035em!important;
+}
+
+.aa-sentinel-arrival-head p{
+  margin:0;
+  color:#aac2d1;
+  font-size:12px;
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
+}
+
+.aa-sentinel-verified{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  color:#19e3aa;
+  font-weight:850;
+}
+
+.aa-sentinel-verified svg{
+  width:14px;
+  height:14px;
+}
+
+.aa-sentinel-map{
+  position:relative;
+  height:310px;
+  overflow:hidden;
+  background:#06121b;
+  isolation:isolate;
+}
+
+.aa-sentinel-map:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  z-index:4;
+  background:
+    linear-gradient(rgba(2,17,28,.04),rgba(0,8,14,.24)),
+    radial-gradient(circle at 50% 48%,transparent 34%,rgba(0,5,10,.45));
+  box-shadow:inset 0 0 55px rgba(0,4,8,.66);
+}
+
+.aa-sentinel-map-tiles{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:768px;
+  height:768px;
+  transform:translate(-50%,-50%);
+}
+
+.aa-sentinel-map-tiles img{
+  position:absolute;
+  width:256px;
+  height:256px;
+  max-width:none;
+  user-select:none;
+  pointer-events:none;
+  filter:
+    grayscale(.28)
+    invert(.90)
+    hue-rotate(167deg)
+    saturate(1.75)
+    brightness(.43)
+    contrast(1.25);
+}
+
+.aa-sentinel-map-line{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  z-index:2;
+  pointer-events:none;
+}
+
+.aa-sentinel-map-line line{
+  stroke:#24d4ff;
+  stroke-width:5;
+  stroke-dasharray:12 8;
+  stroke-linecap:round;
+  filter:drop-shadow(0 0 6px #17cfff);
+}
+
+.aa-sentinel-marker{
+  position:absolute;
+  z-index:5;
+  transform:translate(-50%,-50%);
+  display:grid;
+  justify-items:center;
+  gap:5px;
+}
+
+.aa-sentinel-marker span{
+  padding:5px 8px;
+  border-radius:9px;
+  background:rgba(1,15,25,.94);
+  border:1px solid rgba(46,213,255,.75);
+  color:#fff;
+  font-size:8px;
+  font-weight:950;
+  letter-spacing:.12em;
+  box-shadow:0 5px 18px rgba(0,0,0,.42);
+}
+
+.aa-sentinel-marker-user i{
+  display:block;
+  width:24px;
+  height:24px;
+  border-radius:50%;
+  background:#18bfff;
+  border:6px solid #dffaff;
+  box-shadow:
+    0 0 0 9px rgba(20,199,255,.14),
+    0 0 24px #18c7ff;
+}
+
+.aa-sentinel-marker-responder b{
+  width:38px;
+  height:38px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:#11dfa7;
+  border:3px solid #e8fff8;
+  color:#00251a;
+  box-shadow:
+    0 0 0 9px rgba(17,223,167,.12),
+    0 0 26px rgba(17,223,167,.75);
+}
+
+.aa-sentinel-marker-responder svg{
+  width:20px;
+  height:20px;
+}
+
+.aa-sentinel-map-attribution{
+  position:absolute;
+  z-index:7;
+  right:6px;
+  bottom:5px;
+  padding:3px 5px;
+  border-radius:5px;
+  background:rgba(0,0,0,.58);
+  color:rgba(255,255,255,.72);
+  font-size:7px;
+}
+
+.aa-sentinel-map-empty{
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:8px;
+  text-align:center;
+  color:#42d9ff;
+}
+
+.aa-sentinel-map-empty svg{
+  width:34px;
+  height:34px;
+}
+
+.aa-sentinel-map-empty strong{
+  color:#eafbff;
+}
+
+.aa-sentinel-map-empty small{
+  color:#87a5b7;
+}
+
+.aa-sentinel-stats{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  border-top:1px solid rgba(43,192,240,.18);
+  border-bottom:1px solid rgba(43,192,240,.18);
+}
+
+.aa-sentinel-stats>div{
+  min-width:0;
+  padding:14px 7px;
+  text-align:center;
+  display:grid;
+  gap:5px;
+  border-right:1px solid rgba(43,192,240,.18);
+}
+
+.aa-sentinel-stats>div:last-child{
+  border-right:0;
+}
+
+.aa-sentinel-stats small{
+  color:#789bae;
+  font-size:8px;
+  font-weight:850;
+  letter-spacing:.09em;
+}
+
+.aa-sentinel-stats strong{
+  color:#f4fbff;
+  font-size:14px;
+}
+
+.aa-sentinel-live-status{
+  min-height:62px;
+  padding:10px 15px;
+  display:grid;
+  grid-template-columns:12px 1fr;
+  gap:11px;
+  align-items:center;
+}
+
+.aa-sentinel-live-status>i{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:#12e6a9;
+  box-shadow:0 0 16px #12e6a9;
+  animation:aaSentinelLivePulse 1.7s ease-in-out infinite;
+}
+
+.aa-sentinel-live-status span{
+  display:grid;
+  gap:3px;
+}
+
+.aa-sentinel-live-status strong{
+  font-size:12px;
+}
+
+.aa-sentinel-live-status small{
+  color:#88a6b8;
+  font-size:9px;
+}
+
+@keyframes aaSentinelLivePulse{
+  0%,100%{opacity:.55;transform:scale(.85)}
+  50%{opacity:1;transform:scale(1.2)}
+}
+
+@media(max-width:390px){
+  .aa-sentinel-map{
+    height:275px;
+  }
+
+  .aa-sentinel-arrival-head{
+    padding:14px;
+  }
+
+  .aa-sentinel-arrival-head h2{
+    font-size:20px!important;
+  }
+
+  .aa-sentinel-stats strong{
+    font-size:12px;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .aa-sentinel-live-status>i{
+    animation:none;
+  }
+}
+
+/* =========================================================
+   WALLAA MESSAGES — v4 native visual language
+   ========================================================= */
+
+.wallaa-messages-screen{
+  min-height:calc(100dvh - 70px);
+  padding-bottom:28px;
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb,var(--v4-green) 7%,transparent), transparent 28%),
+    var(--v4-bg);
+}
+
+.wallaa-messages-heading{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:15px;
+}
+
+.wallaa-message-lock{
+  width:42px;
+  height:42px;
+  flex:0 0 42px;
+  border-radius:14px;
+  display:grid;
+  place-items:center;
+  color:var(--v4-green);
+  background:var(--v4-green-soft);
+  border:1px solid color-mix(in srgb,var(--v4-green) 18%,var(--v4-line));
+  animation:wallaaMessageLockIn .45s var(--ease) both;
+}
+
+@keyframes wallaaMessageLockIn{
+  from{opacity:0;transform:scale(.8) rotate(-5deg)}
+  to{opacity:1;transform:none}
+}
+
+.wallaa-message-search{
+  height:46px;
+  margin:19px 0 12px;
+  border-radius:14px;
+  border:1px solid var(--v4-line);
+  background:var(--v4-surface);
+  color:var(--v4-muted);
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:0 13px;
+  font-size:11px;
+  box-shadow:var(--v4-shadow);
+}
+
+.wallaa-message-security{
+  display:flex;
+  gap:11px;
+  align-items:center;
+  padding:12px 13px;
+  border-radius:16px;
+  background:var(--v4-green-soft);
+  border:1px solid color-mix(in srgb,var(--v4-green) 16%,var(--v4-line));
+}
+
+.wallaa-message-security-icon{
+  width:37px;
+  height:37px;
+  flex:0 0 37px;
+  border-radius:12px;
+  display:grid;
+  place-items:center;
+  color:var(--v4-green);
+  background:color-mix(in srgb,var(--v4-green) 10%,var(--v4-surface));
+}
+
+.wallaa-message-security div:last-child{
+  min-width:0;
+  display:grid;
+  gap:2px;
+}
+
+.wallaa-message-security strong{
+  font-size:11px;
+  color:var(--v4-text);
+}
+
+.wallaa-message-security span{
+  color:var(--v4-muted);
+  font-size:8.5px;
+  line-height:1.4;
+}
+
+.wallaa-message-section-title{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  margin:22px 2px 9px;
+  color:var(--v4-muted);
+}
+
+.wallaa-message-section-title span{
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.13em;
+}
+
+.wallaa-message-section-title small{
+  min-width:19px;
+  height:19px;
+  padding:0 5px;
+  border-radius:999px;
+  display:grid;
+  place-items:center;
+  background:var(--v4-surface-2);
+  color:var(--v4-muted);
+  font-size:8px;
+  font-weight:900;
+}
+
+.wallaa-conversation-list{
+  display:grid;
+  gap:8px;
+}
+
+.wallaa-conversation{
+  width:100%;
+  min-height:79px;
+  border:1px solid var(--v4-line);
+  border-radius:17px;
+  background:var(--v4-surface);
+  color:var(--v4-text);
+  padding:11px;
+  display:grid;
+  grid-template-columns:48px minmax(0,1fr) 27px;
+  align-items:center;
+  gap:11px;
+  text-align:left;
+  box-shadow:var(--v4-shadow);
+  animation:wallaaConversationIn .42s var(--ease) both;
+  animation-delay:calc(var(--message-index) * 55ms);
+  transition:transform .2s var(--ease),border-color .2s var(--ease);
+}
+
+.wallaa-conversation:active{
+  transform:scale(.985);
+}
+
+@keyframes wallaaConversationIn{
+  from{opacity:0;transform:translateY(8px)}
+  to{opacity:1;transform:none}
+}
+
+.wallaa-conversation-avatar,
+.wallaa-chat-avatar{
+  position:relative;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:var(--v4-surface-3);
+  color:var(--v4-muted);
+}
+
+.wallaa-conversation-avatar{
+  width:48px;
+  height:48px;
+}
+
+.wallaa-conversation-avatar.guardian,
+.wallaa-chat-avatar.guardian{
+  color:var(--v4-blue);
+  background:color-mix(in srgb,var(--v4-blue) 12%,var(--v4-surface-2));
+}
+
+.wallaa-conversation-avatar.sentinel,
+.wallaa-chat-avatar.sentinel{
+  color:var(--v4-green);
+  background:var(--v4-green-soft);
+}
+
+.wallaa-conversation-avatar i{
+  position:absolute;
+  right:1px;
+  bottom:2px;
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:var(--v4-green);
+  border:2px solid var(--v4-surface);
+  box-shadow:0 0 9px color-mix(in srgb,var(--v4-green) 65%,transparent);
+}
+
+.wallaa-conversation-copy{
+  min-width:0;
+}
+
+.wallaa-conversation-copy>div{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+
+.wallaa-conversation-copy strong{
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  font-size:13px;
+}
+
+.wallaa-conversation-copy time{
+  flex:0 0 auto;
+  color:var(--v4-muted);
+  font-size:8px;
+}
+
+.wallaa-conversation-copy>small{
+  display:block;
+  width:fit-content;
+  margin-top:3px;
+  font-size:7px;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.07em;
+  color:var(--v4-muted);
+}
+
+.wallaa-conversation-copy>small.guardian{color:var(--v4-blue)}
+.wallaa-conversation-copy>small.sentinel{color:var(--v4-green)}
+
+.wallaa-conversation-copy p{
+  margin:5px 0 0;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  color:var(--v4-muted);
+  font-size:9.5px;
+}
+
+.wallaa-conversation-side{
+  display:grid;
+  justify-items:end;
+  gap:7px;
+  color:var(--v4-muted);
+}
+
+.wallaa-conversation-side b{
+  min-width:19px;
+  height:19px;
+  padding:0 5px;
+  border-radius:999px;
+  display:grid;
+  place-items:center;
+  background:var(--v4-green);
+  color:#03140a;
+  font-size:8px;
+  box-shadow:0 0 13px color-mix(in srgb,var(--v4-green) 28%,transparent);
+}
+
+.wallaa-message-demo-note{
+  margin:14px 7px 0!important;
+  text-align:center;
+  color:var(--v4-muted)!important;
+  font-size:8px!important;
+  line-height:1.5!important;
+}
+
+/* Chat */
+
+.wallaa-chat-screen{
+  height:100dvh;
+  min-height:0;
+  max-height:100dvh;
+  overflow:hidden;
+  display:grid;
+  grid-template-rows:auto auto 1fr auto;
+  background:
+    radial-gradient(circle at 100% 0,color-mix(in srgb,var(--v4-green) 5%,transparent),transparent 30%),
+    var(--v4-bg);
+  color:var(--v4-text);
+}
+
+.wallaa-chat-header{
+  min-height:62px;
+  padding:9px 13px;
+  display:grid;
+  grid-template-columns:38px 38px minmax(0,1fr);
+  align-items:center;
+  gap:9px;
+  border-bottom:1px solid var(--v4-line);
+  background:color-mix(in srgb,var(--v4-bg) 91%,transparent);
+  backdrop-filter:blur(22px);
+  -webkit-backdrop-filter:blur(22px);
+}
+
+.wallaa-chat-header>button{
+  width:36px;
+  height:36px;
+  border:0;
+  border-radius:50%;
+  background:var(--v4-surface-2);
+  color:var(--v4-text);
+  display:grid;
+  place-items:center;
+}
+
+.wallaa-chat-avatar{
+  width:38px;
+  height:38px;
+}
+
+.wallaa-chat-person{
+  min-width:0;
+  display:grid;
+  gap:3px;
+}
+
+.wallaa-chat-person strong{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:13px;
+}
+
+.wallaa-chat-person span{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  color:var(--v4-green);
+  font-size:8px;
+  font-weight:800;
+}
+
+.wallaa-chat-operational{
+  margin:10px 13px 0;
+  padding:10px 11px;
+  display:flex;
+  gap:9px;
+  align-items:flex-start;
+  border:1px solid color-mix(in srgb,var(--v4-green) 18%,var(--v4-line));
+  border-radius:13px;
+  background:var(--v4-green-soft);
+  color:var(--v4-green);
+}
+
+.wallaa-chat-operational div{
+  display:grid;
+  gap:2px;
+}
+
+.wallaa-chat-operational strong{
+  font-size:9px;
+}
+
+.wallaa-chat-operational span{
+  color:var(--v4-muted);
+  font-size:8px;
+  line-height:1.35;
+}
+
+.wallaa-chat-thread{
+  min-height:0;
+  height:100%;
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+  padding:15px 13px 20px;
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+  -webkit-overflow-scrolling:touch;
+}
+
+.wallaa-chat-day{
+  align-self:center;
+  margin:3px 0 7px;
+  padding:5px 8px;
+  border-radius:999px;
+  background:var(--v4-surface-2);
+  color:var(--v4-muted);
+  font-size:7px;
+  font-weight:900;
+  letter-spacing:.08em;
+}
+
+.wallaa-chat-message{
+  max-width:82%;
+  padding:9px 11px 6px;
+  border-radius:16px;
+  animation:wallaaBubbleIn .32s var(--ease) both;
+  animation-delay:calc(var(--bubble-index) * 55ms);
+}
+
+@keyframes wallaaBubbleIn{
+  from{opacity:0;transform:translateY(5px) scale(.97)}
+  to{opacity:1;transform:none}
+}
+
+.wallaa-chat-message.theirs{
+  align-self:flex-start;
+  border-bottom-left-radius:5px;
+  background:var(--v4-surface-2);
+  border:1px solid var(--v4-line);
+}
+
+.wallaa-chat-message.mine{
+  align-self:flex-end;
+  border-bottom-right-radius:5px;
+  background:linear-gradient(
+    145deg,
+    color-mix(in srgb,var(--v4-green) 24%,var(--v4-surface)),
+    color-mix(in srgb,var(--v4-green) 14%,var(--v4-surface))
+  );
+  border:1px solid color-mix(in srgb,var(--v4-green) 20%,var(--v4-line));
+}
+
+.wallaa-chat-message p{
+  margin:0;
+  font-size:12px;
+  line-height:1.4;
+  color:var(--v4-text);
+}
+
+.wallaa-chat-message>span{
+  margin-top:4px;
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  gap:3px;
+  color:var(--v4-muted);
+  font-size:7px;
+}
+
+.wallaa-chat-message.mine>span svg{
+  color:var(--v4-green);
+}
+
+.wallaa-chat-composer{
+  padding:9px 11px calc(8px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--v4-line);
+  background:color-mix(in srgb,var(--v4-bg-2) 96%,transparent);
+}
+
+.wallaa-chat-composer>div{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 40px;
+  gap:8px;
+  align-items:end;
+}
+
+.wallaa-chat-composer textarea{
+  width:100%;
+  min-height:42px;
+  max-height:110px;
+  resize:none;
+  border:1px solid var(--v4-line);
+  border-radius:15px;
+  outline:0;
+  padding:10px 12px;
+  background:var(--v4-surface);
+  color:var(--v4-text);
+  font:inherit;
+  font-size:16px;
+}
+
+.wallaa-chat-composer button{
+  width:40px;
+  height:40px;
+  border:0;
+  border-radius:13px;
+  display:grid;
+  place-items:center;
+  background:var(--v4-green);
+  color:#03140a;
+  box-shadow:0 8px 20px color-mix(in srgb,var(--v4-green) 23%,transparent);
+  transition:transform .18s var(--ease);
+}
+
+.wallaa-chat-composer button:active{
+  transform:scale(.92);
+}
+
+.wallaa-chat-composer>small{
+  margin-top:5px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  color:var(--v4-muted);
+  font-size:7px;
+}
+
+.screen-chat .v4-topbar,
+.screen-chat .v4-bottom-nav{
+  display:none;
+}
+
+.screen-chat .app-main-v4{
+  padding-bottom:0;
+}
+
+@media(max-width:390px){
+  .wallaa-conversation{
+    grid-template-columns:44px minmax(0,1fr) 24px;
+    padding:10px;
+  }
+
+  .wallaa-conversation-avatar{
+    width:44px;
+    height:44px;
+  }
+
+  .wallaa-messages-screen{
+    padding-left:12px;
+    padding-right:12px;
+  }
+}
+
+
+/* =========================================================
+   WALLAA CONNECT — real-data-ready UI / iPhone safe area
+   ========================================================= */
+
+.screen-messages .app-main-v4{
+  padding-top:env(safe-area-inset-top)!important;
+}
+
+.wallaa-messages-screen{
+  width:100%;
+  max-width:720px;
+  margin:0 auto;
+  box-sizing:border-box;
+  padding-left:max(18px,env(safe-area-inset-left))!important;
+  padding-right:max(18px,env(safe-area-inset-right))!important;
+}
+
+.wallaa-messages-heading{
+  align-items:center!important;
+}
+
+.wallaa-new-chat-button{
+  flex:0 0 auto;
+  width:46px;
+  height:46px;
+  border-radius:15px;
+  border:1px solid rgba(35,221,145,.38);
+  background:rgba(10,72,53,.68);
+  color:#20e98e;
+  display:grid;
+  place-items:center;
+}
+
+.wallaa-message-search{
+  width:100%;
+  text-align:left;
+  cursor:pointer;
+}
+
+.wallaa-messages-empty{
+  min-height:260px;
+  padding:44px 24px;
+  border:1px dashed rgba(116,162,190,.22);
+  border-radius:24px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  color:#8297a5;
+  background:rgba(5,20,31,.34);
+}
+
+.wallaa-messages-empty>div{
+  width:58px;
+  height:58px;
+  border-radius:19px;
+  display:grid;
+  place-items:center;
+  color:#27e995;
+  background:rgba(20,226,143,.08);
+  border:1px solid rgba(39,233,149,.17);
+  margin-bottom:15px;
+}
+
+.wallaa-messages-empty strong{
+  color:#eef8ff;
+  font-size:17px;
+}
+
+.wallaa-messages-empty p{
+  max-width:290px;
+  margin:7px 0 18px;
+  font-size:12px;
+  line-height:1.5;
+}
+
+.wallaa-messages-empty button{
+  min-height:44px;
+  padding:0 17px;
+  border:0;
+  border-radius:14px;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  background:#16e886;
+  color:#02120b;
+  font-weight:900;
+}
+
+.wallaa-new-chat-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:2000;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  background:rgba(0,5,10,.68);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+
+.wallaa-new-chat-sheet{
+  width:min(720px,100%);
+  padding:8px 18px max(calc(24px + env(safe-area-inset-bottom)),30px);
+  border-radius:28px 28px 0 0;
+  border:1px solid rgba(49,196,238,.18);
+  background:#06131d;
+  color:#f1f9ff;
+  box-shadow:0 -25px 70px rgba(0,0,0,.5);
+}
+
+.wallaa-new-chat-handle{
+  width:42px;
+  height:5px;
+  margin:0 auto 18px;
+  border-radius:999px;
+  background:#304552;
+}
+
+.wallaa-new-chat-sheet header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:15px;
+}
+
+.wallaa-new-chat-sheet header span{
+  color:#1ee68b;
+  font-size:9px;
+  font-weight:950;
+  letter-spacing:.14em;
+}
+
+.wallaa-new-chat-sheet h2{
+  margin:3px 0 0;
+  font-size:23px;
+}
+
+.wallaa-new-chat-sheet header button{
+  width:42px;
+  height:42px;
+  border:1px solid #193447;
+  border-radius:14px;
+  background:#0a1b27;
+  color:#eaf8ff;
+  display:grid;
+  place-items:center;
+}
+
+.wallaa-new-chat-search{
+  min-height:52px;
+  margin-top:20px;
+  padding:0 14px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  border:1px solid #1a4d67;
+  border-radius:17px;
+  background:#071b29;
+  color:#69a6c5;
+}
+
+.wallaa-new-chat-search input{
+  width:100%;
+  min-width:0;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#fff;
+  font-size:16px;
+}
+
+.wallaa-new-chat-placeholder{
+  min-height:180px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+  color:#78909f;
+}
+
+.wallaa-new-chat-placeholder svg{
+  color:#24e18d;
+  margin-bottom:10px;
+}
+
+.wallaa-new-chat-placeholder strong{
+  color:#eaf7ff;
+}
+
+.wallaa-new-chat-placeholder p{
+  max-width:320px;
+  font-size:12px;
+  line-height:1.5;
+}
+
+/* Full-screen chat owns the complete iPhone viewport. */
+.screen-chat{
+  height:100dvh!important;
+  min-height:100dvh!important;
+  overflow:hidden!important;
+}
+
+.screen-chat .app-main-v4{
+  height:100dvh!important;
+  min-height:100dvh!important;
+  max-height:100dvh!important;
+  padding:0!important;
+  overflow:hidden!important;
+}
+
+.wallaa-chat-screen{
+  width:100%!important;
+  max-width:720px!important;
+  height:100dvh!important;
+  min-height:100dvh!important;
+  margin:0 auto!important;
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+  box-sizing:border-box!important;
+}
+
+.wallaa-chat-header{
+  flex:0 0 auto;
+  min-height:calc(68px + env(safe-area-inset-top))!important;
+  padding:
+    calc(10px + env(safe-area-inset-top))
+    max(16px,env(safe-area-inset-right))
+    10px
+    max(16px,env(safe-area-inset-left))!important;
+  box-sizing:border-box!important;
+  grid-template-columns:44px 44px minmax(0,1fr) 42px!important;
+}
+
+.wallaa-chat-delete{
+  width:40px!important;
+  height:40px!important;
+  border-radius:13px!important;
+  color:#ff7380!important;
+  background:rgba(255,55,73,.07)!important;
+  border:1px solid rgba(255,82,98,.16)!important;
+}
+
+.wallaa-chat-operational{
+  flex:0 0 auto;
+  margin:10px max(16px,env(safe-area-inset-right))
+    0 max(16px,env(safe-area-inset-left))!important;
+}
+
+.wallaa-chat-thread{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  overflow-y:auto!important;
+  padding-left:max(18px,env(safe-area-inset-left))!important;
+  padding-right:max(18px,env(safe-area-inset-right))!important;
+}
+
+.wallaa-chat-thread-empty{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  color:#718895!important;
+}
+
+.wallaa-empty-chat-icon{
+  width:58px;
+  height:58px;
+  border-radius:19px;
+  display:grid;
+  place-items:center;
+  margin-bottom:13px;
+  color:#21e58c;
+  background:rgba(33,229,140,.07);
+  border:1px solid rgba(33,229,140,.15);
+}
+
+.wallaa-chat-thread-empty>strong{
+  color:#eaf6fd;
+  font-size:16px;
+}
+
+.wallaa-chat-thread-empty>p{
+  margin:5px 0;
+  font-size:12px;
+}
+
+.wallaa-chat-composer{
+  flex:0 0 auto!important;
+  padding:
+    10px
+    max(14px,env(safe-area-inset-right))
+    max(calc(10px + env(safe-area-inset-bottom)),16px)
+    max(14px,env(safe-area-inset-left))!important;
+  box-sizing:border-box!important;
+}
+
+.wallaa-chat-composer textarea:disabled,
+.wallaa-chat-composer button:disabled{
+  opacity:.42;
+}
+
+
+/* =========================================================
+   WALLAA CONNECT — CONVERSATION CARD FIX 2026-09-15
+   ========================================================= */
+
+.wallaa-conversation-list{
+  display:grid;
+  gap:12px;
+  width:100%;
+}
+
+.wallaa-conversation-row{
+  position:relative;
+  width:100%;
+  min-width:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 42px;
+  align-items:center;
+  gap:10px;
+}
+
+.wallaa-conversation-row .wallaa-conversation{
+  width:100%;
+  min-width:0;
+  min-height:84px;
+  margin:0;
+  box-sizing:border-box;
+
+  display:grid;
+  grid-template-columns:52px minmax(0,1fr);
+  align-items:center;
+  gap:13px;
+
+  padding:13px 14px;
+
+  border:1px solid var(--v4-line);
+  border-radius:19px;
+  background:var(--v4-surface);
+  color:var(--v4-text);
+  text-align:left;
+  overflow:hidden;
+}
+
+.wallaa-conversation-row .wallaa-conversation-avatar{
+  width:52px;
+  height:52px;
+  flex:0 0 52px;
+}
+
+.wallaa-conversation-row .wallaa-conversation-copy{
+  width:100%;
+  min-width:0;
+  overflow:hidden;
+}
+
+.wallaa-conversation-row .wallaa-conversation-copy > div{
+  width:100%;
+  min-width:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:10px;
+}
+
+.wallaa-conversation-row .wallaa-conversation-copy strong{
+  min-width:0;
+  display:block;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  font-size:14px;
+  line-height:1.25;
+}
+
+.wallaa-conversation-row .wallaa-conversation-copy time{
+  display:block;
+  flex:none;
+  white-space:nowrap;
+  font-size:9px;
+  color:var(--v4-muted);
+}
+
+.wallaa-conversation-row .wallaa-conversation-copy > small{
+  display:block;
+  margin-top:4px;
+  font-size:8px;
+  font-weight:900;
+  line-height:1.2;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+
+.wallaa-conversation-row .wallaa-conversation-copy p{
+  width:100%;
+  min-width:0;
+  margin:7px 0 0;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  font-size:10px;
+  line-height:1.3;
+}
+
+.wallaa-conversation-delete{
+  width:42px;
+  height:42px;
+  min-width:42px;
+  max-width:42px;
+  padding:0;
+  margin:0;
+
+  display:grid;
+  place-items:center;
+  align-self:center;
+
+  border:1px solid rgba(255,100,100,.18);
+  border-radius:14px;
+
+  background:rgba(90,32,38,.28);
+  color:#ff8a91;
+
+  box-sizing:border-box;
+  cursor:pointer;
+}
+
+.wallaa-conversation-delete:active{
+  transform:scale(.94);
+}
+
+@media(max-width:390px){
+  .wallaa-conversation-row{
+    grid-template-columns:minmax(0,1fr) 38px;
+    gap:8px;
+  }
+
+  .wallaa-conversation-row .wallaa-conversation{
+    grid-template-columns:46px minmax(0,1fr);
+    gap:11px;
+    min-height:78px;
+    padding:11px 12px;
+  }
+
+  .wallaa-conversation-row .wallaa-conversation-avatar{
+    width:46px;
+    height:46px;
+  }
+
+  .wallaa-conversation-delete{
+    width:38px;
+    min-width:38px;
+    max-width:38px;
+    height:38px;
+  }
+}
+
+/* Wallaa Messages — unread state */
+.wallaa-conversation-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wallaa-conversation-preview p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.wallaa-message-unread {
+  flex: 0 0 auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}

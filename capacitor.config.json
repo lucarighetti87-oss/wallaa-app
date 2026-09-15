@@ -21,6 +21,10 @@
         "banner",
         "list"
       ]
+    },
+    "Keyboard": {
+      "resize": "native",
+      "resizeOnFullScreen": true
     }
   }
 }

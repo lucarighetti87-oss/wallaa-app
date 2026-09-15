@@ -1,16 +1,42 @@
-import { AlertTriangle, BellRing, CheckCircle2, Link2, MapPin, ShieldCheck, Trash2 } from 'lucide-react';
+import {
+  BellRing,
+  CheckCircle2,
+  Link2,
+  MapPin,
+  ShieldCheck,
+  Trash2,
+  TriangleAlert
+} from 'lucide-react';
+
 import { activityTitle, formatDateTime, triggerLabel } from '../utils/format';
 
-function iconFor(entry) {
-  if (entry.status === 'error') return AlertTriangle;
-  if (entry.type === 'button' || entry.type === 'device') return Link2;
-  if (entry.type === 'alert' || entry.type === 'network-alert') return BellRing;
-  return CheckCircle2;
+function ActivityIcon({ entry }) {
+  if (entry?.status === 'error') return <TriangleAlert size={18}/>;
+  if (entry?.type === 'button' || entry?.type === 'device') return <Link2 size={18}/>;
+  if (entry?.type === 'alert' || entry?.type === 'network-alert') return <BellRing size={18}/>;
+  return <CheckCircle2 size={18}/>;
 }
 
-export default function ActivityScreen({ activities, onClear, t, language }) {
-  const alertCount = activities.filter((x) => x.type === 'alert' || x.type === 'network-alert').length;
-  const successCount = activities.filter((x) => x.status === 'success' || (x.type === 'trigger' && x.status === 'working')).length;
+export default function ActivityScreen({
+  activities = [],
+  onClear,
+  t,
+  language
+}) {
+  const rows = [...activities].sort(
+    (a, b) => new Date(b.at || 0) - new Date(a.at || 0)
+  );
+
+  const alertCount = rows.filter(
+    (x) => x.type === 'alert' || x.type === 'network-alert'
+  ).length;
+
+  const successCount = rows.filter(
+    (x) =>
+      x.status === 'success' ||
+      (x.type === 'trigger' && x.status === 'working')
+  ).length;
+
   const handleClear = (event) => {
     event?.preventDefault?.();
     event?.stopPropagation?.();
@@ -18,66 +44,128 @@ export default function ActivityScreen({ activities, onClear, t, language }) {
   };
 
   return (
-    <div className="screen activity-screen aa-activity-screen">
-      <div className="screen-title pro-title activity-pro-title">
-        <div>
-          <p className="eyebrow dark">{t('activity.eyebrow')}</p>
-          <h1>{t('activity.title')}</h1>
-          <p>{t('v412.activity.subtitle')}</p>
-        </div>
-      </div>
+    <div className="aa-notifications-screen aa-activity-screen-v39">
 
-      <section className="activity-summary-grid">
-        <div className="activity-summary-card">
-          <div className="activity-summary-icon blue"><BellRing size={18} /></div>
-          <div><small>{t('activity.totalAlerts')}</small><strong>{alertCount}</strong></div>
+      <header className="aa-activity-head-v39">
+        <div className="aa-activity-head-symbol">
+          <ShieldCheck/>
         </div>
-        <div className="activity-summary-card">
-          <div className="activity-summary-icon green"><ShieldCheck size={18} /></div>
-          <div><small>{t('activity.successful')}</small><strong>{successCount}</strong></div>
+
+        <div className="aa-notifications-titleblock">
+          <span>WALLAA CENTER</span>
+          <h1>Attività</h1>
+          <p>Eventi, SOS e attività di sicurezza degli ultimi 30 giorni.</p>
+        </div>
+
+        <div
+          className="aa-activity-count-v39"
+          aria-label={`${rows.length} attività`}
+        >
+          <BellRing/>
+          <b>{rows.length}</b>
+        </div>
+      </header>
+
+      <section className="aa-activity-metrics-v39">
+        <div>
+          <i><BellRing/></i>
+          <span>
+            <small>ALERT TOTALI</small>
+            <strong>{alertCount}</strong>
+          </span>
+        </div>
+
+        <div>
+          <i><ShieldCheck/></i>
+          <span>
+            <small>EVENTI RIUSCITI</small>
+            <strong>{successCount}</strong>
+          </span>
         </div>
       </section>
 
-      <div className="v412-activity-tools">
-        <span>{t('v412.activity.retention')}</span>
-        <button className="v412-clear-activity" type="button" onClick={handleClear} disabled={!activities.length}><Trash2 size={15}/>{t('v412.activity.clearAll')}</button>
-      </div>
+      <section className="aa-notifications-tools aa-notifications-tools-v38 aa-activity-tools-v39">
+        <div className="aa-notifications-tool-copy">
+          <ShieldCheck/>
+          <span>
+            <strong>Cronologia attività</strong>
+            <small>Conservazione automatica · 30 giorni</small>
+          </span>
+        </div>
 
-      <div className="activity-feed">
-        {activities.map((entry) => {
-          const visualStatus = entry.type === 'trigger' && entry.status === 'working' ? 'success' : entry.status;
-          const Icon = iconFor({ ...entry, status: visualStatus });
+        <button
+          type="button"
+          onClick={handleClear}
+          disabled={!rows.length}
+        >
+          <Trash2/>
+          <span>Cancella tutto</span>
+        </button>
+      </section>
+
+      <section className="aa-notifications-feed aa-notifications-feed-v38 aa-activity-feed-v39">
+        {rows.map((entry) => {
+          const visualStatus =
+            entry.type === 'trigger' && entry.status === 'working'
+              ? 'success'
+              : entry.status;
+
           const title = activityTitle(entry, language);
-          const statusText = visualStatus === 'error' ? t('common.error') : visualStatus === 'working' ? t('common.working') : t('common.completed');
+
+          const emergency =
+            entry.type === 'alert' ||
+            entry.type === 'network-alert';
+
           return (
-            <article className={`activity-card ${visualStatus}`} key={entry.id}>
-              <div className="activity-card-top">
-                <div className="activity-card-icon"><Icon size={18} /></div>
-                <div className="activity-card-head">
-                  <strong>{title}</strong>
-                  <span>{formatDateTime(entry.at, language)}</span>
-                </div>
-                <div className={`activity-status ${visualStatus}`}>{statusText}</div>
-              </div>
-              <div className="activity-card-body">
-                {entry.trigger && <small className="activity-badge">{triggerLabel(entry.trigger, language)}</small>}
+            <article
+              className={`aa-notification-row aa-activity-row-v39 ${emergency ? 'emergency' : ''} ${visualStatus || ''}`}
+              key={entry.id}
+            >
+              <i>
+                <ActivityIcon entry={{ ...entry, status: visualStatus }}/>
+              </i>
+
+              <div className="aa-notification-copy">
+                <strong>{title}</strong>
+
+                <small>
+                  {entry.detail ||
+                    (entry.trigger
+                      ? triggerLabel(entry.trigger, language)
+                      : emergency
+                        ? 'Aggiornamento sicurezza Wallaa'
+                        : 'Evento Wallaa')}
+                </small>
+
                 {entry.location?.mapsUrl && (
-                  <a href={entry.location.mapsUrl} target="_blank" rel="noreferrer"><MapPin size={14} /> {t('common.openPosition')}</a>
+                  <a
+                    href={entry.location.mapsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <MapPin size={13}/>
+                    Apri posizione
+                  </a>
                 )}
-                {entry.detail && <p>{entry.detail}</p>}
               </div>
+
+              <time>{formatDateTime(entry.at, language)}</time>
             </article>
           );
         })}
 
-        {!activities.length && (
-          <div className="empty-state compact-empty activity-empty-pro">
-            <div className="empty-orb"><BellRing size={30} /></div>
-            <h2>{t('activity.emptyTitle')}</h2>
-            <p>{t('activity.emptyDesc')}</p>
+        {!rows.length && (
+          <div className="aa-notifications-empty">
+            <BellRing/>
+            <h2>Nessuna attività</h2>
+            <p>
+              Gli eventi del Wallaa Button, gli SOS e gli aggiornamenti
+              di sicurezza compariranno qui.
+            </p>
           </div>
         )}
-      </div>
+      </section>
+
     </div>
   );
 }

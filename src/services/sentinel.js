@@ -4,7 +4,11 @@ function headers(identity) {
   return {
     'Content-Type': 'application/json',
     ...(identity?.installationId ? { 'x-wallaa-installation-id': identity.installationId } : {}),
-    ...(identity?.authToken ? { 'x-wallaa-install-token': identity.authToken } : {})
+    ...(identity?.authToken ? {
+      'x-wallaa-install-token': identity.authToken,
+      'x-wallaa-auth-token': identity.authToken,
+      'Authorization': `Bearer ${identity.authToken}`
+    } : {})
   };
 }
 
@@ -103,6 +107,19 @@ export async function getNearbySentinels(identity, location) {
     : '';
   return normalizeNearbyPayload(await request(`/api/sentinel/nearby${qs}`, { identity }));
 }
-export const acceptSentinelOffer = (identity, offerId) => request(`/api/sentinel/offers/${encodeURIComponent(offerId)}/accept`, { method: 'POST', identity, body: {} });
-export const declineSentinelOffer = (identity, offerId) => request(`/api/sentinel/offers/${encodeURIComponent(offerId)}/decline`, { method: 'POST', identity, body: {} });
-export const completeSentinelIncident = (identity, incidentId) => request(`/api/sentinel/incidents/${encodeURIComponent(incidentId)}/complete`, { method: 'POST', identity, body: {} });
+export const acceptSentinelOffer = (identity, offerId) => request(`/api/sentinel/dispatch/offers/${encodeURIComponent(offerId)}/accept`, { method: 'POST', identity, body: {} });
+export const declineSentinelOffer = (identity, offerId) => request(`/api/sentinel/dispatch/offers/${encodeURIComponent(offerId)}/decline`, { method: 'POST', identity, body: {} });
+export const completeSentinelIncident = (identity, incidentId) => request(`/api/sentinel/dispatch/incidents/${encodeURIComponent(incidentId)}/complete`, { method: 'POST', identity, body: {} });
+
+
+export const getCurrentSentinelOffer = (identity) =>
+  request('/api/sentinel/dispatch/current-offer', { identity });
+
+export const getCurrentSentinelIncident = (identity) =>
+  request('/api/sentinel/dispatch/current-incident', { identity });
+
+
+export const getMySosSentinel = (identity, alertId) =>
+  request(`/api/sentinel/dispatch/my-sos-sentinel/${encodeURIComponent(alertId)}`, {
+    identity
+  });

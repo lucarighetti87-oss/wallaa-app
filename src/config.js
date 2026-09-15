@@ -6,11 +6,12 @@ export const CONFIG = {
   demoMode: String(import.meta.env.VITE_DEMO_MODE || 'false').toLowerCase() === 'true',
   privacyPolicyUrl: import.meta.env.VITE_PRIVACY_POLICY_URL || 'https://wallaasafety.com/privacy-policy',
   termsUrl: import.meta.env.VITE_TERMS_URL || 'https://wallaasafety.com/terms-and-conditions',
+  safetyNoticeUrl: import.meta.env.VITE_SAFETY_NOTICE_URL || 'https://wallaasafety.com/safety-notice',
   privacyChoicesUrl: import.meta.env.VITE_PRIVACY_CHOICES_URL || 'https://wallaasafety.com/privacy-choices',
   privacyContactEmail: import.meta.env.VITE_PRIVACY_CONTACT_EMAIL || 'safety@wallaasafety.com',
-  privacyPolicyVersion: import.meta.env.VITE_PRIVACY_POLICY_VERSION || '2026-09-07',
-  termsVersion: import.meta.env.VITE_TERMS_VERSION || '2026-09-07',
-  safetyNoticeVersion: import.meta.env.VITE_SAFETY_NOTICE_VERSION || '2026-09-07'
+  privacyPolicyVersion: import.meta.env.VITE_PRIVACY_POLICY_VERSION || 'privacy-2.0-2026-09-14',
+  termsVersion: import.meta.env.VITE_TERMS_VERSION || 'terms-2.0-2026-09-14',
+  safetyNoticeVersion: import.meta.env.VITE_SAFETY_NOTICE_VERSION || 'safety-2.0-2026-09-14'
 };
 
 export const TRIGGERS = [

@@ -36,11 +36,12 @@ export default function PrivacyCenterScreen({ profile, onNavigate, onDeleteAccou
     <section className="v411-legal-links">
       <a href={CONFIG.privacyPolicyUrl} target="_blank" rel="noreferrer"><FileText size={17}/><span>{t('v405.legal.privacy')}</span><ExternalLink size={15}/></a>
       <a href={CONFIG.termsUrl} target="_blank" rel="noreferrer"><FileText size={17}/><span>{t('v405.legal.terms')}</span><ExternalLink size={15}/></a>
+      <a href={CONFIG.safetyNoticeUrl} target="_blank" rel="noreferrer"><ShieldCheck size={17}/><span>{t('v411.legal.safetyNotice')}</span><ExternalLink size={15}/></a>
       <a href={CONFIG.privacyChoicesUrl} target="_blank" rel="noreferrer"><ShieldCheck size={17}/><span>{t('v411.privacy.choices')}</span><ExternalLink size={15}/></a>
       <a href={`mailto:${CONFIG.privacyContactEmail}`}><Mail size={17}/><span>{CONFIG.privacyContactEmail}</span><ExternalLink size={15}/></a>
     </section>
 
-    <section className="v411-legal-version"><span>{t('v411.privacy.policyVersion')}: {CONFIG.privacyPolicyVersion}</span><span>{t('v411.privacy.termsVersion')}: {CONFIG.termsVersion}</span></section>
+    <section className="v411-legal-version"><span>{t('v411.privacy.policyVersion')}: {CONFIG.privacyPolicyVersion}</span><span>{t('v411.privacy.termsVersion')}: {CONFIG.termsVersion}</span><span>Safety Notice: {CONFIG.safetyNoticeVersion}</span></section>
 
     <button className="danger-outline full" onClick={onDeleteAccount}><Trash2 size={18}/>{t('v4.settings.deleteAccount')}</button>
     <button className="v4-primary" onClick={()=>onNavigate('settings')}>{t('common.close')}</button>

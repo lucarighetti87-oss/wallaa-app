@@ -2,6 +2,7 @@ import { Check, Eye, EyeOff, Lock, Mail, Phone, ShieldCheck, UserRound } from 'l
 import { useMemo, useState } from 'react';
 import { CONFIG } from '../config';
 import { resendWallaaVerification } from '../services/network';
+import { PHONE_COUNTRIES } from '../data/phoneCountries';
 
 export default function OnboardingScreen({ profile, onComplete, onLogin, t, initialMode = 'register' }) {
   const [mode, setMode] = useState(initialMode);
@@ -10,9 +11,17 @@ export default function OnboardingScreen({ profile, onComplete, onLogin, t, init
   const [verificationMessage, setVerificationMessage] = useState('');
   const [resending, setResending] = useState(false);
   const [form, setForm] = useState({
-    firstName: profile.firstName || '', lastName: profile.lastName || '', email: profile.email || '',
-    phone: profile.phone || '', countryCode: profile.countryCode || '+39', privacyAccepted: false,
-    termsAccepted: false, safetyNoticeAccepted: false, password: '', confirmPassword: ''
+    firstName: profile.firstName || '',
+    lastName: profile.lastName || '',
+    email: profile.email || '',
+    phone: profile.phone || '',
+    countryCode: profile.countryCode || '+39',
+    dateOfBirth: profile.dateOfBirth || '',
+    privacyAccepted: false,
+    termsAccepted: false,
+    safetyNoticeAccepted: false,
+    password: '',
+    confirmPassword: ''
   });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -22,7 +31,17 @@ export default function OnboardingScreen({ profile, onComplete, onLogin, t, init
   const passwordsMatch = isLogin || (form.password.length >= 8 && form.password === form.confirmPassword);
   const canSubmit = useMemo(() => isLogin
     ? Boolean(form.email.trim() && form.password)
-    : Boolean(form.firstName.trim() && form.lastName.trim() && form.email.trim() && form.phone.trim() && passwordsMatch && form.privacyAccepted && form.termsAccepted && form.safetyNoticeAccepted), [form, isLogin, passwordsMatch]);
+    : Boolean(
+        form.firstName.trim() &&
+        form.lastName.trim() &&
+        form.email.trim() &&
+        form.phone.trim() &&
+        form.dateOfBirth &&
+        passwordsMatch &&
+        form.privacyAccepted &&
+        form.termsAccepted &&
+        form.safetyNoticeAccepted
+      ), [form, isLogin, passwordsMatch]);
 
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const switchMode = (next) => { setMode(next); setError(''); setVerificationEmail(''); setVerificationMessage(''); set('password', ''); set('confirmPassword', ''); };
@@ -101,7 +120,55 @@ export default function OnboardingScreen({ profile, onComplete, onLogin, t, init
           <label><UserRound size={17}/><input value={form.lastName} onChange={(e)=>set('lastName',e.target.value)} placeholder={t('v4.onboarding.lastName')} autoComplete="family-name"/></label>
         </div>}
         <label><Mail size={17}/><input value={form.email} onChange={(e)=>set('email',e.target.value)} placeholder={isLogin ? t('v415.auth.identifierPlaceholder') : 'Email'} type={isLogin ? 'text' : 'email'} inputMode={isLogin ? 'text' : 'email'} autoCapitalize="none" autoComplete={isLogin ? 'username' : 'email'}/></label>
-        {!isLogin && <label className="phone-row"><Phone size={17}/><span className="country-code">🇮🇹 {form.countryCode}</span><input value={form.phone} onChange={(e)=>set('phone',e.target.value)} placeholder={t('v4.onboarding.phone')} type="tel" autoComplete="tel"/></label>}
+        {!isLogin && <>
+          <label className="phone-row">
+            <Phone size={17}/>
+            <select
+              className="country-code-select"
+              value={form.countryCode}
+              onChange={(e)=>set('countryCode', e.target.value)}
+              aria-label="Prefisso internazionale"
+            >
+              {PHONE_COUNTRIES.map((country) => (
+                <option
+                  key={`${country.iso}-${country.callingCode}`}
+                  value={country.callingCode}
+                >
+                  {country.flag} {country.name} {country.callingCode}
+                </option>
+              ))}
+            </select>
+            <input
+              value={form.phone}
+              onChange={(e)=>set('phone',e.target.value)}
+              placeholder={t('v4.onboarding.phone')}
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel-national"
+            />
+          </label>
+
+          <label className="v420-dob-row">
+            <span>Data di nascita</span>
+            <input
+              value={form.dateOfBirth}
+              onChange={(e)=>set('dateOfBirth',e.target.value)}
+              type="date"
+              max={(() => {
+                const today = new Date();
+                const cutoff = new Date(
+                  Date.UTC(
+                    today.getUTCFullYear() - 18,
+                    today.getUTCMonth(),
+                    today.getUTCDate()
+                  )
+                );
+                return cutoff.toISOString().slice(0,10);
+              })()}
+              autoComplete="bday"
+            />
+          </label>
+        </>}
         <label className="v405-password-row"><Lock size={17}/><input value={form.password} onChange={(e)=>set('password',e.target.value)} placeholder={isLogin ? t('v405.auth.password') : t('v4.onboarding.password')} type={showPassword ? 'text' : 'password'} autoComplete={isLogin ? 'current-password' : 'new-password'}/><button type="button" onClick={()=>setShowPassword((value)=>!value)} aria-label={showPassword ? t('v404.safetyWord.hide') : t('v404.safetyWord.show')}>{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button></label>
         {!isLogin && <>
           <label className={`v405-password-row ${form.confirmPassword && !passwordsMatch ? 'v417-password-mismatch' : ''}`}><Lock size={17}/><input value={form.confirmPassword} onChange={(e)=>set('confirmPassword',e.target.value)} placeholder={t('v417.auth.confirmPassword')} type={showPassword ? 'text' : 'password'} autoComplete="new-password"/><span className="v417-password-status">{form.confirmPassword && passwordsMatch ? <Check size={18}/> : null}</span></label>
@@ -111,7 +178,7 @@ export default function OnboardingScreen({ profile, onComplete, onLogin, t, init
         {!isLogin && <div className="onboarding-consents v405-consents">
           <label className="check-row"><input type="checkbox" checked={form.privacyAccepted} onChange={(e)=>set('privacyAccepted',e.target.checked)}/><span className="check-box">{form.privacyAccepted && <Check size={14}/>}</span><span>{t('v405.legal.acceptPrivacy')} <a href={CONFIG.privacyPolicyUrl} target="_blank" rel="noreferrer">{t('v405.legal.privacy')}</a></span></label>
           <label className="check-row"><input type="checkbox" checked={form.termsAccepted} onChange={(e)=>set('termsAccepted',e.target.checked)}/><span className="check-box">{form.termsAccepted && <Check size={14}/>}</span><span>{t('v405.legal.acceptTerms')} <a href={CONFIG.termsUrl} target="_blank" rel="noreferrer">{t('v405.legal.terms')}</a></span></label>
-          <label className="check-row v411-safety-consent"><input type="checkbox" checked={form.safetyNoticeAccepted} onChange={(e)=>set('safetyNoticeAccepted',e.target.checked)}/><span className="check-box">{form.safetyNoticeAccepted && <Check size={14}/>}</span><span>{t('v411.legal.safetyNotice')}</span></label>
+          <label className="check-row v411-safety-consent"><input type="checkbox" checked={form.safetyNoticeAccepted} onChange={(e)=>set('safetyNoticeAccepted',e.target.checked)}/><span className="check-box">{form.safetyNoticeAccepted && <Check size={14}/>}</span><span><a href={CONFIG.safetyNoticeUrl} target="_blank" rel="noreferrer">{t('v411.legal.safetyNotice')}</a></span></label>
         </div>}
 
         {error && <div className="onboarding-error" role="alert">{error}</div>}

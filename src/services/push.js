@@ -13,7 +13,7 @@ export async function stopPushListeners() {
   await Promise.all(current.map((h) => h?.remove?.().catch?.(() => {}) || Promise.resolve()));
 }
 
-export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentinelOffer, onError } = {}) {
+export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentinelOffer, onMessage, onError } = {}) {
   if (!Capacitor.isNativePlatform()) return { supported: false, permission: 'web' };
 
   await stopPushListeners();
@@ -56,6 +56,14 @@ export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentin
       onAlert?.(alert);
     }
     if (notification?.data?.type === 'wallaa_safe') onAlertClosed?.(notification?.data?.alertId || '');
+    if (notification?.data?.type === 'wallaa_message') {
+      const d = notification?.data || {};
+      onMessage?.({
+        conversationId:d.conversationId || '',
+        senderUserId:d.senderUserId || '',
+        opened:false
+      });
+    }
     if (notification?.data?.type === 'wallaa_sentinel_request') { feedbackWarning(); const d=notification?.data||{}; onSentinelOffer?.({ offerId:d.offerId||'', incidentId:d.incidentId||'', distanceM:Number(d.distanceM||0), createdAt:d.createdAt||new Date().toISOString() }); }
   }));
   handles.push(await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
@@ -63,6 +71,14 @@ export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentin
     const notification = action?.notification;
     if (notification?.data?.type === 'wallaa_sos') onAlert?.(normalizePush(notification));
     if (notification?.data?.type === 'wallaa_safe') onAlertClosed?.(notification?.data?.alertId || '');
+    if (notification?.data?.type === 'wallaa_message') {
+      const d = notification?.data || {};
+      onMessage?.({
+        conversationId:d.conversationId || '',
+        senderUserId:d.senderUserId || '',
+        opened:true
+      });
+    }
     if (notification?.data?.type === 'wallaa_sentinel_request') { feedbackWarning(); const d=notification?.data||{}; onSentinelOffer?.({ offerId:d.offerId||'', incidentId:d.incidentId||'', distanceM:Number(d.distanceM||0), createdAt:d.createdAt||new Date().toISOString() }); }
   }));
 

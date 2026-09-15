@@ -1,15 +1,14 @@
 import { useEffect } from 'react';
-import { Activity, BellRing, CircleUserRound, Home, Link2, MapPin, Settings, Shield, UsersRound, X } from 'lucide-react';
+import { CircleUserRound, Home, Link2, MapPin, MessageCircle, Settings, Shield, UsersRound, X } from 'lucide-react';
 import WallaaButton3D from './WallaaButton3D';
 
 const items = [
   ['home', 'nav.home', Home],
-  ['active-alert', 'v4.menu.activeAlert', BellRing],
   ['device', 'v4.menu.myButton', Link2],
   ['network', 'v4.menu.safetyNetwork', Shield],
   ['contacts', 'v4.menu.emergencyContacts', UsersRound],
   ['map', 'v4.menu.location', MapPin],
-  ['activity', 'nav.activity', Activity],
+  ['messages', 'Messaggi', MessageCircle],
   ['settings', 'nav.settings', Settings]
 ];
 

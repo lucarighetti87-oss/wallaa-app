@@ -12,6 +12,8 @@ import HomeV4Screen from './screens/HomeV4Screen';
 import ContactsScreen from './screens/ContactsScreen';
 import DeviceScreen from './screens/DeviceScreen';
 import ActivityScreen from './screens/ActivityScreen';
+import MessagesScreen from './screens/MessagesScreen';
+import ChatScreen from './screens/ChatScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import NetworkScreen from './screens/NetworkScreen';
 import ActiveAlertScreen from './screens/ActiveAlertScreen';
@@ -23,8 +25,10 @@ import SecurityCheckScreen from './screens/SecurityCheckScreen';
 import SentinelScreen from './screens/SentinelScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import PrivacyCenterScreen from './screens/PrivacyCenterScreen';
+import LegalUpdateScreen from './screens/LegalUpdateScreen';
 import { useWallaaSafe } from './hooks/useWallaaSafe';
 import { detectDeviceLanguage, translate } from './i18n';
+import { getWallaaConversations } from './services/network.js';
 
 const emptyContact = {
   id: '', name: '', email: '', phone: '', role: 'guardian',
@@ -34,6 +38,51 @@ const emptyContact = {
 export default function App() {
   const safe = useWallaaSafe();
   const [screen, setScreen] = useState('home');
+  const [selectedConversation, setSelectedConversation] = useState(null);
+
+  useEffect(() => {
+    const messagePush = safe.messagePush;
+
+    // A notification received while the user is already using Wallaa
+    // must not force navigation away from the current safety screen.
+    if (!messagePush?.opened || !messagePush?.conversationId) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const result = await getWallaaConversations(safe.networkIdentity);
+        if (cancelled) return;
+
+        const conversations = result?.conversations || [];
+        const conversation = conversations.find(
+          (item) => String(item?.id) === String(messagePush.conversationId)
+        );
+
+        if (!conversation) {
+          setScreen('messages');
+          return;
+        }
+
+        setSelectedConversation(conversation);
+        setScreen('chat');
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('[WALLAA][MESSAGE][OPEN_PUSH]', error?.message || error);
+          setScreen('messages');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    safe.messagePush,
+    safe.networkIdentity?.installationId,
+    safe.networkIdentity?.authToken
+  ]);
+
   const [drawer, setDrawer] = useState(false);
   const [contactModal, setContactModal] = useState(false);
   const [contactDraft, setContactDraft] = useState(emptyContact);
@@ -104,6 +153,36 @@ export default function App() {
     return <OnboardingScreen profile={safe.profile} onComplete={safe.completeOnboarding} onLogin={safe.loginAccount} initialMode={safe.profile?.onboardingComplete ? 'login' : 'register'} t={t} />;
   }
 
+  const emergencyInProgress = Boolean(
+    safe.activeAlert?.active || safe.incomingAlert
+  );
+
+  if (!emergencyInProgress && safe.legalGatePending) {
+    return (
+      <div className="splash splash-radar-ready" role="status">
+        <div className="splash-aura"/>
+        <div className="splash-radar" aria-hidden="true"><i/><i/><i/></div>
+        <div className="splash-logo">
+          <img src="/wallaa-app-icon.png" alt="Wallaa"/>
+        </div>
+        <h1>WALLAA</h1>
+        <p className="splash-brand-slogan">Stay safe. Press Wallaa.</p>
+        <p className="splash-subtitle">Verifica documenti legali…</p>
+      </div>
+    );
+  }
+
+  if (!emergencyInProgress && safe.legalRequired) {
+    return (
+      <LegalUpdateScreen
+        language={language}
+        onAccept={safe.acceptLegalUpdate}
+        onSignOut={safe.signOut}
+        legalError={safe.legalError}
+      />
+    );
+  }
+
   async function submitContact(e) {
     e.preventDefault();
     try {
@@ -151,8 +230,8 @@ export default function App() {
   }
 
   const common = { ...safe, onNavigate: setScreen, t, language };
-  const showDock = ['home','map','activity','settings'].includes(screen);
-  const showTopBar = ['home','contacts','map','activity','settings','network','security-check'].includes(screen);
+  const showDock = ['home','map','messages','settings'].includes(screen);
+  const showTopBar = ['home','contacts','map','messages','activity','settings','network','security-check'].includes(screen);
 
   return (
     <div className={`app-shell-v4 screen-${screen}`}>
@@ -163,13 +242,47 @@ export default function App() {
         {screen === 'contacts' && <ContactsScreen contacts={safe.contacts} plan={safe.profile?.plan || 'basic'} t={t} onBack={() => setScreen('home')} onAdd={() => { setContactDraft(emptyContact); setContactModal(true); }} onEdit={(contact) => { setContactDraft(contact); setContactModal(true); }} />}
         {screen === 'guardian' && <GuardianModeScreen profile={safe.profile} currentLocation={safe.currentLocation} locationStatus={safe.locationStatus} networkState={safe.networkState} contacts={safe.contacts} onToggle={(v)=>safe.setGuardianMode(v).catch((e)=>safe.setToast({type:'error',text:e.message}))} onRefreshLocation={safe.refreshCurrentLocation} onBack={()=>setScreen('home')} />}
         {screen === 'map' && <MapScreen activeAlert={safe.activeAlert} plan={safe.profile?.plan || 'basic'} networkIdentity={safe.networkIdentity} currentLocation={safe.currentLocation} locationStatus={safe.locationStatus} onRefreshLocation={safe.refreshCurrentLocation} t={t} language={language} />}
-        {screen === 'sentinel' && <SentinelScreen networkIdentity={safe.networkIdentity} currentLocation={safe.currentLocation} onRefreshLocation={safe.refreshCurrentLocation} onBack={() => setScreen('home')} onHome={() => setScreen('home')} sentinelOffer={safe.sentinelOffer} clearSentinelOffer={safe.clearSentinelOffer} setToast={safe.setToast} plan={safe.profile?.plan || 'basic'} />} 
+        {screen === 'sentinel' && <SentinelScreen networkIdentity={safe.networkIdentity} currentLocation={safe.currentLocation} onRefreshLocation={safe.refreshCurrentLocation} onBack={() => setScreen('home')} onHome={() => setScreen('home')} onOpenChat={(conversation) => { setSelectedConversation(conversation); setScreen('chat'); }} sentinelOffer={safe.sentinelOffer} clearSentinelOffer={safe.clearSentinelOffer} setToast={safe.setToast} plan={safe.profile?.plan || 'basic'} />}
         {screen === 'device' && <DeviceScreen onBack={() => setScreen('home')} onHome={() => setScreen('home')} device={safe.device} telemetry={safe.telemetry} pairingState={safe.pairingState} onPair={() => safe.pairDevice().catch(()=>{})} connectionGuard={safe.connectionGuard} onConnectionGuard={safe.setConnectionGuard} connectionStatus={safe.connectionStatus} signalQuality={safe.signalQuality} trigger={safe.trigger} onTrigger={safe.setTrigger} t={t} />}
         {screen === 'activity' && <ActivityScreen activities={safe.activities} onClear={() => clearActivityFeed('activity')} t={t} language={language} />}
+
+        {screen === 'messages' && (
+          <MessagesScreen
+            networkIdentity={safe.networkIdentity}
+            onOpenChat={(conversation) => {
+              setSelectedConversation(conversation);
+              setScreen('chat');
+            }}
+          />
+        )}
+
+        {screen === 'chat' && (
+          <ChatScreen
+            conversation={selectedConversation}
+            networkIdentity={safe.networkIdentity}
+            messagePush={safe.messagePush}
+            onBack={() => setScreen('messages')}
+            onDeleted={() => setSelectedConversation(null)}
+          />
+        )}
         {screen === 'notifications' && <NotificationsScreen activities={safe.activities} onBack={()=>setScreen('home')} onClear={() => clearActivityFeed('notifications')} t={t} language={language} />}
         {screen === 'network' && <NetworkScreen profile={safe.profile} networkState={safe.networkState} qrDataUrl={safe.qrDataUrl} onScan={async () => { try { await safe.scanNetworkQr(); setScreen('home'); } catch (error) { safe.setToast({ type:'error', text:error.message }); } }} onRotate={() => safe.rotateQr().catch((error) => safe.setToast({ type:'error', text:error.message }))} onRemoveLink={(id) => safe.removeNetworkLink(id).catch((error) => safe.setToast({ type:'error', text:error.message }))} onRefresh={() => safe.refreshNetwork().catch(() => {})} t={t} />}
         {screen === 'resolved-alert' && <ResolvedAlertScreen alert={safe.resolvedAlert} onHome={()=>{safe.dismissResolvedAlert();setScreen('home')}} />}
-        {screen === 'active-alert' && <ActiveAlertScreen alert={safe.activeAlert} onHome={() => setScreen('home')} plan={safe.profile?.plan || 'basic'} onSafe={markSafe} busy={safe.busy} t={t} language={language} />}
+        {screen === 'active-alert' && <ActiveAlertScreen
+          alert={safe.activeAlert}
+          networkIdentity={safe.networkIdentity}
+          currentLocation={safe.currentLocation}
+          onHome={() => setScreen('home')}
+          onOpenChat={(conversation) => {
+            setSelectedConversation(conversation);
+            setScreen('chat');
+          }}
+          plan={safe.profile?.plan || 'basic'}
+          onSafe={markSafe}
+          busy={safe.busy}
+          t={t}
+          language={language}
+        />}
         {screen === 'privacy' && <PrivacyCenterScreen profile={safe.profile} onNavigate={setScreen} onDeleteAccount={deleteAccount} t={t} />}
         {screen === 'settings' && <SettingsScreen profile={safe.profile} onSaveProfile={safe.saveProfile} armed={safe.armed} onArmed={safe.setArmed} onReset={resetAll} appearance={safe.appearance} onAppearance={safe.setAppearance} onDeleteAccount={deleteAccount} onSignOut={safe.signOut} networkState={safe.networkState} systemHealth={safe.systemHealth} onRefreshSystemHealth={safe.refreshSystemHealth} onTestEmail={safe.sendTestEmail} onTestAlarmSound={safe.testAlarmSound} onNavigate={setScreen} connectionGuard={safe.connectionGuard} onConnectionGuard={safe.setConnectionGuard} connectionStatus={safe.connectionStatus} t={t} />}
       </div></main>

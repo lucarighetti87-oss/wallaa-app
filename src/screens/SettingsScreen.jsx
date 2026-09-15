@@ -6,9 +6,19 @@ import {
 import { useEffect, useState } from 'react';
 import { LANGUAGES } from '../i18n';
 import { CONFIG } from '../config';
+import { PHONE_COUNTRIES } from '../data/phoneCountries';
 
 function ServiceDot({ ok, pending = false }) {
   return <i className={`service-dot ${pending ? 'pending' : ok ? 'ok' : 'bad'}`} />;
+}
+
+function formatDateOfBirth(value) {
+  if (!value) return '—';
+
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return String(value);
+
+  return `${match[3]}/${match[2]}/${match[1]}`;
 }
 
 export default function SettingsScreen({
@@ -50,7 +60,14 @@ export default function SettingsScreen({
               <div className="v412-profile-value"><small>{t('v4.settings.firstName')}</small><strong>{profile.firstName || '—'}</strong></div>
               <div className="v412-profile-value"><small>{t('v4.settings.lastName')}</small><strong>{profile.lastName || '—'}</strong></div>
               <div className="v412-profile-value wide"><small>Email</small><strong>{profile.email || '—'}</strong></div>
-              <div className="v412-profile-value wide"><small>{t('v4.settings.phone')}</small><strong>{profile.phone || '—'}</strong></div>
+              <div className="v412-profile-value wide">
+                <small>{t('v4.settings.phone')}</small>
+                <strong>{profile.phone ? `${profile.countryCode || '+39'} ${profile.phone}` : '—'}</strong>
+              </div>
+              <div className="v412-profile-value wide">
+                <small>Data di nascita</small>
+                <strong>{formatDateOfBirth(profile.dateOfBirth)}</strong>
+              </div>
             </div>
             <button className="v412-edit-profile" type="button" onClick={() => { setDraftProfile(profile); setEditingProfile(true); }}><Pencil size={16}/> {t('v412.settings.editMyData')}</button>
           </>
@@ -60,7 +77,41 @@ export default function SettingsScreen({
               <input value={draftProfile.firstName||''} onChange={(e)=>setDraftProfile({...draftProfile,firstName:e.target.value})} placeholder={t('v4.settings.firstName')}/>
               <input value={draftProfile.lastName||''} onChange={(e)=>setDraftProfile({...draftProfile,lastName:e.target.value})} placeholder={t('v4.settings.lastName')}/>
               <input className="wide" value={draftProfile.email||''} onChange={(e)=>setDraftProfile({...draftProfile,email:e.target.value})} placeholder="Email" type="email"/>
-              <input className="wide" value={draftProfile.phone||''} onChange={(e)=>setDraftProfile({...draftProfile,phone:e.target.value})} placeholder={t('v4.settings.phone')} type="tel"/>
+              <div className="wide v420-profile-phone-row">
+                <select
+                  value={draftProfile.countryCode || '+39'}
+                  onChange={(e)=>setDraftProfile({...draftProfile,countryCode:e.target.value})}
+                  aria-label="Prefisso internazionale"
+                >
+                  {PHONE_COUNTRIES.map((country) => (
+                    <option
+                      key={`${country.iso}-${country.callingCode}`}
+                      value={country.callingCode}
+                    >
+                      {country.flag} {country.name} {country.callingCode}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={draftProfile.phone||''}
+                  onChange={(e)=>setDraftProfile({...draftProfile,phone:e.target.value})}
+                  placeholder={t('v4.settings.phone')}
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel-national"
+                />
+              </div>
+
+              <label className="wide v420-profile-dob">
+                <span>Data di nascita</span>
+                <input
+                  value={draftProfile.dateOfBirth || ''}
+                  onChange={(e)=>setDraftProfile({...draftProfile,dateOfBirth:e.target.value})}
+                  type="date"
+                  max={new Date().toISOString().slice(0,10)}
+                  autoComplete="bday"
+                />
+              </label>
             </div>
             <div className="v412-profile-actions"><button className="cancel" type="button" onClick={()=>{setDraftProfile(profile);setEditingProfile(false);}}>{t('common.close')}</button><button className="save" type="button" onClick={saveEditedProfile}>{t('common.save')}</button></div>
           </>

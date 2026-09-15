@@ -6,7 +6,7 @@ import { getCurrentLocation, requestLocationPermission, watchLiveLocation } from
 import { sendWallaaAlert } from '../services/alert';
 import { closeLiveAlert, deleteWallaaAccount, sendDeviceHeartbeat, updateLiveLocation, sendLiveProtectionLocation, sendAuthorizedLocationSnapshot, sendUniversalSentinelHeartbeat } from '../services/liveAlert';
 import {
-  createQrDataUrl, claimWallaaDevice, getWallaaNetwork, getWallaaContacts, getWallaaAccount, getWallaaAlerts, getNetworkAlert, loginWallaaAccount, logoutWallaaAccount, registerWallaaAccount, registerWallaaIdentity, removeWallaaLink, rotateWallaaQr, scanQrWithCamera, scanWallaaCode, syncWallaaContacts, getWallaaNotificationHistory, acknowledgeActiveNetworkAlerts, clearWallaaNotificationHistory } from '../services/network';
+  createQrDataUrl, claimWallaaDevice, getWallaaNetwork, getWallaaContacts, getWallaaAccount, getWallaaLegalStatus, acceptWallaaLegalDocuments, getWallaaAlerts, getNetworkAlert, loginWallaaAccount, logoutWallaaAccount, registerWallaaAccount, registerWallaaIdentity, removeWallaaLink, rotateWallaaQr, scanQrWithCamera, scanWallaaCode, syncWallaaContacts, getWallaaNotificationHistory, acknowledgeActiveNetworkAlerts, clearWallaaNotificationHistory } from '../services/network';
 import { clearDeliveredWallaaNotifications, initWallaaPush, playWallaaAlarm, stopPushListeners, stopWallaaAlarm } from '../services/push';
 import { detectDeviceLanguage, translate } from '../i18n';
 import { ensureLocalNotificationPermission, feedbackWarning, showLocalSafetyNotification } from '../services/nativeFeedback';
@@ -72,9 +72,13 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [incomingAlert, setIncomingAlert] = useState(null);
   const [sentinelOffer, setSentinelOffer] = useState(null);
+  const [messagePush, setMessagePush] = useState(null);
   const [connectionGuard, setConnectionGuardState] = useState({ enabled: true, delaySeconds: 60 });
   const [appearance, setAppearanceState] = useState({ mode: 'system' });
   const [systemHealth, setSystemHealth] = useState({ status: 'idle' });
+  const [legalStatus, setLegalStatus] = useState(null);
+  const [legalChecked, setLegalChecked] = useState(false);
+  const [legalError, setLegalError] = useState('');
   const [currentLocation, setCurrentLocation] = useState(null);
   const [locationStatus, setLocationStatus] = useState('idle');
   const [clock, setClock] = useState(Date.now());
@@ -354,6 +358,12 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
           pushActivity({ type: 'network-alert', status: 'error', titleKey: 'activity.networkSos', titleVars: { name: alert.ownerName }, location: alert.location }).catch(() => {});
         },
         onSentinelOffer: (offer) => setSentinelOffer(offer),
+        onMessage: (message) => {
+          setMessagePush({
+            ...message,
+            receivedAt: Date.now()
+          });
+        },
         onAlertClosed: (alertId) => {
           stopWallaaAlarm();
           setIncomingAlert((current) => (!alertId || current?.id === alertId) ? null : current);
@@ -990,7 +1000,13 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const dismissResolvedAlert = useCallback(() => setResolvedAlert(null), []);
 
   const completeOnboarding = useCallback(async ({ password, confirmPassword: _confirmPassword, ...next }) => {
-    if (!next.firstName?.trim() || !next.lastName?.trim() || !next.email?.trim() || !next.phone?.trim()) throw new Error(tx('v405.auth.completeFields'));
+    if (
+      !next.firstName?.trim() ||
+      !next.lastName?.trim() ||
+      !next.email?.trim() ||
+      !next.phone?.trim() ||
+      !next.dateOfBirth?.trim()
+    ) throw new Error(tx('v405.auth.completeFields'));
     if (!next.privacyAccepted || !next.termsAccepted || !next.safetyNoticeAccepted) throw new Error(tx('v405.auth.acceptLegal'));
     if (!password || password.length < 8) throw new Error(tx('v405.auth.passwordLength'));
     const baseIdentity = networkIdentityRef.current || newNetworkIdentity();
@@ -1025,6 +1041,111 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     await initializeAccountServices(identity, normalized);
     return normalized;
   }, [defaultLanguage, initializeAccountServices, tx]);
+
+  const refreshLegalStatus = useCallback(async (identity = networkIdentityRef.current) => {
+    if (!identity?.authToken) {
+      setLegalStatus(null);
+      setLegalChecked(false);
+      setLegalError('');
+      return null;
+    }
+
+    try {
+      const status = await getWallaaLegalStatus(identity);
+      setLegalStatus(status);
+      setLegalError('');
+      return status;
+    } catch (error) {
+      setLegalError(error?.message || 'Verifica documenti legali non riuscita.');
+      throw error;
+    } finally {
+      setLegalChecked(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!loaded || !networkIdentity?.authToken || !profile?.onboardingComplete) {
+      setLegalStatus(null);
+      setLegalChecked(false);
+      setLegalError('');
+      return;
+    }
+
+    setLegalChecked(false);
+
+    refreshLegalStatus(networkIdentity).catch(() => {
+      // In caso di rete non disponibile usiamo le versioni già presenti
+      // nel profilo locale come fallback. Un account con versioni vecchie
+      // resta comunque soggetto al gate.
+    });
+  }, [
+    loaded,
+    networkIdentity?.authToken,
+    profile?.onboardingComplete,
+    refreshLegalStatus
+  ]);
+
+  const acceptLegalUpdate = useCallback(async ({
+    privacyAccepted,
+    termsAccepted,
+    safetyNoticeAccepted
+  }) => {
+    const identity = networkIdentityRef.current;
+
+    if (!identity?.authToken) {
+      throw new Error('Sessione Wallaa non valida.');
+    }
+
+    if (!privacyAccepted || !termsAccepted || !safetyNoticeAccepted) {
+      throw new Error('Devi confermare tutti i documenti.');
+    }
+
+    const result = await acceptWallaaLegalDocuments(identity, {
+      privacyAccepted,
+      termsAccepted,
+      safetyNoticeAccepted,
+      language: currentLanguage()
+    });
+
+    const accepted = result?.accepted || {};
+
+    const nextProfile = {
+      ...profileRef.current,
+      privacyAccepted: true,
+      termsAccepted: true,
+      safetyNoticeAccepted: true,
+      privacyPolicyVersion:
+        accepted.privacyPolicyVersion || CONFIG.privacyPolicyVersion,
+      termsVersion:
+        accepted.termsVersion || CONFIG.termsVersion,
+      safetyNoticeVersion:
+        accepted.safetyNoticeVersion || CONFIG.safetyNoticeVersion
+    };
+
+    setProfile(nextProfile);
+    profileRef.current = nextProfile;
+    await storage.setProfile(nextProfile);
+
+    await refreshLegalStatus(identity).catch(() => {
+      setLegalStatus({
+        ok: true,
+        current: {
+          privacyPolicyVersion: nextProfile.privacyPolicyVersion,
+          termsVersion: nextProfile.termsVersion,
+          safetyNoticeVersion: nextProfile.safetyNoticeVersion
+        },
+        accepted: {
+          privacyPolicyVersion: nextProfile.privacyPolicyVersion,
+          termsVersion: nextProfile.termsVersion,
+          safetyNoticeVersion: nextProfile.safetyNoticeVersion
+        }
+      });
+      setLegalChecked(true);
+      setLegalError('');
+    });
+
+    return result;
+  }, [currentLanguage, refreshLegalStatus]);
 
   const signOut = useCallback(async () => {
     const currentIdentity = networkIdentityRef.current;
@@ -1164,11 +1285,53 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     await resetLocalSession();
   }, [resetLocalSession]);
 
+
+  const legalRequired = useMemo(() => {
+    if (!networkIdentity?.authToken || !profile?.onboardingComplete) {
+      return false;
+    }
+
+    const current = legalStatus?.current;
+    const accepted = legalStatus?.accepted;
+
+    if (current && accepted) {
+      return (
+        !accepted.privacyPolicyVersion ||
+        !accepted.termsVersion ||
+        !accepted.safetyNoticeVersion ||
+        accepted.privacyPolicyVersion !== current.privacyPolicyVersion ||
+        accepted.termsVersion !== current.termsVersion ||
+        accepted.safetyNoticeVersion !== current.safetyNoticeVersion
+      );
+    }
+
+    return (
+      profile?.privacyPolicyVersion !== CONFIG.privacyPolicyVersion ||
+      profile?.termsVersion !== CONFIG.termsVersion ||
+      profile?.safetyNoticeVersion !== CONFIG.safetyNoticeVersion
+    );
+  }, [
+    networkIdentity?.authToken,
+    profile?.onboardingComplete,
+    profile?.privacyPolicyVersion,
+    profile?.termsVersion,
+    profile?.safetyNoticeVersion,
+    legalStatus
+  ]);
+
+  const legalGatePending = Boolean(
+    networkIdentity?.authToken &&
+    profile?.onboardingComplete &&
+    !legalChecked
+  );
+
   return {
     loaded, profile, contacts, device, armed, trigger, activities, telemetry, pairingState, busy, dispatchingAlert, dispatchStage, ready, toast, lastAlert,
     networkIdentity, networkState, qrDataUrl, incomingAlert, sentinelOffer, connectionGuard, appearance, connectionStatus, lastSignalAgeSeconds,
+    messagePush,
     signalQuality, safetyLevel, activeAlert, resolvedAlert, systemHealth, currentLocation, locationStatus, authenticated: Boolean(networkIdentity?.authToken && profile?.onboardingComplete),
-    setToast, setArmed, setTrigger, saveProfile, setGuardianMode, dismissResolvedAlert, completeOnboarding, loginAccount, signOut, addOrUpdateContact, removeContact, pairDevice, disconnectDevice,
+    legalStatus, legalChecked, legalRequired, legalGatePending, legalError,
+    setToast, setArmed, setTrigger, saveProfile, setGuardianMode, dismissResolvedAlert, completeOnboarding, loginAccount, signOut, acceptLegalUpdate, refreshLegalStatus, addOrUpdateContact, removeContact, pairDevice, disconnectDevice,
     fireAlert, closeActiveAlert, clearActivities, clearData, deleteAccount, refreshNetwork, scanNetworkQr, rotateQr, removeNetworkLink,
     setIncomingAlert, clearSentinelOffer: () => setSentinelOffer(null), setConnectionGuard, setAppearance, refreshSystemHealth, sendTestEmail, testAlarmSound, refreshCurrentLocation
   };
