@@ -1,6 +1,12 @@
 const alertUrl = import.meta.env.VITE_ALERT_API_URL || 'http://localhost:8787/api/alert';
 
 export const CONFIG = {
+  safetyNoticeUrl: 'https://wallaasafety.com/legal/wallaa-safety-notice-2.1-2026-09-16.pdf',
+  termsUrl: 'https://wallaasafety.com/legal/wallaa-terms-2.1-2026-09-16.pdf',
+  privacyPolicyUrl: 'https://wallaasafety.com/legal/wallaa-privacy-policy-2.1-2026-09-16.pdf',
+  safetyNoticeVersion: '2.1',
+  termsVersion: '2.1',
+  privacyPolicyVersion: '2.1',
   apiUrl: alertUrl,
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL || alertUrl.replace(/\/api\/alert\/?$/, ''),
   demoMode: String(import.meta.env.VITE_DEMO_MODE || 'false').toLowerCase() === 'true',

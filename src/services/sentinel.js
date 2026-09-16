@@ -96,8 +96,8 @@ export async function applyAsSentinel(identity, application) {
   form.append('identityDeclaration', String(application.identityDeclaration === true));
   form.append('sentinelTermsAccepted', String(application.sentinelTermsAccepted === true));
   form.append('privacyNoticeAccepted', String(application.privacyNoticeAccepted === true));
-  form.append('sentinelTermsVersion', application.sentinelTermsVersion || '1.0');
-  form.append('privacyNoticeVersion', application.privacyNoticeVersion || '1.0');
+  form.append('sentinelTermsVersion', '1.1');
+  form.append('privacyNoticeVersion', '1.1');
   form.append('documentFront', application.documentFront);
   if (application.documentBack) form.append('documentBack', application.documentBack);
   form.append('selfieDocument', application.selfieDocument);
