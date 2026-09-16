@@ -17,6 +17,8 @@ export default function OnboardingScreen({ profile, onComplete, onLogin, t, init
     phone: profile.phone || '',
     countryCode: profile.countryCode || '+39',
     dateOfBirth: profile.dateOfBirth || '',
+    birthCountry: profile.birthCountry || '',
+    birthPlace: profile.birthPlace || '',
     privacyAccepted: false,
     termsAccepted: false,
     safetyNoticeAccepted: false,
@@ -37,6 +39,8 @@ export default function OnboardingScreen({ profile, onComplete, onLogin, t, init
         form.email.trim() &&
         form.phone.trim() &&
         form.dateOfBirth &&
+        form.birthCountry.trim() &&
+        form.birthPlace.trim() &&
         passwordsMatch &&
         form.privacyAccepted &&
         form.termsAccepted &&
@@ -168,6 +172,8 @@ export default function OnboardingScreen({ profile, onComplete, onLogin, t, init
               autoComplete="bday"
             />
           </label>
+          <label className="v420-dob-row"><span>Paese di nascita</span><select value={form.birthCountry} onChange={(e)=>set('birthCountry',e.target.value)}><option value="">Seleziona Paese</option>{PHONE_COUNTRIES.map((country)=><option key={country.iso} value={country.name}>{country.flag} {country.name}</option>)}</select></label>
+          <label className="v420-dob-row"><span>Luogo / città di nascita</span><input value={form.birthPlace} onChange={(e)=>set('birthPlace',e.target.value)} placeholder="Luogo di nascita"/></label>
         </>}
         <label className="v405-password-row"><Lock size={17}/><input value={form.password} onChange={(e)=>set('password',e.target.value)} placeholder={isLogin ? t('v405.auth.password') : t('v4.onboarding.password')} type={showPassword ? 'text' : 'password'} autoComplete={isLogin ? 'current-password' : 'new-password'}/><button type="button" onClick={()=>setShowPassword((value)=>!value)} aria-label={showPassword ? t('v404.safetyWord.hide') : t('v404.safetyWord.show')}>{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button></label>
         {!isLogin && <>

@@ -68,6 +68,8 @@ export default function SettingsScreen({
                 <small>Data di nascita</small>
                 <strong>{formatDateOfBirth(profile.dateOfBirth)}</strong>
               </div>
+              <div className="v412-profile-value"><small>Paese di nascita</small><strong>{profile.birthCountry || '—'}</strong></div>
+              <div className="v412-profile-value"><small>Luogo di nascita</small><strong>{profile.birthPlace || '—'}</strong></div>
             </div>
             <button className="v412-edit-profile" type="button" onClick={() => { setDraftProfile(profile); setEditingProfile(true); }}><Pencil size={16}/> {t('v412.settings.editMyData')}</button>
           </>
@@ -112,6 +114,8 @@ export default function SettingsScreen({
                   autoComplete="bday"
                 />
               </label>
+              <label className="wide v420-profile-dob"><span>Paese di nascita</span><select value={draftProfile.birthCountry || ''} onChange={(e)=>setDraftProfile({...draftProfile,birthCountry:e.target.value})}><option value="">Seleziona Paese</option>{PHONE_COUNTRIES.map((country)=><option key={country.iso} value={country.name}>{country.flag} {country.name}</option>)}</select></label>
+              <label className="wide v420-profile-dob"><span>Luogo / città di nascita</span><input value={draftProfile.birthPlace || ''} onChange={(e)=>setDraftProfile({...draftProfile,birthPlace:e.target.value})} placeholder="Luogo di nascita"/></label>
             </div>
             <div className="v412-profile-actions"><button className="cancel" type="button" onClick={()=>{setDraftProfile(profile);setEditingProfile(false);}}>{t('common.close')}</button><button className="save" type="button" onClick={saveEditedProfile}>{t('common.save')}</button></div>
           </>

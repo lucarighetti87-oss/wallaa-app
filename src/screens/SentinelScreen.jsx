@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import SentinelApplicationScreen from './SentinelApplicationScreen';
 import { ArrowLeft, CheckCircle2, ChevronRight, MapPin, MessageCircle, ShieldCheck } from 'lucide-react';
 import {
   acceptSentinelOffer,
@@ -210,12 +211,13 @@ function SentinelInterventionMap({ incident, currentLocation }) {
   );
 }
 
-export default function SentinelScreen({ networkIdentity, currentLocation, onRefreshLocation, onBack, onHome, onOpenChat, sentinelOffer, clearSentinelOffer, setToast, plan = 'basic' }) {
+export default function SentinelScreen({ networkIdentity, profile, currentLocation, onRefreshLocation, onBack, onHome, onOpenChat, sentinelOffer, clearSentinelOffer, setToast, plan = 'basic' }) {
   const [state, setState] = useState(null);
   const [nearby, setNearby] = useState([]);
   const [busy, setBusy] = useState(false);
   const [incident, setIncident] = useState(null);
   const [serverOffer, setServerOffer] = useState(null);
+  const [showApplication,setShowApplication] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!networkIdentity?.authToken) return;
@@ -310,6 +312,7 @@ export default function SentinelScreen({ networkIdentity, currentLocation, onRef
   const offer = serverOffer || sentinelOffer || null;
   const available = Boolean(state?.profile?.available);
   const verified = Boolean(state?.profile?.verified);
+  const applicationStatus = state?.application?.status || null;
   const enabled = state?.enabled !== false;
 
   async function run(task) {
@@ -386,13 +389,15 @@ export default function SentinelScreen({ networkIdentity, currentLocation, onRef
     </section>;
   }
 
+  if (showApplication) return <SentinelApplicationScreen networkIdentity={networkIdentity} profile={profile} onBack={()=>setShowApplication(false)} onSubmitted={async()=>{setShowApplication(false);await refresh();}} setToast={setToast}/>;
+
   return <section className="sentinel-page">
     <div className="sentinel-top"><button onClick={onBack}><ArrowLeft/></button><button className="sentinel-brand" onClick={onHome}><img src="/wallaa-app-icon.png" alt="Wallaa"/><b>Wallaa</b></button><span/></div>
     {offer && <div className="sentinel-offer"><div className="sentinel-offer-title"><span>RICHIESTA DI AIUTO</span><h2>NELLE VICINANZE</h2></div><div className="sentinel-offer-radar"><i/><MapPin/><strong>{distanceLabel(offer.distanceM)}</strong><small>zona approssimativa</small></div><p>Prima di accettare vedi solo distanza e zona approssimativa. La posizione precisa viene mostrata dopo l'accettazione.</p><div className="sentinel-offer-actions"><button disabled={busy} onClick={declineOffer}>Non posso</button><button disabled={busy} onClick={acceptOffer}>Accetta</button></div></div>}
     <div className="sentinel-hero"><img src="/sentinel-shield.png" alt="Wallaa Sentinel"/><div><small>WALLAA SENTINEL</small><h1>La rete che rende Wallaa più forte</h1><p>Persone verificate e disponibili nelle vicinanze possono aiutare quando serve.</p></div></div>
 
-    {!state?.profile ? <div className="sentinel-join"><h2>Diventa Sentinel</h2><p>Metti la tua disponibilità al servizio della community Wallaa.</p><button className="sentinel-primary" disabled={busy} onClick={() => run(() => applyAsSentinel(networkIdentity))}>Invia candidatura</button></div> :
-      <div className="sentinel-status-card"><div><small>STATO SENTINEL</small><h2>{verified ? 'Profilo verificato' : 'Candidatura ricevuta'}</h2><p>{verified ? 'Puoi scegliere quando essere disponibile.' : 'La verifica viene gestita da Wallaa.'}</p></div><span className={verified ? 'verified' : 'pending'}>{verified ? <CheckCircle2/> : 'IN VERIFICA'}</span></div>}
+    {!state?.profile ? <div className="sentinel-join"><h2>Diventa Sentinel</h2><p>Metti la tua disponibilità al servizio della community Wallaa.</p><button className="sentinel-primary" disabled={busy} onClick={() => setShowApplication(true)}>Inizia candidatura</button></div> :
+      <div className="sentinel-status-card"><div><small>STATO SENTINEL</small><h2>{verified ? 'Profilo verificato' : applicationStatus === 'rejected' ? 'Candidatura non approvata' : applicationStatus === 'needs_resubmission' ? 'Nuovi documenti richiesti' : 'Candidatura ricevuta'}</h2><p>{verified ? 'Puoi scegliere quando essere disponibile.' : applicationStatus === 'rejected' ? (state?.application?.reviewNote || 'La candidatura non è stata approvata.') : applicationStatus === 'needs_resubmission' ? (state?.application?.reviewNote || 'Wallaa richiede un nuovo caricamento.') : 'La verifica viene gestita manualmente da Wallaa.'}</p></div><span className={verified ? 'verified' : 'pending'}>{verified ? <CheckCircle2/> : 'IN VERIFICA'}</span></div>}
     {verified && <button className={`sentinel-availability ${available ? 'on' : ''}`} disabled={busy} onClick={toggleAvailability}><span><b>{available ? 'Disponibile' : 'Non disponibile'}</b><small>{available ? 'Puoi ricevere richieste Sentinel' : 'Non riceverai richieste'}</small></span><i/></button>}
     <div className="sentinel-nearby"><div className="sentinel-section-title"><div><small>RETE VICINA</small><h2>Sentinel nella tua area</h2></div><b>{nearby.length}</b></div>{nearby.slice(0,6).map((item, index) => <div className="sentinel-nearby-row" key={item.id || index}><img src="/sentinel-shield.png" alt=""/><span><b>{`Sentinel ${index + 1}`}</b><small>{item.statusLabel || 'Disponibile'} · posizione protetta</small></span></div>)}</div>
   </section>;

@@ -52,7 +52,7 @@ function pruneActivities(items = []) {
 
 const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const [loaded, setLoaded] = useState(false);
-  const [profile, setProfile] = useState({ customerId: '', name: '', firstName: '', lastName: '', email: '', phone: '', countryCode: '+39', safetyWord: '', language: defaultLanguage, plan: 'basic', sosLocationEnabled: true, liveProtectionEnabled: false, onboardingComplete: false });
+  const [profile, setProfile] = useState({ customerId: '', name: '', firstName: '', lastName: '', email: '', phone: '', countryCode: '+39', birthCountry: '', birthPlace: '', safetyWord: '', language: defaultLanguage, plan: 'basic', sosLocationEnabled: true, liveProtectionEnabled: false, onboardingComplete: false });
   const [contacts, setContacts] = useState([]);
   const [device, setDevice] = useState(null);
   const [armed, setArmedState] = useState(true);
@@ -566,7 +566,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     if (profileSyncTimerRef.current) { clearTimeout(profileSyncTimerRef.current); profileSyncTimerRef.current = null; }
     await storage.clearAll();
 
-    const emptyProfile = { customerId:'',name:'',firstName:'',lastName:'',email:'',phone:'',countryCode:'+39',safetyWord:'',language:currentLanguage(),plan:'basic',sosLocationEnabled:true,liveProtectionEnabled:false,privacyAccepted:false,termsAccepted:false,onboardingComplete:false };
+    const emptyProfile = { customerId:'',name:'',firstName:'',lastName:'',email:'',phone:'',countryCode:'+39',birthCountry:'',birthPlace:'',safetyWord:'',language:currentLanguage(),plan:'basic',sosLocationEnabled:true,liveProtectionEnabled:false,privacyAccepted:false,termsAccepted:false,onboardingComplete:false };
     const identity = { installationId: currentIdentity?.installationId || makeId(), userId:'', authToken:'', qrToken:'', qrPayload:'' };
     await storage.setProfile(emptyProfile);
     await storage.setNetworkIdentity(identity);
@@ -726,7 +726,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       const identity = savedIdentity || newNetworkIdentity();
       const legacyHasName = Boolean(savedProfile?.name?.trim());
       const normalizedProfile = {
-        name: '', firstName: '', lastName: '', email: '', phone: '', countryCode: '+39', safetyWord: '', plan: 'basic', sosLocationEnabled: true, liveProtectionEnabled: false, privacyAccepted: false, termsAccepted: false,
+        name: '', firstName: '', lastName: '', email: '', phone: '', countryCode: '+39', birthCountry: '', birthPlace: '', safetyWord: '', plan: 'basic', sosLocationEnabled: true, liveProtectionEnabled: false, privacyAccepted: false, termsAccepted: false,
         ...savedProfile,
         language: savedProfile?.language || defaultLanguage,
         onboardingComplete: savedProfile?.onboardingComplete ?? legacyHasName
@@ -1005,7 +1005,9 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       !next.lastName?.trim() ||
       !next.email?.trim() ||
       !next.phone?.trim() ||
-      !next.dateOfBirth?.trim()
+      !next.dateOfBirth?.trim() ||
+      !next.birthCountry?.trim() ||
+      !next.birthPlace?.trim()
     ) throw new Error(tx('v405.auth.completeFields'));
     if (!next.privacyAccepted || !next.termsAccepted || !next.safetyNoticeAccepted) throw new Error(tx('v405.auth.acceptLegal'));
     if (!password || password.length < 8) throw new Error(tx('v405.auth.passwordLength'));

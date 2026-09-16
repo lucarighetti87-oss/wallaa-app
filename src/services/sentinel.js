@@ -87,7 +87,29 @@ export function normalizeNearbyPayload(payload) {
 }
 
 export const getSentinelProfile = (identity) => request('/api/sentinel/me', { identity });
-export const applyAsSentinel = (identity) => request('/api/sentinel/apply', { method: 'POST', identity, body: {} });
+export async function applyAsSentinel(identity, application) {
+  const form = new FormData();
+  form.append('documentType', application.documentType);
+  form.append('documentCountry', application.documentCountry);
+  form.append('documentExpiry', application.documentExpiry);
+  form.append('challengeCode', application.challengeCode || '');
+  form.append('identityDeclaration', String(application.identityDeclaration === true));
+  form.append('sentinelTermsAccepted', String(application.sentinelTermsAccepted === true));
+  form.append('privacyNoticeAccepted', String(application.privacyNoticeAccepted === true));
+  form.append('sentinelTermsVersion', application.sentinelTermsVersion || '1.0');
+  form.append('privacyNoticeVersion', application.privacyNoticeVersion || '1.0');
+  form.append('documentFront', application.documentFront);
+  if (application.documentBack) form.append('documentBack', application.documentBack);
+  form.append('selfieDocument', application.selfieDocument);
+  const uploadHeaders = {
+    ...(identity?.installationId ? { 'x-wallaa-installation-id': identity.installationId } : {}),
+    ...(identity?.authToken ? { 'x-wallaa-install-token': identity.authToken, 'x-wallaa-auth-token': identity.authToken, 'Authorization': `Bearer ${identity.authToken}` } : {})
+  };
+  const response = await fetch(`${CONFIG.apiBaseUrl}/api/sentinel/apply`, { method:'POST', headers:uploadHeaders, body:form });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `Sentinel non disponibile (${response.status})`);
+  return payload;
+}
 export const setSentinelAvailability = (identity, available) => request('/api/sentinel/availability', { method: 'POST', identity, body: { available: Boolean(available) } });
 export const sendSentinelPresence = (identity, location) => request('/api/sentinel/presence', {
   method: 'POST',

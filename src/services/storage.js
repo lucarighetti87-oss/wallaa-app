@@ -29,7 +29,7 @@ async function setJson(key, value) {
 }
 
 export const storage = {
-  getProfile: () => getJson(KEYS.profile, { name: '', firstName: '', lastName: '', email: '', phone: '', countryCode: '+39', safetyWord: '', plan: 'basic', sosLocationEnabled: true, onboardingComplete: false }),
+  getProfile: () => getJson(KEYS.profile, { name: '', firstName: '', lastName: '', email: '', phone: '', countryCode: '+39', birthCountry: '', birthPlace: '', safetyWord: '', plan: 'basic', sosLocationEnabled: true, onboardingComplete: false }),
   setProfile: (value) => setJson(KEYS.profile, value),
   getContacts: () => getJson(KEYS.contacts, []),
   setContacts: (value) => setJson(KEYS.contacts, value),
