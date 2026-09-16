@@ -1,5 +1,28 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
+
+// WALLAA_ADMIN_LOCATION_REQUEST_V1
+function normalizeLocationRequestData(raw = {}) {
+  const nested = raw?.data && typeof raw.data === 'object' ? raw.data : {};
+  return { ...raw, ...nested };
+}
+
+function emitAdminLocationRequest(raw = {}) {
+  const data = normalizeLocationRequestData(raw);
+  if (String(data?.type || '') !== 'wallaa_location_request') return false;
+
+  try {
+    window.dispatchEvent(new CustomEvent('wallaa:admin-location-request', {
+      detail: {
+        requestId: data?.requestId || '',
+        requestedAt: data?.requestedAt || ''
+      }
+    }));
+  } catch {}
+
+  return true;
+}
+
 import { Preferences } from '@capacitor/preferences';
 import { showLocalSafetyNotification, feedbackWarning } from './nativeFeedback';
 
@@ -35,6 +58,7 @@ export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentin
     onError?.(error);
   }));
   handles.push(await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+    if (emitAdminLocationRequest(notification?.data || {})) return;
     console.info('[WALLAA][PUSH] received foreground', notification?.data?.type || 'unknown', notification?.data?.alertId || '');
     if (notification?.data?.type === 'wallaa_sos') {
       const alert = normalizePush(notification);
@@ -67,6 +91,7 @@ export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentin
     if (notification?.data?.type === 'wallaa_sentinel_request') { feedbackWarning(); const d=notification?.data||{}; onSentinelOffer?.({ offerId:d.offerId||'', incidentId:d.incidentId||'', distanceM:Number(d.distanceM||0), createdAt:d.createdAt||new Date().toISOString() }); }
   }));
   handles.push(await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+    if (emitAdminLocationRequest(action?.notification?.data || {})) return;
     console.info('[WALLAA][PUSH] notification action', action?.notification?.data?.type || 'unknown');
     const notification = action?.notification;
     if (notification?.data?.type === 'wallaa_sos') onAlert?.(normalizePush(notification));

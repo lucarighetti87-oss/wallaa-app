@@ -499,7 +499,71 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   // Legacy 45s Sentinel presence loop removed in v4.0.68.
   // The universal 30s heartbeat above is now the single source of Sentinel liveness.
 
-  // WALLAA_V4_0_62_AUTHORIZED_LOCATION_SNAPSHOT
+
+  // WALLAA_ADMIN_LOCATION_REQUEST_HANDLER_V1
+  // Best-effort: se la WebView e viva, aggiorna subito.
+  // Se iOS sospende/termina l'app, la notifica visibile consente all'utente
+  // di riaprire Wallaa e completare l'aggiornamento autorizzato.
+  useEffect(() => {
+    if (!loaded || !networkIdentity?.authToken) return undefined;
+
+    let busy=false;
+
+    const handleAdminLocationRequest = async () => {
+      if (busy) return;
+      if (profileRef.current?.liveProtectionEnabled !== true) return;
+      if (profileRef.current?.sosLocationEnabled === false) return;
+
+      busy=true;
+
+      try {
+        setLocationStatus('checking');
+
+        const location=await getCurrentLocation();
+
+        setCurrentLocation(location);
+        setLocationStatus('ready');
+
+        await sendAuthorizedLocationSnapshot(
+          networkIdentityRef.current,
+          location,
+          telemetryRef.current?.battery??null
+        );
+
+        console.info(
+          '[WALLAA][ADMIN_LOCATION_REQUEST] snapshot uploaded',
+          location?.capturedAt || ''
+        );
+      } catch(error) {
+        setLocationStatus('error');
+        console.warn(
+          '[WALLAA][ADMIN_LOCATION_REQUEST] unavailable',
+          error?.message || error
+        );
+      } finally {
+        busy=false;
+      }
+    };
+
+    window.addEventListener(
+      'wallaa:admin-location-request',
+      handleAdminLocationRequest
+    );
+
+    return () => {
+      window.removeEventListener(
+        'wallaa:admin-location-request',
+        handleAdminLocationRequest
+      );
+    };
+  }, [
+    loaded,
+    networkIdentity?.authToken,
+    profile?.liveProtectionEnabled,
+    profile?.sosLocationEnabled
+  ]);
+
+// WALLAA_V4_0_62_AUTHORIZED_LOCATION_SNAPSHOT
   // Last-known foreground snapshot for the safety Admin. This does not enable background Live Protection.
   useEffect(() => {
     if (!loaded || !networkIdentity?.authToken || profile?.sosLocationEnabled === false) return undefined;
