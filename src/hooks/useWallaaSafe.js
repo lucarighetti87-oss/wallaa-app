@@ -73,6 +73,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const [incomingAlert, setIncomingAlert] = useState(null);
   const [sentinelOffer, setSentinelOffer] = useState(null);
   const [messagePush, setMessagePush] = useState(null);
+  const [centralMessagePush, setCentralMessagePush] = useState(null);
   const [connectionGuard, setConnectionGuardState] = useState({ enabled: true, delaySeconds: 60 });
   const [appearance, setAppearanceState] = useState({ mode: 'system' });
   const [systemHealth, setSystemHealth] = useState({ status: 'idle' });
@@ -361,6 +362,9 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
         onMessage: (message) => {
           setMessagePush({
             ...message,
+      onCentralMessage: (payload) => {
+        setCentralMessagePush(payload);
+      },
             receivedAt: Date.now()
           });
         },
@@ -482,7 +486,19 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       try {
         let location=null;
         try { location=await getCurrentLocation(); if(!stopped&&location) setCurrentLocation(location); } catch {}
-        if(!stopped) await sendUniversalSentinelHeartbeat(networkIdentityRef.current,location);
+        if(!stopped) {
+          const heartbeat = await sendUniversalSentinelHeartbeat(networkIdentityRef.current,location);
+          if(!stopped) {
+            const activeSentinel = heartbeat?.ignored !== true;
+            const status = String(heartbeat?.status || 'offline').toLowerCase();
+            await storage.setNativeSentinel({
+              active: activeSentinel,
+              available: activeSentinel && status !== 'offline',
+              status,
+              syncedAt: new Date().toISOString()
+            });
+          }
+        }
       } catch(error) { console.warn('[WALLAA][SENTINEL] heartbeat',error?.message||error); }
       finally { running=false; }
     };
@@ -511,7 +527,6 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
 
     const handleAdminLocationRequest = async () => {
       if (busy) return;
-      if (profileRef.current?.liveProtectionEnabled !== true) return;
       if (profileRef.current?.sosLocationEnabled === false) return;
 
       busy=true;
@@ -1247,11 +1262,9 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     setPairingState('scanning');
     try {
       const paired = await pairWallaaButton({ onProgress: (state) => setPairingState(state === 'found' ? 'press-detected' : state) });
-      if (!paired.portableIdentity || !paired.hardwareId) {
-        const identityError = new Error('Questo Wallaa Button non espone ancora un codice hardware permanente. Contatta l’assistenza Wallaa prima di associarlo.');
-        identityError.code = 'DEVICE_IDENTITY_NOT_STABLE';
-        throw identityError;
-      }
+      // Anche un Button legacy privo di hardwareId deve arrivare al server.
+      // Il server decide se esiste una finestra Admin di pairing valida
+      // e, solo in quel caso, assegna l'identità LEGACY permanente.
       const claim = await claimWallaaDevice(networkIdentityRef.current, paired);
       const wallaaDevice = {
         ...paired,
@@ -1267,7 +1280,24 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       if (connectionGuardRef.current.enabled) ensureLocalNotificationPermission().catch(() => {});
       return wallaaDevice;
     } catch (error) {
-      setPairingState('idle'); setToast({ type: 'error', text: error.message || 'Pairing non riuscito.' }); throw error;
+      setPairingState('idle');
+
+      const code = String(error?.code || '').toUpperCase();
+
+      const permanentlyOwned =
+        code === 'WALLAA_DEVICE_PERMANENTLY_CLAIMED' ||
+        code === 'DEVICE_ALREADY_OWNED';
+
+      const message = permanentlyOwned
+        ? 'Device already registered. This Wallaa device has already been registered to another account and cannot be paired again. Please contact Wallaa Support if you need assistance.'
+        : (error?.message || 'Pairing failed.');
+
+      setToast({
+        type: 'error',
+        text: message
+      });
+
+      throw error;
     }
   }, [pushActivity, tx]);
 
@@ -1395,6 +1425,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     loaded, profile, contacts, device, armed, trigger, activities, telemetry, pairingState, busy, dispatchingAlert, dispatchStage, ready, toast, lastAlert,
     networkIdentity, networkState, qrDataUrl, incomingAlert, sentinelOffer, connectionGuard, appearance, connectionStatus, lastSignalAgeSeconds,
     messagePush,
+    centralMessagePush,
     signalQuality, safetyLevel, activeAlert, resolvedAlert, systemHealth, currentLocation, locationStatus, authenticated: Boolean(networkIdentity?.authToken && profile?.onboardingComplete),
     legalStatus, legalChecked, legalRequired, legalGatePending, legalError,
     setToast, setArmed, setTrigger, saveProfile, setGuardianMode, dismissResolvedAlert, completeOnboarding, loginAccount, signOut, acceptLegalUpdate, refreshLegalStatus, addOrUpdateContact, removeContact, pairDevice, disconnectDevice,

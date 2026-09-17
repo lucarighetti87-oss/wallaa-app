@@ -108,6 +108,10 @@ export async function pairWallaaButton({ onProgress } = {}) {
             id: decoded.id,
             name: 'Wallaa Button',
             battery: decoded.battery ?? null,
+            hardwareId: decoded.hardwareId || '',
+            advertisedName: decoded.advertisedName || '',
+            identitySource: decoded.identitySource || '',
+            portableIdentity: decoded.portableIdentity === true,
             pairingPacketId: decoded.packetId ?? null,
             pairingButtonEvent: decoded.button || null,
             pairedAt: new Date().toISOString()
