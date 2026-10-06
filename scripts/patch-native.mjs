@@ -21,6 +21,8 @@ ${xml}
 const iosPlist = path.resolve('ios/App/App/Info.plist');
 if (fs.existsSync(iosPlist)) {
   let plist = fs.readFileSync(iosPlist, 'utf8');
+  plist = plist.replace(/<key>CFBundleShortVersionString<\/key>\s*<string>[^<]*<\/string>/, `<key>CFBundleShortVersionString</key>\n\t<string>${release.version}</string>`);
+  plist = plist.replace(/<key>CFBundleVersion<\/key>\s*<string>[^<]*<\/string>/, `<key>CFBundleVersion</key>\n\t<string>${release.wallaaBuild}</string>`);
   // Export compliance must live at the TOP LEVEL of Info.plist.
   // v4.0.13 could accidentally insert this key inside UIApplicationSceneManifest,
   // which makes UIKit treat a Boolean as a scene-configuration collection and crash at launch.

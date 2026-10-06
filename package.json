@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test tests/bthome.test.mjs tests/moko-button.test.mjs tests/moko-monitor.test.mjs tests/sos-gps-fallback.test.mjs",
+    "test": "node --test tests/bthome.test.mjs tests/moko-button.test.mjs tests/moko-monitor.test.mjs tests/sos-gps-fallback.test.mjs tests/native-release-version.test.mjs",
     "cap:sync": "npx cap sync && node scripts/patch-native.mjs",
     "ios:add": "npx cap add ios && npm run cap:sync",
     "ios:open": "npx cap open ios",
