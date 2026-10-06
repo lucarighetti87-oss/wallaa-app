@@ -13,7 +13,9 @@ import {
 
 import HoldToConfirmButton from '../components/HoldToConfirmButton';
 import { getMySosSentinel } from '../services/sentinel';
+import CentralSosChat from '../components/CentralSosChat.jsx';
 
+import WallaaBrandShield from '../components/WallaaBrandShield';
 function elapsedSince(value){
   const start = new Date(value || Date.now()).getTime();
   return Math.max(0, Math.floor((Date.now() - start) / 1000));
@@ -223,8 +225,7 @@ export default function ActiveAlertScreen({
   busy,
   networkIdentity,
   currentLocation,
-  onOpenChat
-}) {
+  onOpenChat, centralMessagePush}) {
   const [elapsed, setElapsed] = useState(() => elapsedSince(alert?.at));
   const [sentinel, setSentinel] = useState(null);
 
@@ -325,6 +326,7 @@ export default function ActiveAlertScreen({
 
   return (
     <div className="aa-focus aa-sos-active-screen">
+      {alert?.location?.approximate && <p className="v402-privacy-note">Zona indicativa rilevata dalla rete Wallaa. La posizione proviene da un telefono che ha visto il pulsante nelle vicinanze.</p>}
       <div
         className="aa-sos-network-bg"
         aria-hidden="true"
@@ -337,10 +339,7 @@ export default function ActiveAlertScreen({
           onClick={onHome}
           aria-label="Torna alla Home"
         >
-          <img
-            src="/wallaa-app-icon.png"
-            alt="Wallaa"
-          />
+          <WallaaBrandShield alt="Wallaa" />
           <span>
             <strong>Wallaa</strong>
             <small>SAFETY</small>
@@ -516,6 +515,13 @@ export default function ActiveAlertScreen({
         La centrale è già stata allertata. Usa questo comando solo
         quando la situazione è realmente risolta.
       </p>
-    </div>
+
+      <CentralSosChat
+        alert={alert}
+        networkIdentity={networkIdentity}
+        centralMessagePush={centralMessagePush}
+      />
+
+</div>
   );
 }

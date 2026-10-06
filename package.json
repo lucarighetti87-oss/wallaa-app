@@ -1,18 +1,19 @@
 {
   "name": "wallaa-safe-button",
   "private": true,
-  "version": "4.0.68",
+  "version": "4.0.88",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --test tests/bthome.test.mjs tests/moko-button.test.mjs tests/moko-monitor.test.mjs tests/sos-gps-fallback.test.mjs",
     "cap:sync": "npx cap sync && node scripts/patch-native.mjs",
     "ios:add": "npx cap add ios && npm run cap:sync",
     "ios:open": "npx cap open ios",
     "android:add": "npx cap add android && npm run cap:sync",
-    "android:open": "npx cap open android"
+    "android:open": "npx cap open android",
+    "test:legacy": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@capacitor-community/bluetooth-le": "^8.3.0",
@@ -34,6 +35,12 @@
     "@capacitor/cli": "^8.5.1",
     "@capacitor/ios": "^8.5.1",
     "@vitejs/plugin-react": "4.4.1",
-    "vite": "6.4.1"
+    "vite": "^6.4.4"
+  },
+  "wallaaBuild": 88,
+  "overrides": {
+    "xcode": {
+      "uuid": "^11.1.1"
+    }
   }
 }

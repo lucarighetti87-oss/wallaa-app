@@ -78,7 +78,7 @@ export default function SecurityCheckScreen({
         <div className={`w49-scan-core ${phase === 'done' ? 'done' : ''}`} aria-live="polite">
           <span className="w49-scan-ring ring-a"/><span className="w49-scan-ring ring-b"/><span className="w49-scan-ring ring-c"/>
           <div className="w49-scan-center">
-            {phase === 'running' ? <LoaderCircle className="w49-spin" size={42}/> : allGood ? <ShieldCheck size={44}/> : <Wifi size={44}/>} 
+            {phase === 'running' ? <LoaderCircle className="w49-spin" size={42}/> : allGood ? <ShieldCheck size={44}/> : <Wifi size={44}/>}
             <strong>{phase === 'running' ? `${progress}%` : allGood ? 'Sistema pronto' : 'Verifica completata'}</strong>
             <small>{phase === 'running' ? 'Controllo in corso…' : `${healthyCount}/${checks.length} controlli operativi`}</small>
           </div>

@@ -1,3 +1,5 @@
+import { setNetworkParticipation, getOwnedNetworkDevices, reportNetworkObservations, getDeviceNetworkLocation, setDeviceNetworkTracking as saveDeviceNetworkTracking } from '../services/deviceNetwork';
+import { configureMokoConnection, getMokoConnectionStatus, supportsMokoConnection } from '../services/mokoConnection';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { storage } from '../services/storage';
@@ -59,6 +61,10 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const [trigger, setTriggerState] = useState('double_press');
   const [activities, setActivities] = useState([]);
   const [telemetry, setTelemetry] = useState({ battery: null, rssi: null, seenAt: null });
+  const [networkOwnedDevices, setNetworkOwnedDevices] = useState([]);
+  const [networkDevice, setNetworkDevice] = useState({trackingEnabled:false,lastObservation:null});
+  const networkObservationBuffer = useRef(new Map());
+  const [mokoConnection, setMokoConnection] = useState({ state: 'disabled', connected: false, ready: false });
   const [pairingState, setPairingState] = useState('idle');
   const [busy, setBusy] = useState(false);
   const [dispatchingAlert, setDispatchingAlert] = useState(false);
@@ -147,7 +153,8 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       claimToken: device?.claimToken || '',
       profile: {
         firstName: profile?.firstName || '', lastName: profile?.lastName || '', name: profile?.name || '',
-        phone: profile?.phone || '', safetyWord: profile?.safetyWord || '', language: profile?.language || 'en'
+        phone: profile?.phone || '', safetyWord: profile?.safetyWord || '', language: profile?.language || 'en',
+        liveProtectionEnabled: profile?.liveProtectionEnabled === true, sosLocationEnabled: profile?.sosLocationEnabled !== false, plan: profile?.plan || 'basic', networkObserverEnabled: profile?.networkObserverEnabled === true
       },
       contacts: (contacts || []).map((c) => ({
         name: c.name || '', email: c.email || '', phone: c.phone || '', role: c.role || 'guardian',
@@ -180,9 +187,10 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       await storage.clearNativeAlert();
     };
     consumeNativeAlert().catch(() => {});
+    const nativeTimer = setInterval(() => { if (document.visibilityState === 'visible') consumeNativeAlert().catch(() => {}); }, 1500);
     const onVisibility = () => { if (document.visibilityState === 'visible') consumeNativeAlert().catch(() => {}); };
     document.addEventListener('visibilitychange', onVisibility);
-    return () => { cancelled = true; document.removeEventListener('visibilitychange', onVisibility); };
+    return () => { cancelled = true; clearInterval(nativeTimer); document.removeEventListener('visibilitychange', onVisibility); };
   }, [loaded]);
 
   useEffect(() => {
@@ -194,7 +202,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     const media = globalThis.matchMedia?.('(prefers-color-scheme: dark)');
     const apply = () => {
       const systemDark = Boolean(media?.matches);
-      const mode = appearance.mode === 'system' ? 'dark' : appearance.mode;
+      const mode = appearance.mode === 'system' ? (systemDark ? 'dark' : 'light') : appearance.mode;
       document.documentElement.dataset.theme = mode;
       document.documentElement.dataset.themePreference = appearance.mode;
       document.documentElement.style.colorScheme = mode;
@@ -326,18 +334,10 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     try {
       const cloud = await getWallaaContacts(identity);
       const cloudContacts = Array.isArray(cloud?.contacts) ? cloud.contacts.map(normalizeContact) : [];
-      if (cloudContacts.length) {
-        setContacts(cloudContacts);
-        contactsRef.current = cloudContacts;
-        await storage.setContacts(cloudContacts);
-        return cloudContacts;
-      }
-      if (contactsRef.current.length) {
-        const seeded = await syncWallaaContacts(identity, contactsRef.current);
-        const seededContacts = Array.isArray(seeded?.contacts) ? seeded.contacts.map(normalizeContact) : contactsRef.current;
-        setContacts(seededContacts); contactsRef.current = seededContacts; await storage.setContacts(seededContacts);
-        return seededContacts;
-      }
+      setContacts(cloudContacts);
+      contactsRef.current = cloudContacts;
+      await storage.setContacts(cloudContacts);
+      return cloudContacts;
     } catch (error) {
       console.warn('Wallaa contacts cloud sync skipped:', error?.message || error);
     }
@@ -355,7 +355,13 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       const push = await initWallaaPush({
         onToken: (token) => syncNetworkIdentity({ pushToken: token, baseIdentity: networkIdentityRef.current, nextProfile: profileRef.current }),
         onAlert: (alert) => {
-          playWallaaAlarm(); setIncomingAlert(alert);
+          if (alert?.opened) {
+            stopWallaaAlarm();
+            clearDeliveredWallaaNotifications().catch(() => {});
+          } else {
+            playWallaaAlarm();
+          }
+          setIncomingAlert(alert);
           pushActivity({ type: 'network-alert', status: 'error', titleKey: 'activity.networkSos', titleVars: { name: alert.ownerName }, location: alert.location }).catch(() => {});
         },
         onSentinelOffer: (offer) => setSentinelOffer(offer),
@@ -759,7 +765,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   }, [loaded, networkIdentity?.authToken, profile?.plan, profile?.liveProtectionEnabled]);
 
   useEffect(() => {
-    if (!activeAlert?.id || !activeAlert.active || profileRef.current?.plan !== 'pro') return undefined;
+    if (!activeAlert?.id || !activeAlert.active || profileRef.current?.plan !== 'pro' || profile?.sosLocationEnabled === false) return undefined;
     let stopped = false;
     let stopWatch = null;
     let lastPublishedAt = 0;
@@ -791,7 +797,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       stopped = true;
       stopWatch?.();
     };
-  }, [activeAlert?.id, activeAlert?.active]);
+  }, [activeAlert?.id, activeAlert?.active, profile?.plan, profile?.sosLocationEnabled]);
 
   useEffect(() => {
     let active = true;
@@ -873,15 +879,18 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   }, [defaultLanguage, initializeAccountServices, resetLocalSession]);
 
   useEffect(() => {
-    if (!loaded || !device?.id || !armed || !appVisible) {
+    if (!loaded || !networkIdentity?.authToken || !appVisible || ((!device?.id || !armed) && !profile?.networkObserverEnabled)) {
       stopBleScan().catch(() => {});
       return undefined;
     }
 
     startWallaaMonitor({
-      deviceId: device.id,
+      deviceId: armed ? device?.id : null,
+      hardwareId: device?.hardwareId,
+      communityEnabled: profile?.networkObserverEnabled === true,
+      onCommunityObservation: observation => networkObservationBuffer.current.set(observation.hardwareId,observation),
       onTelemetry: (data) => {
-        setTelemetry((prev) => ({ ...prev, battery:data.battery, rssi:data.rssi, seenAt:data.seenAt }));
+        setTelemetry((prev) => ({ ...prev, battery:data.battery, rssi:data.rssi, seenAt:data.seenAt, ...(data.protocol === 'moko-button' ? { motion:data.motion, acceleration:data.acceleration, batteryVoltageMv:data.batteryVoltageMv } : {}) }));
         const current = deviceRef.current;
         const identity = networkIdentityRef.current;
         if (!deviceClaimMigrationRef.current && current?.id && !current?.claimToken && data?.portableIdentity && data?.hardwareId && identity?.authToken) {
@@ -930,7 +939,83 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     }).catch((error) => setToast({ type: 'error', text: error.message || 'Impossibile avviare il monitor Bluetooth.' }));
 
     return () => { stopBleScan().catch(() => {}); };
-  }, [loaded, device?.id, armed, appVisible, fireAlert, pushActivity]);
+  }, [loaded, device?.id, device?.hardwareId, armed, appVisible, profile?.networkObserverEnabled, networkIdentity?.authToken, fireAlert, pushActivity]);
+
+  useEffect(() => {
+    if (!loaded || !networkIdentity?.authToken || !device?.hardwareId?.startsWith('MOKO:') || !supportsMokoConnection()) return undefined;
+    let stopped = false;
+    configureMokoConnection({ hardwareId: device.hardwareId, enabled: device.mokoContinuousEnabled !== false,
+      password: 'Moko4321', useExistingPassword: true }).catch(error => setToast({type:'error',text:error.message}));
+    const refresh = async () => {
+      try {
+        const status = await getMokoConnectionStatus();
+        if (stopped) return;
+        setMokoConnection(status);
+        if (status.connected) setTelemetry(prev => ({...prev, rssi:status.rssi ?? prev.rssi, seenAt:new Date().toISOString()}));
+      } catch (error) { if (!stopped) setMokoConnection({state:'unavailable',connected:false,ready:false}); }
+    };
+    refresh();
+    const timer = setInterval(refresh, 1500);
+    return () => { stopped = true; clearInterval(timer); };
+  }, [loaded, networkIdentity?.authToken, device?.hardwareId, device?.mokoContinuousEnabled]);
+
+  const setMokoConnectionOptions = useCallback(async ({enabled, password}) => {
+    const current = deviceRef.current;
+    if (!current?.hardwareId?.startsWith('MOKO:')) return;
+    try { await configureMokoConnection({hardwareId:current.hardwareId, enabled, password}); }
+    catch (error) { setToast({type:'error',text:error.message || 'Configurazione del pulsante non riuscita.'}); return false; }
+    const next = {...current, mokoContinuousEnabled:enabled};
+    setDevice(next); deviceRef.current=next; await storage.setDevice(next);
+    setToast({type:'success',text:enabled?'Connessione continua attivata. Verifica lo stato del pulsante.':'Connessione continua disattivata.'});
+    return true;
+  }, []);
+
+  useEffect(() => {
+    if (!loaded || !networkIdentity?.authToken || !profile?.networkObserverEnabled || !appVisible) return undefined;
+    let stopped=false, publishing=false;
+    const publish=async()=>{
+      if(stopped || publishing || !networkObservationBuffer.current.size) return;
+      publishing=true;
+      try{
+        const location=await getCurrentLocation();
+        if(stopped)return;
+        const items=[...networkObservationBuffer.current.values()].filter(x=>Date.now()-new Date(x.observedAt).getTime()<60000).slice(0,10);
+        if(items.length)await reportNetworkObservations(networkIdentityRef.current,location,items);
+        for(const item of items)if(networkObservationBuffer.current.get(item.hardwareId)===item)networkObservationBuffer.current.delete(item.hardwareId);
+        for(const [key,item] of networkObservationBuffer.current)if(Date.now()-new Date(item.observedAt).getTime()>60000)networkObservationBuffer.current.delete(key);
+      }catch{}finally{publishing=false;}
+    };
+    const timer=setInterval(publish,15000);
+    return()=>{stopped=true;clearInterval(timer);networkObservationBuffer.current.clear();};
+  },[loaded,networkIdentity?.authToken,profile?.networkObserverEnabled,appVisible]);
+
+  useEffect(()=>{
+    if(!loaded || !networkIdentity?.authToken || !device?.hardwareId?.startsWith('MOKO:') || !appVisible)return undefined;
+    let stopped=false;
+    const refresh=async()=>{try{const value=await getDeviceNetworkLocation(networkIdentityRef.current,device.hardwareId);if(!stopped)setNetworkDevice(value);}catch{if(!stopped)setNetworkDevice({trackingEnabled:false,lastObservation:null,unavailable:true});}};
+    refresh();const timer=setInterval(refresh,20000);
+    return()=>{stopped=true;clearInterval(timer);};
+  },[loaded,networkIdentity?.authToken,device?.hardwareId,appVisible]);
+
+  useEffect(()=>{
+    if(!loaded || !networkIdentity?.authToken || !appVisible)return undefined;
+    let stopped=false;
+    const refresh=async()=>{try{const value=await getOwnedNetworkDevices(networkIdentityRef.current);if(!stopped)setNetworkOwnedDevices(value.devices||[]);}catch{if(!stopped)setNetworkOwnedDevices([]);}};
+    refresh();const timer=setInterval(refresh,20000);return()=>{stopped=true;clearInterval(timer);};
+  },[loaded,networkIdentity?.authToken,appVisible]);
+
+  const setNetworkObserver=useCallback(async(enabled)=>{
+    try{
+      if(enabled)await requestLocationPermission();
+      await setNetworkParticipation(networkIdentityRef.current,enabled);
+      const next={...profileRef.current,networkObserverEnabled:enabled};setProfile(next);profileRef.current=next;await storage.setProfile(next);
+      setToast({type:'success',text:enabled?'Partecipazione alla rete Wallaa attivata.':'Partecipazione alla rete Wallaa disattivata.'});
+    }catch(error){setToast({type:'error',text:error.message});}
+  },[]);
+  const setDeviceNetworkTracking=useCallback(async(enabled)=>{
+    try{await saveDeviceNetworkTracking(networkIdentityRef.current,deviceRef.current,enabled);setNetworkDevice(prev=>({...prev,trackingEnabled:enabled,...(!enabled?{lastObservation:null}:{})}));}
+    catch(error){setToast({type:'error',text:error.message});}
+  },[]);
 
   const lastSignalAgeSeconds = useMemo(() => telemetry.seenAt ? Math.max(0, Math.round((clock - new Date(telemetry.seenAt).getTime()) / 1000)) : null, [telemetry.seenAt, clock]);
 
@@ -938,6 +1023,11 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
 
   const connectionStatus = useMemo(() => {
     if (!device?.id) return 'absent';
+    if (device?.hardwareId?.startsWith('MOKO:') && device.mokoContinuousEnabled !== false && supportsMokoConnection() && ['press','any_press'].includes(trigger)) {
+      if (mokoConnection.connected) return 'connected';
+      if (mokoConnection.disconnectedAt) return 'disconnected';
+      return 'searching';
+    }
     if (eventOnlyButton) {
       // Shelly BLU Button Tough is normally silent and advertises when an event occurs.
       // Silence must never be interpreted as a disconnect.
@@ -948,11 +1038,15 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     if (lastSignalAgeSeconds <= 25) return 'connected';
     if (lastSignalAgeSeconds <= 60) return 'weak';
     return 'disconnected';
-  }, [device?.id, eventOnlyButton, lastSignalAgeSeconds]);
+  }, [device?.id, device?.hardwareId, device?.mokoContinuousEnabled, trigger, mokoConnection, eventOnlyButton, lastSignalAgeSeconds]);
 
   const guardExceeded = useMemo(() => Boolean(
-    !eventOnlyButton && device?.id && connectionGuard.enabled && lastSignalAgeSeconds != null && lastSignalAgeSeconds >= connectionGuard.delaySeconds
-  ), [eventOnlyButton, device?.id, connectionGuard.enabled, connectionGuard.delaySeconds, lastSignalAgeSeconds]);
+    device?.id && connectionGuard.enabled && (
+      mokoConnection.disconnectedAt && connectionStatus === 'disconnected'
+        ? (clock - new Date(mokoConnection.disconnectedAt).getTime()) / 1000 >= connectionGuard.delaySeconds
+        : !eventOnlyButton && lastSignalAgeSeconds != null && lastSignalAgeSeconds >= connectionGuard.delaySeconds
+    )
+  ), [eventOnlyButton, device?.id, connectionGuard.enabled, connectionGuard.delaySeconds, lastSignalAgeSeconds, mokoConnection.disconnectedAt, connectionStatus, clock]);
 
   // Persist only state transitions. Advertising reception itself remains passive and is not polled.
   useEffect(() => {
@@ -1022,8 +1116,9 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const ready = useMemo(() => {
     const hasEmail = contacts.some((c) => c.email?.trim() && c.permissions?.sosAlerts !== false);
     const hasWallaaGuardian = (networkState.guardians?.length || 0) > 0;
-    return Boolean(armed && device?.id && (hasEmail || hasWallaaGuardian));
-  }, [armed, device, contacts, networkState.guardians]);
+    const continuous = device?.hardwareId?.startsWith('MOKO:') && device.mokoContinuousEnabled !== false && supportsMokoConnection() && ['press','any_press'].includes(trigger);
+    return Boolean(armed && device?.id && (hasEmail || hasWallaaGuardian) && (!continuous || mokoConnection.ready));
+  }, [armed, device, contacts, networkState.guardians, trigger, mokoConnection.ready]);
 
   const safetyLevel = useMemo(() => {
     let score = 0;
@@ -1275,6 +1370,10 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
         monitorMode: 'event-only'
       };
       setDevice(wallaaDevice); deviceRef.current = wallaaDevice; await storage.setDevice(wallaaDevice);
+      if (paired.protocol === 'moko-button' && paired.pairingButtonEvent) {
+        setTriggerState(paired.pairingButtonEvent); triggerRef.current = paired.pairingButtonEvent;
+        await storage.setTrigger(paired.pairingButtonEvent);
+      }
       await pushActivity({ type: 'device', status: 'success', titleKey: 'activity.devicePaired' });
       setPairingState('done'); setToast({ type: 'success', text: claim.message || 'Wallaa Button registrato. Questo dispositivo appartiene ora al tuo account.' });
       if (connectionGuardRef.current.enabled) ensureLocalNotificationPermission().catch(() => {});
@@ -1426,7 +1525,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     networkIdentity, networkState, qrDataUrl, incomingAlert, sentinelOffer, connectionGuard, appearance, connectionStatus, lastSignalAgeSeconds,
     messagePush,
     centralMessagePush,
-    signalQuality, safetyLevel, activeAlert, resolvedAlert, systemHealth, currentLocation, locationStatus, authenticated: Boolean(networkIdentity?.authToken && profile?.onboardingComplete),
+    networkOwnedDevices, networkDevice, setNetworkObserver, setDeviceNetworkTracking, mokoConnection, setMokoConnectionOptions, signalQuality, safetyLevel, activeAlert, resolvedAlert, systemHealth, currentLocation, locationStatus, authenticated: Boolean(networkIdentity?.authToken && profile?.onboardingComplete),
     legalStatus, legalChecked, legalRequired, legalGatePending, legalError,
     setToast, setArmed, setTrigger, saveProfile, setGuardianMode, dismissResolvedAlert, completeOnboarding, loginAccount, signOut, acceptLegalUpdate, refreshLegalStatus, addOrUpdateContact, removeContact, pairDevice, disconnectDevice,
     fireAlert, closeActiveAlert, clearActivities, clearData, deleteAccount, refreshNetwork, scanNetworkQr, rotateQr, removeNetworkLink,

@@ -1,23 +1,17 @@
 const alertUrl = import.meta.env.VITE_ALERT_API_URL || 'http://localhost:8787/api/alert';
 
 export const CONFIG = {
-  safetyNoticeUrl: 'https://wallaasafety.com/legal/wallaa-safety-notice-2.1-2026-09-16.pdf',
-  termsUrl: 'https://wallaasafety.com/legal/wallaa-terms-2.1-2026-09-16.pdf',
-  privacyPolicyUrl: 'https://wallaasafety.com/legal/wallaa-privacy-policy-2.1-2026-09-16.pdf',
-  safetyNoticeVersion: '2.1',
-  termsVersion: '2.1',
-  privacyPolicyVersion: '2.1',
   apiUrl: alertUrl,
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL || alertUrl.replace(/\/api\/alert\/?$/, ''),
   demoMode: String(import.meta.env.VITE_DEMO_MODE || 'false').toLowerCase() === 'true',
-  privacyPolicyUrl: import.meta.env.VITE_PRIVACY_POLICY_URL || 'https://wallaasafety.com/privacy-policy',
-  termsUrl: import.meta.env.VITE_TERMS_URL || 'https://wallaasafety.com/terms-and-conditions',
-  safetyNoticeUrl: import.meta.env.VITE_SAFETY_NOTICE_URL || 'https://wallaasafety.com/safety-notice',
+  privacyPolicyUrl: import.meta.env.VITE_PRIVACY_POLICY_URL || 'https://wallaasafety.com/legal/wallaa-privacy-policy-2.1-2026-09-16.pdf',
+  termsUrl: import.meta.env.VITE_TERMS_URL || 'https://wallaasafety.com/legal/wallaa-terms-2.1-2026-09-16.pdf',
+  safetyNoticeUrl: import.meta.env.VITE_SAFETY_NOTICE_URL || 'https://wallaasafety.com/legal/wallaa-safety-notice-2.1-2026-09-16.pdf',
   privacyChoicesUrl: import.meta.env.VITE_PRIVACY_CHOICES_URL || 'https://wallaasafety.com/privacy-choices',
   privacyContactEmail: import.meta.env.VITE_PRIVACY_CONTACT_EMAIL || 'safety@wallaasafety.com',
-  privacyPolicyVersion: import.meta.env.VITE_PRIVACY_POLICY_VERSION || 'privacy-2.0-2026-09-14',
-  termsVersion: import.meta.env.VITE_TERMS_VERSION || 'terms-2.0-2026-09-14',
-  safetyNoticeVersion: import.meta.env.VITE_SAFETY_NOTICE_VERSION || 'safety-2.0-2026-09-14'
+  privacyPolicyVersion: import.meta.env.VITE_PRIVACY_POLICY_VERSION || '2.1',
+  termsVersion: import.meta.env.VITE_TERMS_VERSION || '2.1',
+  safetyNoticeVersion: import.meta.env.VITE_SAFETY_NOTICE_VERSION || '2.1'
 };
 
 export const TRIGGERS = [

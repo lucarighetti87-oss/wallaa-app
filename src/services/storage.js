@@ -12,7 +12,8 @@ const KEYS = {
   appearance: 'wallaa.safe.appearance',
   activeAlert: 'wallaa.safe.active.alert',
   backgroundConfig: 'wallaa.safe.background.config',
-  nativeAlert: 'wallaa.safe.native.alert'
+  nativeAlert: 'wallaa.safe.native.alert',
+  nativeSentinel: 'wallaa.safe.sentinel.native'
 };
 
 async function getJson(key, fallback) {
@@ -63,6 +64,9 @@ export const storage = {
   getNativeAlert: () => getJson(KEYS.nativeAlert, null),
   setNativeAlert: (value) => setJson(KEYS.nativeAlert, value),
   clearNativeAlert: () => Preferences.remove({ key: KEYS.nativeAlert }),
+  getNativeSentinel: () => getJson(KEYS.nativeSentinel, null),
+  setNativeSentinel: (value) => setJson(KEYS.nativeSentinel, value),
+  clearNativeSentinel: () => Preferences.remove({ key: KEYS.nativeSentinel }),
 
   async clearAll() {
     await Promise.all(Object.values(KEYS).map((key) => Preferences.remove({ key })));

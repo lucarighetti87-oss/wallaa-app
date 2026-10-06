@@ -35,9 +35,12 @@ function LiveMap({lat,lng,accuracy}){
 
 export default function IncomingAlert({ alert, onClose, t, language }) {
   useEffect(() => {
-    if (!alert) stopWallaaAlarm();
+    if (!alert || alert?.opened) {
+      stopWallaaAlarm();
+      if (alert?.opened) clearDeliveredWallaaNotifications().catch(() => {});
+    }
     return () => stopWallaaAlarm();
-  }, [alert?.id]);
+  }, [alert?.id, alert?.opened]);
   if (!alert) return null;
   const lat=Number(alert.location?.latitude), lng=Number(alert.location?.longitude), accuracy=Number(alert.location?.accuracy||0);
   const valid=Number.isFinite(lat)&&Number.isFinite(lng);
@@ -53,9 +56,9 @@ export default function IncomingAlert({ alert, onClose, t, language }) {
       <div className="incoming-audible-status"><Volume2 size={16}/><span>Sirena Guardian attiva — conferma per interromperla</span></div>
       <div className="wallaa-sos-map-wrap">
         <LiveMap lat={valid?lat:NaN} lng={valid?lng:NaN} accuracy={accuracy}/>
-        <div className="wallaa-sos-map-meta"><div><small>POSIZIONE SOS · AGGIORNAMENTO AUTOMATICO</small><strong>{valid?`${lat.toFixed(6)}, ${lng.toFixed(6)}`:'In attesa del GPS…'}</strong></div><span>{accuracy>0?`±${Math.round(accuracy)} m · `:''}{formatDateTime(alert.location?.capturedAt||alert.at,language)}</span></div>
+        <div className="wallaa-sos-map-meta"><div><small>{alert.location?.approximate ? 'ZONA APPROSSIMATIVA · RETE WALLAA' : 'POSIZIONE SOS · AGGIORNAMENTO AUTOMATICO'}</small><strong>{valid?`${lat.toFixed(6)}, ${lng.toFixed(6)}`:'In attesa del GPS…'}</strong></div><span>{accuracy>0?`±${Math.round(accuracy)} m · `:''}{formatDateTime(alert.location?.capturedAt||alert.at,language)}</span></div>
       </div>
-      <p className="wallaa-sos-help">La posizione si aggiorna automaticamente in questa schermata. Non serve aprire una seconda pagina.</p>
+      <p className="wallaa-sos-help">{alert.location?.approximate ? 'Un telefono Wallaa ha rilevato il pulsante vicino a questo punto. È una zona indicativa, non la posizione GPS misurata dalla persona.' : 'La posizione si aggiorna automaticamente in questa schermata. Non serve aprire una seconda pagina.'}</p>
       <div className="incoming-action-grid">
         {phoneHref&&<a className="incoming-call-cta" href={phoneHref}><Phone size={19}/>Chiama la persona</a>}
         {valid&&<a className="incoming-map-cta" href={mapsUrl} target="_blank" rel="noreferrer"><MapPin size={19}/>Apri in Mappe <ExternalLink size={14}/></a>}

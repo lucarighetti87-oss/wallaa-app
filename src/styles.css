@@ -5349,6 +5349,7 @@ html,body,#root{scroll-behavior:auto!important}
 .v454-sentinel-marker i{position:absolute;right:0;bottom:2px;width:9px;height:9px;border-radius:50%;border:2px solid #07121c;background:#27e36f;box-shadow:0 0 8px #27e36f}
 .v454-sentinel-marker i.state-busy{background:#ffb12a;box-shadow:0 0 8px #ffb12a}
 .v454-sentinel-marker i.state-offline{background:#6b7787;box-shadow:none}
+.v454-sentinel-marker .sentinel-count-badge{position:absolute;right:-5px;top:-6px;min-width:19px;height:19px;padding:0 5px;display:grid;place-items:center;border-radius:999px;background:#ff2438;color:#fff;border:2px solid #07121c;font-size:10px;line-height:1;font-weight:950;box-shadow:0 0 10px rgba(255,36,56,.8);z-index:4}
 .v454-sentinel-overlay{padding:12px 14px 0}
 .v454-sentinel-legend,.v454-sentinel-info{display:flex;align-items:center;gap:10px}
 .v454-sentinel-legend{padding:10px 12px;border:1px solid rgba(255,60,72,.38);background:#1e050c8c;border-radius:14px;margin-bottom:8px}
@@ -7360,3 +7361,784 @@ html,body,#root{scroll-behavior:auto!important}
 /* WALLAA_SENTINEL_LEGAL_LINKS_STYLE */
 .sentinel-legal-doc-links{display:grid;gap:8px;margin:12px 0;padding:12px;border:1px solid rgba(47,202,255,.28);border-radius:14px;background:rgba(3,28,44,.72)}
 .sentinel-legal-doc-links a{color:#58d9ff;font-size:11px;font-weight:800;text-decoration:underline;overflow-wrap:anywhere}
+
+/* =========================================================
+   WALLAA CONNECT — FAST STABLE CHAT V2
+   ========================================================= */
+
+.screen-chat,
+.screen-chat .app-main-v4,
+.wallaa-chat-screen {
+  height: var(--visual-viewport-height, 100dvh) !important;
+  min-height: var(--visual-viewport-height, 100dvh) !important;
+  max-height: var(--visual-viewport-height, 100dvh) !important;
+  overflow: hidden !important;
+}
+
+.wallaa-chat-screen {
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative;
+}
+
+.wallaa-chat-header {
+  flex: 0 0 auto !important;
+  position: relative;
+  z-index: 3;
+}
+
+.wallaa-chat-thread {
+  flex: 1 1 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: auto !important;
+  overflow-anchor: none;
+}
+
+.wallaa-chat-composer {
+  flex: 0 0 auto !important;
+  position: relative;
+  z-index: 4;
+}
+
+.wallaa-chat-message {
+  animation: none !important;
+}
+
+.wallaa-conversation-row .wallaa-conversation {
+  animation: none !important;
+}
+
+.wallaa-chat-composer textarea {
+  display: block;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+html.ios-keyboard-open .wallaa-chat-composer {
+  padding-bottom: 8px !important;
+}
+
+html.ios-keyboard-open .screen-chat,
+html.ios-keyboard-open .screen-chat .app-main-v4,
+html.ios-keyboard-open .wallaa-chat-screen {
+  height: var(--visual-viewport-height, 100dvh) !important;
+  min-height: var(--visual-viewport-height, 100dvh) !important;
+  max-height: var(--visual-viewport-height, 100dvh) !important;
+}
+
+/* =========================================================
+   WALLAA AUTH LOGO CENTER FIX 2026-09-16
+   Keep the app icon compact and centered on login/register.
+   ========================================================= */
+
+.v405-auth-screen .v405-auth-shield{
+  width:82px!important;
+  height:82px!important;
+  min-width:82px!important;
+  max-width:82px!important;
+  min-height:82px!important;
+  max-height:82px!important;
+  margin:18px auto 12px!important;
+  padding:5px!important;
+  box-sizing:border-box!important;
+  flex:none!important;
+  overflow:hidden!important;
+  border-radius:23px!important;
+}
+
+.v405-auth-screen .v405-auth-shield img{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  max-width:100%!important;
+  object-fit:cover!important;
+  object-position:center!important;
+  aspect-ratio:1/1!important;
+  border-radius:19px!important;
+}
+
+
+
+/* WALLAA CENTRAL SOS APP 2026-09-17 */
+.wallaa-central-sos{
+  margin:18px 0;
+  padding:16px;
+  border:1px solid rgba(12,38,65,.10);
+  border-radius:22px;
+  background:#fff;
+  box-shadow:0 10px 30px rgba(8,28,48,.07);
+}
+.wallaa-central-sos-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  margin-bottom:13px;
+}
+.wallaa-central-sos-head>div{
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+.wallaa-central-sos-kicker{
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.12em;
+  opacity:.58;
+}
+.wallaa-central-sos-head strong{
+  font-size:16px;
+}
+.wallaa-central-sos-head p{
+  margin:0;
+  font-size:12px;
+  opacity:.65;
+}
+.wallaa-central-sos-status{
+  flex:0 0 auto;
+  padding:6px 9px;
+  border-radius:999px;
+  background:#edf1f4;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.08em;
+}
+.wallaa-central-sos-status.active{
+  background:#dcf8ed;
+  color:#08734d;
+}
+.wallaa-central-sos-thread{
+  height:250px;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  overflow-anchor:none;
+  padding:10px;
+  border-radius:16px;
+  background:#f3f6f8;
+}
+.wallaa-central-row{
+  display:flex;
+  margin:7px 0;
+}
+.wallaa-central-row.central{
+  justify-content:flex-start;
+}
+.wallaa-central-row.me{
+  justify-content:flex-end;
+}
+.wallaa-central-bubble{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  max-width:84%;
+  padding:10px 12px;
+  border-radius:15px;
+  background:#fff;
+  border:1px solid rgba(15,38,57,.09);
+}
+.wallaa-central-row.me .wallaa-central-bubble{
+  background:#0878ff;
+  color:#fff;
+  border-color:transparent;
+}
+.wallaa-central-bubble b{
+  font-size:10px;
+}
+.wallaa-central-bubble span{
+  font-size:14px;
+  line-height:1.4;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+.wallaa-central-bubble time{
+  font-size:9px;
+  opacity:.6;
+  text-align:right;
+}
+.wallaa-central-empty{
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  gap:4px;
+  text-align:center;
+  font-size:12px;
+  opacity:.65;
+}
+.wallaa-central-composer{
+  display:flex;
+  gap:8px;
+  align-items:flex-end;
+  margin-top:10px;
+}
+.wallaa-central-composer textarea{
+  flex:1;
+  min-width:0;
+  resize:none;
+  padding:11px 12px;
+  border:1px solid rgba(12,38,65,.14);
+  border-radius:14px;
+  background:#fff;
+  font:inherit;
+  line-height:1.35;
+  outline:none;
+}
+.wallaa-central-composer textarea:focus{
+  border-color:#0878ff;
+}
+.wallaa-central-composer button{
+  border:0;
+  border-radius:13px;
+  padding:12px 15px;
+  background:#0878ff;
+  color:#fff;
+  font-weight:800;
+}
+.wallaa-central-composer button:disabled{
+  opacity:.45;
+}
+.wallaa-central-error{
+  margin-top:8px;
+  padding:8px 10px;
+  border-radius:10px;
+  background:#ffe9ea;
+  color:#9b1c24;
+  font-size:11px;
+}
+
+/* =========================================================
+   WALLAA 4.0.72
+   Messages viewport + iOS keyboard
+   Safety Network cinematic redesign
+   ========================================================= */
+
+/* ---------- MESSAGES ---------- */
+
+/* The topbar already owns the iOS safe area. Do not add it twice. */
+.screen-messages .app-main-v4{
+  padding-top:0!important;
+}
+
+.app-shell-v4 .wallaa-messages-screen{
+  min-height:calc(100dvh - 94px - env(safe-area-inset-bottom))!important;
+  padding-top:18px!important;
+  padding-bottom:30px!important;
+  align-content:start!important;
+}
+
+.wallaa-messages-heading{
+  margin-top:0!important;
+  padding-top:0!important;
+}
+
+.wallaa-message-search{
+  margin-top:18px!important;
+}
+
+/* Modal lives above the entire application chrome. */
+.wallaa-new-chat-backdrop{
+  position:fixed!important;
+  inset:0!important;
+  z-index:10000!important;
+  box-sizing:border-box!important;
+  display:flex!important;
+  align-items:flex-end!important;
+  justify-content:center!important;
+  overflow:hidden!important;
+}
+
+.wallaa-new-chat-sheet{
+  position:relative!important;
+  width:min(720px,100%)!important;
+  max-width:100%!important;
+  max-height:min(78dvh,720px)!important;
+  box-sizing:border-box!important;
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+  margin:0!important;
+  transform:none!important;
+  background:
+    radial-gradient(circle at 90% 0,rgba(40,210,255,.09),transparent 28%),
+    linear-gradient(180deg,#061824 0%,#03101a 100%)!important;
+  border:1px solid rgba(50,207,255,.30)!important;
+  border-bottom:0!important;
+  box-shadow:0 -24px 70px rgba(0,0,0,.58)!important;
+}
+
+.wallaa-new-chat-sheet > header,
+.wallaa-new-chat-search{
+  flex:0 0 auto!important;
+}
+
+.wallaa-new-chat-results{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+}
+
+/* visualViewport/iOS keyboard: sheet stays inside the visible viewport. */
+.ios-keyboard-open .wallaa-new-chat-backdrop{
+  align-items:flex-end!important;
+  height:100dvh!important;
+}
+
+.ios-keyboard-open .wallaa-new-chat-sheet{
+  position:relative!important;
+  bottom:auto!important;
+  top:auto!important;
+  margin:0!important;
+  transform:none!important;
+  max-height:calc(100dvh - 8px)!important;
+  padding-bottom:12px!important;
+  border-radius:22px 22px 0 0!important;
+  animation:none!important;
+  transition:none!important;
+}
+
+.ios-keyboard-open .wallaa-new-chat-results{
+  max-height:32dvh!important;
+}
+
+/* ---------- SAFETY NETWORK ---------- */
+
+.app-shell-v4 .network-screen{
+  padding:18px 18px 32px!important;
+  background:
+    radial-gradient(circle at 88% 5%,rgba(23,178,255,.11),transparent 27%),
+    radial-gradient(circle at 10% 42%,rgba(21,229,161,.055),transparent 25%),
+    transparent!important;
+  color:#f4fbff!important;
+}
+
+/* QR / personal identity hero */
+.app-shell-v4 .network-hero-card{
+  border-radius:28px!important;
+  padding:22px 18px 18px!important;
+  background:
+    radial-gradient(circle at 12% 0,rgba(50,210,255,.24),transparent 32%),
+    radial-gradient(circle at 94% 90%,rgba(23,226,161,.13),transparent 30%),
+    linear-gradient(145deg,#082b48 0%,#073f7f 48%,#075fc7 100%)!important;
+  border:1px solid rgba(66,211,255,.40)!important;
+  box-shadow:
+    0 24px 60px rgba(0,0,0,.38),
+    inset 0 1px 0 rgba(255,255,255,.12)!important;
+}
+
+.app-shell-v4 .network-chip{
+  background:rgba(4,25,42,.28)!important;
+  border-color:rgba(173,235,255,.30)!important;
+  color:#dff8ff!important;
+}
+
+.app-shell-v4 .network-hero-copy h2{
+  color:#fff!important;
+  text-shadow:0 8px 26px rgba(0,0,0,.30);
+}
+
+.app-shell-v4 .network-hero-copy p{
+  color:rgba(224,243,255,.78)!important;
+}
+
+/* Keep QR white for scanner reliability. */
+.app-shell-v4 .qr-premium-shell{
+  background:#fff!important;
+  box-shadow:
+    0 24px 60px rgba(0,9,30,.42),
+    0 0 0 1px rgba(255,255,255,.38)!important;
+}
+
+.app-shell-v4 .network-primary{
+  background:linear-gradient(180deg,#ffffff,#edf7ff)!important;
+  color:#075ac9!important;
+  box-shadow:0 13px 28px rgba(0,21,66,.24)!important;
+}
+
+.app-shell-v4 .network-secondary{
+  background:rgba(3,30,55,.24)!important;
+  border:1px solid rgba(198,240,255,.28)!important;
+  color:#fff!important;
+}
+
+/* Three counters */
+.app-shell-v4 .network-status-strip{
+  gap:9px!important;
+  margin:15px 0!important;
+}
+
+.app-shell-v4 .network-status-strip>div{
+  min-height:78px!important;
+  border-radius:20px!important;
+  background:
+    linear-gradient(145deg,rgba(7,35,54,.97),rgba(3,20,32,.98))!important;
+  border:1px solid rgba(43,195,242,.25)!important;
+  box-shadow:
+    0 14px 35px rgba(0,0,0,.24),
+    inset 0 1px 0 rgba(255,255,255,.035)!important;
+}
+
+.app-shell-v4 .network-status-strip svg{
+  color:#39d7ff!important;
+  filter:drop-shadow(0 0 8px rgba(57,215,255,.18));
+}
+
+.app-shell-v4 .network-status-strip small{
+  color:#7f9caf!important;
+}
+
+.app-shell-v4 .network-status-strip strong{
+  color:#f4fbff!important;
+}
+
+/* Guardian / protected people cards */
+.app-shell-v4 .network-list-card{
+  margin-top:13px!important;
+  overflow:hidden!important;
+  border-radius:25px!important;
+  background:
+    linear-gradient(145deg,rgba(6,32,50,.97),rgba(2,18,29,.985))!important;
+  border:1px solid rgba(43,195,242,.25)!important;
+  box-shadow:
+    0 18px 46px rgba(0,0,0,.30),
+    inset 0 1px 0 rgba(255,255,255,.035)!important;
+}
+
+.app-shell-v4 .network-list-heading{
+  padding:17px 16px 14px!important;
+  border-bottom:1px solid rgba(64,179,222,.14)!important;
+  background:linear-gradient(180deg,rgba(12,51,76,.34),transparent)!important;
+}
+
+.app-shell-v4 .network-list-heading h2{
+  color:#f5fbff!important;
+  font-size:15px!important;
+}
+
+.app-shell-v4 .network-list-heading p{
+  color:#86a4b7!important;
+}
+
+.app-shell-v4 .network-list-heading>span{
+  background:rgba(31,154,255,.12)!important;
+  border:1px solid rgba(49,190,255,.18)!important;
+  color:#48d9ff!important;
+}
+
+.app-shell-v4 .network-person-row{
+  border-bottom:1px solid rgba(66,164,204,.12)!important;
+  background:transparent!important;
+}
+
+.app-shell-v4 .network-person-row strong{
+  color:#f3faff!important;
+}
+
+.app-shell-v4 .network-person-row small{
+  color:#829fb1!important;
+}
+
+.app-shell-v4 .network-avatar.green{
+  background:linear-gradient(145deg,rgba(19,226,161,.17),rgba(11,112,84,.17))!important;
+  border:1px solid rgba(34,231,170,.22)!important;
+  color:#2ce5a9!important;
+}
+
+.app-shell-v4 .network-avatar.blue{
+  background:linear-gradient(145deg,rgba(35,170,255,.18),rgba(17,91,183,.17))!important;
+  border:1px solid rgba(49,190,255,.22)!important;
+  color:#46d8ff!important;
+}
+
+.app-shell-v4 .network-person-row button{
+  background:rgba(8,39,58,.76)!important;
+  border:1px solid rgba(61,155,194,.16)!important;
+  color:#7895a7!important;
+}
+
+.app-shell-v4 .network-empty{
+  color:#829eaf!important;
+}
+
+/* How it works */
+.app-shell-v4 .network-how-card{
+  margin-top:13px!important;
+  border-radius:25px!important;
+  background:
+    radial-gradient(circle at 100% 0,rgba(43,208,255,.11),transparent 32%),
+    linear-gradient(145deg,#07273d,#041724)!important;
+  border:1px solid rgba(43,195,242,.26)!important;
+  box-shadow:0 18px 45px rgba(0,0,0,.28)!important;
+}
+
+.app-shell-v4 .network-how-number{
+  background:rgba(38,203,255,.10)!important;
+  border-color:rgba(70,214,255,.24)!important;
+  color:#55dcff!important;
+  box-shadow:0 0 18px rgba(42,205,255,.06);
+}
+
+.app-shell-v4 .network-how-card strong{
+  color:#f5fbff!important;
+}
+
+.app-shell-v4 .network-how-card p{
+  color:#86a6b9!important;
+}
+
+/* Offline/configuration card must also belong to dark UI. */
+.app-shell-v4 .network-offline-card{
+  background:linear-gradient(145deg,rgba(57,39,8,.72),rgba(30,22,8,.76))!important;
+  border:1px solid rgba(244,200,78,.25)!important;
+  color:#ffe2a0!important;
+}
+
+.app-shell-v4 .network-offline-icon{
+  background:rgba(244,200,78,.10)!important;
+  color:#f4c84e!important;
+  box-shadow:none!important;
+}
+
+.app-shell-v4 .network-offline-card p{
+  color:#c5aa6b!important;
+}
+
+@media(max-width:420px){
+  .app-shell-v4 .network-screen{
+    padding-left:14px!important;
+    padding-right:14px!important;
+  }
+
+  .app-shell-v4 .network-status-strip>div{
+    padding:11px 8px!important;
+    gap:7px!important;
+  }
+
+  .app-shell-v4 .network-status-strip small{
+    font-size:7px!important;
+  }
+
+  .app-shell-v4 .network-status-strip strong{
+    font-size:10px!important;
+  }
+
+  .wallaa-new-chat-sheet{
+    border-radius:24px 24px 0 0!important;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .network-hero-card::after,
+  .network-orb,
+  .qr-premium-shell,
+  .network-person-row{
+    animation:none!important;
+  }
+}
+
+
+/* WALLAA_4_0_82_GUARDIAN_REAL_DATA */
+.aa-guardian-real .aa-real-guardians{display:flex!important;align-items:center;justify-content:space-between;gap:14px;padding:18px!important}
+.aa-real-guardian-title{display:flex;align-items:center;gap:12px;min-width:0}
+.aa-real-guardian-icon{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;border:1px solid #2cd6ff;background:rgba(3,31,49,.85);color:#36d8ff;box-shadow:0 0 22px rgba(30,205,255,.12);flex:0 0 auto}
+.aa-real-guardian-title>div{display:grid;gap:3px;min-width:0}
+.aa-real-guardian-title strong{font-size:16px;color:#fff}
+.aa-real-guardian-title small{font-size:11px;line-height:1.35;color:#91aabd}
+.aa-real-avatar-stack{justify-content:flex-end;flex:0 0 auto}
+.aa-real-avatar-stack i{margin-right:-6px!important;background:linear-gradient(145deg,#164765,#071522)!important}
+.aa-guardian-map-real .aa-route-svg,.aa-guardian-map-real .aa-follower-pin{display:none!important}
+.aa-guardian-map-real .aa-live-pin{left:50%!important;top:50%!important}
+.aa-map-control.aa-real-locate{top:auto!important;bottom:18px!important;right:16px!important}
+.aa-real-live-card{grid-template-columns:1fr auto!important}
+.aa-real-live-card .off{background:#708797!important;box-shadow:none!important}
+.aa-real-live-meta{grid-column:1/-1;display:grid;grid-template-columns:1fr auto;gap:6px 14px;padding-top:10px;margin-top:4px;border-top:1px solid rgba(50,201,255,.15)}
+.aa-real-live-meta small{color:#809caf}
+.aa-real-live-meta b{color:#dff8ff;text-align:right}
+.aa-guardian-empty button{border:1px solid #28ccff;background:#06263a;color:#dff8ff;border-radius:12px;padding:8px 14px;font-weight:800}
+@media(max-width:430px){.aa-guardian-real .aa-real-guardians{align-items:flex-start}.aa-real-guardian-title small{max-width:220px}.aa-real-avatar-stack i{width:38px!important;height:38px!important}.aa-real-guardian-icon{width:42px;height:42px}}
+
+
+/* WALLAA_4_0_85_MESSAGES_REFINEMENT */
+.wallaa-messages-screen{
+  padding-top:6px!important;
+}
+.wallaa-messages-heading{
+  padding:4px 2px 2px;
+}
+.wallaa-messages-heading .v4-screen-heading>span{
+  color:#28d9ff;
+  letter-spacing:.18em;
+}
+.wallaa-messages-heading .v4-screen-heading h1{
+  font-size:clamp(28px,8vw,38px);
+  line-height:1;
+  letter-spacing:-.035em;
+}
+.wallaa-messages-heading .v4-screen-heading p{
+  max-width:390px;
+  margin-top:8px;
+  color:#8ca8ba;
+  line-height:1.45;
+}
+.wallaa-new-chat-button{
+  border-color:rgba(38,213,255,.42)!important;
+  background:linear-gradient(145deg,rgba(7,47,70,.96),rgba(4,27,42,.96))!important;
+  color:#34d8ff!important;
+  box-shadow:0 0 24px rgba(28,196,244,.10);
+}
+.wallaa-message-search{
+  min-height:50px!important;
+  margin-top:18px!important;
+  border-color:rgba(41,198,239,.20)!important;
+  background:linear-gradient(145deg,rgba(7,29,43,.96),rgba(5,21,33,.96))!important;
+  color:#9ab3c3!important;
+  box-shadow:0 10px 30px rgba(0,0,0,.18)!important;
+}
+.wallaa-message-security{
+  margin-top:10px;
+  padding:14px!important;
+  border-color:rgba(37,205,255,.16)!important;
+  background:linear-gradient(145deg,rgba(4,33,49,.76),rgba(5,22,34,.88))!important;
+}
+.wallaa-message-security-icon{
+  color:#32d6ff!important;
+  background:rgba(34,203,255,.08)!important;
+  border:1px solid rgba(42,213,255,.16);
+}
+.wallaa-message-section-title{
+  margin-top:24px!important;
+}
+.wallaa-message-section-title small{
+  display:none!important;
+}
+.wallaa-conversation-list{
+  gap:10px!important;
+}
+.wallaa-conversation-row{
+  position:relative;
+  display:flex;
+  align-items:stretch;
+  gap:8px;
+}
+.wallaa-conversation-main{
+  flex:1 1 auto;
+  min-width:0;
+}
+.wallaa-conversation{
+  min-height:82px!important;
+  grid-template-columns:50px minmax(0,1fr)!important;
+  padding:13px!important;
+  border-color:rgba(74,145,179,.16)!important;
+  background:linear-gradient(145deg,rgba(6,26,39,.98),rgba(4,18,29,.98))!important;
+}
+.wallaa-conversation-avatar{
+  width:50px!important;
+  height:50px!important;
+  border:1px solid rgba(41,207,255,.14);
+}
+.wallaa-conversation-copy strong{
+  font-size:14px!important;
+}
+.wallaa-conversation-copy>small{
+  margin-top:4px!important;
+  color:#6f91a5!important;
+}
+.wallaa-conversation-preview{
+  margin-top:6px;
+  min-width:0;
+}
+.wallaa-conversation-preview p{
+  margin:0!important;
+  font-size:10.5px!important;
+}
+.wallaa-conversation-delete{
+  width:42px;
+  flex:0 0 42px;
+  border:1px solid rgba(255,80,109,.14);
+  border-radius:16px;
+  background:rgba(50,8,18,.42);
+  color:#ff7088;
+  display:grid;
+  place-items:center;
+}
+.wallaa-message-unread{
+  flex:0 0 auto;
+}
+.wallaa-new-chat-sheet{
+  max-height:min(78dvh,720px);
+  display:flex;
+  flex-direction:column;
+}
+.wallaa-new-chat-results{
+  min-height:0;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+
+
+/* WALLAA_4_0_86_MESSAGES_BEHAVIOR_FIX */
+.wallaa-messages-screen{
+  min-height:100dvh;
+  overflow-x:hidden;
+  overscroll-behavior-y:contain;
+  padding-bottom:calc(92px + env(safe-area-inset-bottom))!important;
+}
+.wallaa-messages-screen:has(.wallaa-new-chat-sheet)::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:998;
+  background:rgba(0,8,14,.64);
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+  pointer-events:none;
+}
+.wallaa-new-chat-sheet{
+  position:fixed!important;
+  left:0!important;
+  right:0!important;
+  bottom:0!important;
+  z-index:1000!important;
+  width:min(100%,560px)!important;
+  margin:0 auto!important;
+  max-height:min(76dvh,720px)!important;
+  min-height:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+  border-radius:24px 24px 0 0!important;
+  padding-bottom:max(14px,env(safe-area-inset-bottom))!important;
+  animation:wallaaMessagesSheetIn .18s ease-out;
+  box-shadow:0 -20px 60px rgba(0,0,0,.34)!important;
+}
+@keyframes wallaaMessagesSheetIn{
+  from{ transform:translateY(18px); opacity:.88; }
+  to{ transform:translateY(0); opacity:1; }
+}
+.wallaa-new-chat-results{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+.wallaa-new-chat-sheet input,
+.wallaa-new-chat-sheet textarea{
+  font-size:16px!important;
+}
+body.wallaa-messages-composer-open nav,
+body.wallaa-messages-composer-open [class*="bottom-nav"],
+body.wallaa-messages-composer-open [class*="bottomNav"],
+body.wallaa-messages-composer-open [class*="tab-bar"],
+body.wallaa-messages-composer-open [class*="tabbar"],
+.wallaa-messages-screen:has(.wallaa-new-chat-sheet) ~ nav{
+  visibility:hidden!important;
+  pointer-events:none!important;
+}

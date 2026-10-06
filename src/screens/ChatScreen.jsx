@@ -35,6 +35,24 @@ export default function ChatScreen({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const threadRef = useRef(null);
+  const shouldStickToBottomRef = useRef(true);
+  const lastMessageIdRef = useRef(null);
+
+  const isThreadNearBottom = () => {
+    const thread = threadRef.current;
+    if (!thread) return true;
+    return (
+      thread.scrollHeight -
+      thread.scrollTop -
+      thread.clientHeight
+    ) < 90;
+  };
+
+  const scrollThreadToBottom = () => {
+    const thread = threadRef.current;
+    if (!thread) return;
+    thread.scrollTop = thread.scrollHeight;
+  };
 
   const current = conversation || {};
 
@@ -82,7 +100,7 @@ export default function ChatScreen({
       loadMessages({ silent: true });
     };
 
-    const timer = window.setInterval(refresh, 3000);
+    const timer = window.setInterval(refresh, 1200);
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') refresh();
@@ -110,40 +128,44 @@ export default function ChatScreen({
   }, [messagePush?.receivedAt, messagePush?.conversationId, current.id]);
 
   useEffect(() => {
-    if (threadRef.current) {
-      threadRef.current.scrollTop = threadRef.current.scrollHeight;
+    const latest = messages[messages.length - 1];
+    const latestId = latest?.id ?? null;
+    const changed =
+      latestId !== null &&
+      latestId !== lastMessageIdRef.current;
+
+    if (shouldStickToBottomRef.current || messages.length <= 1) {
+      window.requestAnimationFrame(() => {
+        scrollThreadToBottom();
+      });
+    }
+
+    if (changed) {
+      lastMessageIdRef.current = latestId;
     }
   }, [messages]);
 
   useEffect(() => {
-    const keepLatestMessageVisible = () => {
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          if (threadRef.current) {
-            threadRef.current.scrollTop = threadRef.current.scrollHeight;
-          }
-        });
-      });
+    const thread = threadRef.current;
+    if (!thread) return undefined;
+
+    const onThreadScroll = () => {
+      shouldStickToBottomRef.current = isThreadNearBottom();
     };
 
-    const viewport = window.visualViewport;
-
-    if (viewport) {
-      viewport.addEventListener('resize', keepLatestMessageVisible);
-      viewport.addEventListener('scroll', keepLatestMessageVisible);
-    }
-
-    window.addEventListener('resize', keepLatestMessageVisible);
+    thread.addEventListener(
+      'scroll',
+      onThreadScroll,
+      { passive: true }
+    );
 
     return () => {
-      if (viewport) {
-        viewport.removeEventListener('resize', keepLatestMessageVisible);
-        viewport.removeEventListener('scroll', keepLatestMessageVisible);
-      }
-
-      window.removeEventListener('resize', keepLatestMessageVisible);
+      thread.removeEventListener(
+        'scroll',
+        onThreadScroll
+      );
     };
-  }, []);
+  }, [current.id]);
 
   const handleSend = async () => {
     const value = body.trim();
@@ -151,6 +173,7 @@ export default function ChatScreen({
     if (!value || !current.id || sending) return;
 
     try {
+      shouldStickToBottomRef.current = true;
       setSending(true);
       setError('');
 
@@ -326,11 +349,10 @@ export default function ChatScreen({
             onChange={(event) => setBody(event.target.value)}
             onKeyDown={handleKeyDown}
             onFocus={() => {
+              shouldStickToBottomRef.current = true;
               window.setTimeout(() => {
-                if (threadRef.current) {
-                  threadRef.current.scrollTop = threadRef.current.scrollHeight;
-                }
-              }, 120);
+                scrollThreadToBottom();
+              }, 80);
             }}
             placeholder="Scrivi un messaggio..."
             aria-label="Messaggio"
