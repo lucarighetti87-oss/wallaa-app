@@ -334,6 +334,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     try {
       const cloud = await getWallaaContacts(identity);
       const cloudContacts = Array.isArray(cloud?.contacts) ? cloud.contacts.map(normalizeContact) : [];
+      if(!cloudContacts.length && contactsRef.current.length)await storage.setContactsRecovery({savedAt:new Date().toISOString(),userId:identity.userId,contacts:contactsRef.current});
       setContacts(cloudContacts);
       contactsRef.current = cloudContacts;
       await storage.setContacts(cloudContacts);

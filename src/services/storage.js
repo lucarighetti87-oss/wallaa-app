@@ -3,6 +3,7 @@ import { Preferences } from '@capacitor/preferences';
 const KEYS = {
   profile: 'wallaa.safe.profile',
   contacts: 'wallaa.safe.contacts',
+  contactsRecovery: 'wallaa.safe.contacts.recovery',
   device: 'wallaa.safe.device',
   armed: 'wallaa.safe.armed',
   trigger: 'wallaa.safe.trigger',
@@ -34,6 +35,8 @@ export const storage = {
   setProfile: (value) => setJson(KEYS.profile, value),
   getContacts: () => getJson(KEYS.contacts, []),
   setContacts: (value) => setJson(KEYS.contacts, value),
+  getContactsRecovery: () => getJson(KEYS.contactsRecovery, null),
+  setContactsRecovery: (value) => setJson(KEYS.contactsRecovery, value),
   getDevice: () => getJson(KEYS.device, null),
   setDevice: (value) => setJson(KEYS.device, value),
 
