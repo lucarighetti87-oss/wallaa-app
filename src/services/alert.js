@@ -13,7 +13,10 @@ export async function sendWallaaAlert({ profile, contacts, trigger, device, netw
   if (locationEnabled) {
     onProgress?.('location');
     await uiBeat(220);
-    location = await getCurrentLocation();
+    let timer;
+    try { location = await Promise.race([getCurrentLocation(), new Promise(resolve => { timer = setTimeout(() => resolve(null), 1500); })]); }
+    catch { location = null; }
+    finally { clearTimeout(timer); }
   }
   const fullName = [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim();
 
@@ -35,6 +38,7 @@ export async function sendWallaaAlert({ profile, contacts, trigger, device, netw
       eventPacketId: Number.isFinite(Number(eventPacketId)) ? Number(eventPacketId) : null,
       device: device ? { name: 'Wallaa Button', id: device.id, hardwareId: device.hardwareId || '', claimToken: device.claimToken || '' } : null,
       contacts: validContacts.map(({ name, email, phone, permissions, role }) => ({ name, email, phone, permissions, role })),
+      locationEnabled,
       location
     })
   });
@@ -48,5 +52,5 @@ export async function sendWallaaAlert({ profile, contacts, trigger, device, netw
   }
 
   onProgress?.('complete');
-  return { ...body, location };
+  return { ...body, location:body.location || location };
 }

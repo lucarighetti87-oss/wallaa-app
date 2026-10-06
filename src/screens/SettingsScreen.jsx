@@ -21,7 +21,7 @@ function formatDateOfBirth(value) {
   return `${match[3]}/${match[2]}/${match[1]}`;
 }
 
-export default function SettingsScreen({
+export default function SettingsScreen({ onNetworkObserver,
   profile, onSaveProfile, armed, onArmed, onReset, appearance, onAppearance, onDeleteAccount, onSignOut,
   networkState, systemHealth, onRefreshSystemHealth, onTestEmail, onTestAlarmSound, onNavigate, connectionStatus, t
 }) {
@@ -144,6 +144,10 @@ export default function SettingsScreen({
         <label className="v4-switch"><input type="checkbox" checked={profile.sosLocationEnabled !== false} onChange={(e)=>onSaveProfile({...profile,sosLocationEnabled:e.target.checked})}/><span/></label>
       </section>
 
+      <section className="v4-settings-card settings-switch-row">
+        <div className="settings-row-title"><UsersRound size={19}/><div><strong>Partecipa alla rete Wallaa</strong><span>Aiuta a ritrovare i pulsanti degli altri partecipanti. Quando il telefono ne rileva uno, invia al servizio Wallaa la propria posizione e il segnale rilevato. Il proprietario vede una zona approssimativa, senza la tua identità. Per i rilevamenti in background serve il permesso di posizione Sempre.</span></div></div>
+        <label className="v4-switch"><input type="checkbox" checked={profile.networkObserverEnabled === true} onChange={e=>onNetworkObserver?.(e.target.checked)}/><span/></label>
+      </section>
       <div className="v412-settings-section-label">WALLAA PRO</div>
       <section className="v4-settings-card v412-plan-card">
         <div className="settings-row-title"><Crown size={19}/><div><strong>Wallaa Pro</strong><span>{t('v412.pro.subtitle')}</span></div></div>

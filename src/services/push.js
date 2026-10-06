@@ -36,7 +36,7 @@ export async function stopPushListeners() {
   await Promise.all(current.map((h) => h?.remove?.().catch?.(() => {}) || Promise.resolve()));
 }
 
-export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentinelOffer, onMessage, onError } = {}) {
+export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentinelOffer, onMessage, onCentralMessage, onDisconnect, onError } = {}) {
   if (!Capacitor.isNativePlatform()) return { supported: false, permission: 'web' };
 
   await stopPushListeners();
@@ -63,7 +63,6 @@ export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentin
     if (notification?.data?.type === 'wallaa_sos') {
       const alert = normalizePush(notification);
       feedbackWarning();
-      playWallaaAlarm({ loop: true });
       // iOS does not necessarily present/sound a remote notification while the app is foreground.
       // Mirror it as a local notification with the bundled Guardian siren so foreground behaviour
       // matches lock-screen/background behaviour.
@@ -79,7 +78,11 @@ export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentin
       });
       onAlert?.(alert);
     }
-    if (notification?.data?.type === 'wallaa_safe') onAlertClosed?.(notification?.data?.alertId || '');
+    if (notification?.data?.type === 'wallaa_safe') {
+      stopWallaaAlarm();
+      clearDeliveredWallaaNotifications().catch(() => {});
+      onAlertClosed?.(notification?.data?.alertId || '');
+    }
     if (notification?.data?.type === 'wallaa_message') {
       const d = notification?.data || {};
       onMessage?.({
@@ -88,14 +91,56 @@ export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentin
         opened:false
       });
     }
-    if (notification?.data?.type === 'wallaa_sentinel_request') { feedbackWarning(); const d=notification?.data||{}; onSentinelOffer?.({ offerId:d.offerId||'', incidentId:d.incidentId||'', distanceM:Number(d.distanceM||0), createdAt:d.createdAt||new Date().toISOString() }); }
+    if (notification?.data?.type === 'wallaa_central_message') {
+      const d = notification?.data || {};
+      onCentralMessage?.({
+        alertId:d.alertId || '',
+        opened:false,
+        central:true,
+        receivedAt:Date.now()
+      });
+    }
+
+    if (notification?.data?.type === 'wallaa_sentinel_request') {
+      feedbackWarning();
+      const d=notification?.data||{};
+      onSentinelOffer?.({
+        offerId:d.offerId||'',
+        incidentId:d.incidentId||'',
+        distanceM:Number(d.distanceM||0),
+        etaSeconds:Number(d.etaSeconds||0),
+        routeDistanceM:Number(d.routeDistanceM||0),
+        approxDistance:d.approxDistance||'',
+        expiresAt:d.expiresAt||'',
+        createdAt:d.createdAt||new Date().toISOString(),
+        opened:false
+      });
+    }
+
+    if (notification?.data?.type === 'wallaa_disconnect') {
+      const d=notification?.data||{};
+      feedbackWarning();
+      onDisconnect?.({
+        ...d,
+        opened:false,
+        receivedAt:Date.now()
+      });
+    }
   }));
   handles.push(await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
     if (emitAdminLocationRequest(action?.notification?.data || {})) return;
     console.info('[WALLAA][PUSH] notification action', action?.notification?.data?.type || 'unknown');
     const notification = action?.notification;
-    if (notification?.data?.type === 'wallaa_sos') onAlert?.(normalizePush(notification));
-    if (notification?.data?.type === 'wallaa_safe') onAlertClosed?.(notification?.data?.alertId || '');
+    if (notification?.data?.type === 'wallaa_sos') {
+      stopWallaaAlarm();
+      clearDeliveredWallaaNotifications().catch(() => {});
+      onAlert?.(normalizePush(notification, { opened: true }));
+    }
+    if (notification?.data?.type === 'wallaa_safe') {
+      stopWallaaAlarm();
+      clearDeliveredWallaaNotifications().catch(() => {});
+      onAlertClosed?.(notification?.data?.alertId || '');
+    }
     if (notification?.data?.type === 'wallaa_message') {
       const d = notification?.data || {};
       onMessage?.({
@@ -104,7 +149,41 @@ export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentin
         opened:true
       });
     }
-    if (notification?.data?.type === 'wallaa_sentinel_request') { feedbackWarning(); const d=notification?.data||{}; onSentinelOffer?.({ offerId:d.offerId||'', incidentId:d.incidentId||'', distanceM:Number(d.distanceM||0), createdAt:d.createdAt||new Date().toISOString() }); }
+    if (notification?.data?.type === 'wallaa_central_message') {
+      const d = notification?.data || {};
+      onCentralMessage?.({
+        alertId:d.alertId || '',
+        opened:true,
+        central:true,
+        receivedAt:Date.now()
+      });
+    }
+
+    if (notification?.data?.type === 'wallaa_sentinel_request') {
+      feedbackWarning();
+      const d=notification?.data||{};
+      onSentinelOffer?.({
+        offerId:d.offerId||'',
+        incidentId:d.incidentId||'',
+        distanceM:Number(d.distanceM||0),
+        etaSeconds:Number(d.etaSeconds||0),
+        routeDistanceM:Number(d.routeDistanceM||0),
+        approxDistance:d.approxDistance||'',
+        expiresAt:d.expiresAt||'',
+        createdAt:d.createdAt||new Date().toISOString(),
+        opened:true
+      });
+    }
+
+    if (notification?.data?.type === 'wallaa_disconnect') {
+      const d=notification?.data||{};
+      feedbackWarning();
+      onDisconnect?.({
+        ...d,
+        opened:true,
+        receivedAt:Date.now()
+      });
+    }
   }));
 
   // Re-register the last known APNs token on every app launch. APNs often returns the same
@@ -119,17 +198,18 @@ export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentin
   return { supported: true, permission: 'granted' };
 }
 
-function normalizePush(notification) {
+function normalizePush(notification, { opened = false } = {}) {
   const data = notification?.data || {};
   const locationAllowed = String(data.locationShared ?? '1') !== '0';
   const latitude = Number(data.latitude);
   const longitude = Number(data.longitude);
   const accuracy = data.accuracy == null || data.accuracy === '' ? null : Number(data.accuracy);
-  const valid = locationAllowed && Number.isFinite(latitude) && Number.isFinite(longitude);
+  const valid = locationAllowed && String(data.locationAvailable ?? '1') !== '0' && data.latitude != null && data.longitude != null && String(data.latitude).trim() !== '' && String(data.longitude).trim() !== '' && Number.isFinite(latitude) && Number.isFinite(longitude);
 
   return {
     id: data.alertId || `push-${Date.now()}`,
     remote: true,
+    opened: Boolean(opened),
     ownerName: data.userName || notification.title || 'Wallaa Safe Button',
     ownerPhone: data.userPhone || '',
     at: data.createdAt || new Date().toISOString(),
@@ -137,6 +217,7 @@ function normalizePush(notification) {
     locationShared: locationAllowed,
     liveUrl: locationAllowed ? (data.liveUrl || '') : '',
     location: valid ? {
+      source:data.positionSource || 'phone', approximate:data.positionSource === 'wallaa_network',
       latitude,
       longitude,
       accuracy: Number.isFinite(accuracy) ? accuracy : null,

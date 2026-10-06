@@ -261,6 +261,25 @@ export async function sendWallaaMessage(identity, conversationId, body) {
   );
 }
 
+
+export async function getWallaaCentralMessages(identity, alertId) {
+  return api(
+    `/api/messages/central/${encodeURIComponent(alertId)}`,
+    { identity }
+  );
+}
+
+export async function sendWallaaCentralMessage(identity, alertId, body) {
+  return api(
+    `/api/messages/central/${encodeURIComponent(alertId)}`,
+    {
+      method: 'POST',
+      identity,
+      body: { body }
+    }
+  );
+}
+
 export async function deleteWallaaConversation(identity, conversationId) {
   return api(
     `/api/messages/conversations/${encodeURIComponent(conversationId)}`,

@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
+const release = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'));
+if (!/^\d+\.\d+\.\d+$/.test(release.version) || !Number.isInteger(release.wallaaBuild) || release.wallaaBuild < 1) throw new Error('Versione o build Wallaa non valida.');
 
 function insertBefore(text, marker, addition) {
   if (text.includes(addition.trim())) return text;
@@ -64,8 +66,8 @@ if (fs.existsSync(iosProject)) {
   let project = fs.readFileSync(iosProject, 'utf8');
   project = project.replace(/TARGETED_DEVICE_FAMILY = "1,2";/g, 'TARGETED_DEVICE_FAMILY = 1;');
   project = project.replace(/TARGETED_DEVICE_FAMILY = 2;/g, 'TARGETED_DEVICE_FAMILY = 1;');
-  project = project.replace(/CURRENT_PROJECT_VERSION = \d+;/g, 'CURRENT_PROJECT_VERSION = 68;');
-  project = project.replace(/MARKETING_VERSION = [^;]+;/g, 'MARKETING_VERSION = 4.0.65;');
+  project = project.replace(/CURRENT_PROJECT_VERSION = \d+;/g, `CURRENT_PROJECT_VERSION = ${release.wallaaBuild};`);
+  project = project.replace(/MARKETING_VERSION = [^;]+;/g, `MARKETING_VERSION = ${release.version};`);
 
   const sirenFileRef = 'AA4060010000000000000001';
   const sirenBuildRef = 'AA4060020000000000000002';

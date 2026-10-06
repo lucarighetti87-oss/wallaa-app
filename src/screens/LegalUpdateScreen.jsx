@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Check, ExternalLink, FileText, ShieldCheck } from 'lucide-react';
 import { CONFIG } from '../config';
 
+import WallaaBrandShield from '../components/WallaaBrandShield';
 const COPY = {
   it: {
     kicker: 'AGGIORNAMENTO LEGALE',
@@ -134,7 +135,7 @@ export default function LegalUpdateScreen({
       </header>
 
       <div className="v405-auth-shield">
-        <img src="/wallaa-app-icon.png" alt="Wallaa"/>
+        <WallaaBrandShield alt="Wallaa"/>
       </div>
 
       <div className="onboarding-copy">

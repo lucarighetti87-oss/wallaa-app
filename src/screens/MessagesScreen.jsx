@@ -62,6 +62,11 @@ function formatConversationTime(value) {
 export default function MessagesScreen({ networkIdentity, onOpenChat }) {
   const [conversations, setConversations] = useState([]);
   const [newChatOpen, setNewChatOpen] = useState(false);
+
+  useEffect(() => {
+    document.body.classList.toggle('wallaa-messages-composer-open', Boolean(newChatOpen));
+    return () => document.body.classList.remove('wallaa-messages-composer-open');
+  }, [newChatOpen]);
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -173,7 +178,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
         <div className="v4-screen-heading">
           <span>WALLAA CONNECT</span>
           <h1>Messaggi</h1>
-          <p>Conversazioni private con utenti della tua rete Wallaa.</p>
+          <p>Messaggi e conversazioni associate al tuo account Wallaa.</p>
         </div>
 
         <button
@@ -206,22 +211,21 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
           <ShieldCheck size={19} />
         </div>
         <div>
-          <strong>Conversazioni private</strong>
+          <strong>Wallaa Connect</strong>
           <span>
-            Sono visibili soltanto le conversazioni associate al tuo account.
+            Qui trovi soltanto conversazioni reali associate al tuo account.
           </span>
         </div>
       </section>
 
       <div className="wallaa-message-section-title">
         <span>CONVERSAZIONI</span>
-        <small>{conversations.length}</small>
       </div>
 
       {loading ? (
         <section className="wallaa-messages-empty">
           <div><MessageCircle size={29} /></div>
-          <strong>Caricamento...</strong>
+          <strong>Aggiornamento…</strong>
           <p>Recupero delle tue conversazioni.</p>
         </section>
       ) : conversations.length === 0 ? (
@@ -276,7 +280,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
                     ? `Intervento Sentinel · ${
                         conversation.closed ? 'concluso' : 'attivo'
                       }`
-                    : 'Contatto Wallaa'}
+                    : 'Conversazione Wallaa'}
                 </small>
 
                 <div className="wallaa-conversation-preview">

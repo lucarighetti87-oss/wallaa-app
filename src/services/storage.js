@@ -3,6 +3,7 @@ import { Preferences } from '@capacitor/preferences';
 const KEYS = {
   profile: 'wallaa.safe.profile',
   contacts: 'wallaa.safe.contacts',
+  contactsRecovery: 'wallaa.safe.contacts.recovery',
   device: 'wallaa.safe.device',
   armed: 'wallaa.safe.armed',
   trigger: 'wallaa.safe.trigger',
@@ -12,7 +13,8 @@ const KEYS = {
   appearance: 'wallaa.safe.appearance',
   activeAlert: 'wallaa.safe.active.alert',
   backgroundConfig: 'wallaa.safe.background.config',
-  nativeAlert: 'wallaa.safe.native.alert'
+  nativeAlert: 'wallaa.safe.native.alert',
+  nativeSentinel: 'wallaa.safe.sentinel.native'
 };
 
 async function getJson(key, fallback) {
@@ -33,6 +35,8 @@ export const storage = {
   setProfile: (value) => setJson(KEYS.profile, value),
   getContacts: () => getJson(KEYS.contacts, []),
   setContacts: (value) => setJson(KEYS.contacts, value),
+  getContactsRecovery: () => getJson(KEYS.contactsRecovery, null),
+  setContactsRecovery: (value) => setJson(KEYS.contactsRecovery, value),
   getDevice: () => getJson(KEYS.device, null),
   setDevice: (value) => setJson(KEYS.device, value),
 
@@ -63,6 +67,9 @@ export const storage = {
   getNativeAlert: () => getJson(KEYS.nativeAlert, null),
   setNativeAlert: (value) => setJson(KEYS.nativeAlert, value),
   clearNativeAlert: () => Preferences.remove({ key: KEYS.nativeAlert }),
+  getNativeSentinel: () => getJson(KEYS.nativeSentinel, null),
+  setNativeSentinel: (value) => setJson(KEYS.nativeSentinel, value),
+  clearNativeSentinel: () => Preferences.remove({ key: KEYS.nativeSentinel }),
 
   async clearAll() {
     await Promise.all(Object.values(KEYS).map((key) => Preferences.remove({ key })));

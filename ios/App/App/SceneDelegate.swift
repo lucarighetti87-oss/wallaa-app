@@ -12,7 +12,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // if UIKit did not provide one.
         if window == nil {
             let fallbackWindow = UIWindow(windowScene: windowScene)
-            fallbackWindow.rootViewController = CAPBridgeViewController()
+            fallbackWindow.rootViewController = WallaaBridgeViewController()
             fallbackWindow.makeKeyAndVisible()
             window = fallbackWindow
         }

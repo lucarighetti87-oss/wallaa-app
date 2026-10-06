@@ -3,6 +3,7 @@ import Capacitor
 import CoreBluetooth
 import CoreLocation
 import UserNotifications
+import Security
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -74,6 +75,24 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
     }
+
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        let type = (userInfo["type"] as? String)
+            ?? (userInfo["data"] as? [String: Any])?["type"] as? String
+            ?? ""
+
+        guard type == "wallaa_location_request" else {
+            completionHandler(.noData)
+            return
+        }
+
+        NSLog("[WALLAA][LOCATION][ADMIN] native location request received")
+        wallaaBackgroundBLE.handleAdminLocationRequest(completion: completionHandler)
+    }
 }
 
 // MARK: - Native background Wallaa Button monitor
@@ -99,6 +118,10 @@ private struct WallaaNativeProfile: Codable {
     let phone: String?
     let safetyWord: String?
     let language: String?
+    let liveProtectionEnabled: Bool?
+    let sosLocationEnabled: Bool?
+    let plan: String?
+    let networkObserverEnabled: Bool?
 }
 
 private struct WallaaNativeIdentity: Codable {
@@ -119,23 +142,33 @@ private struct WallaaNativeConfig: Codable {
     let identity: WallaaNativeIdentity
 }
 
+private struct WallaaNativeSentinelState: Codable {
+    let active: Bool?
+    let available: Bool?
+    let status: String?
+    let syncedAt: String?
+}
+
 private struct WallaaDecodedButton {
     let packetId: Int?
     let battery: Int?
     let buttonCode: Int
     let event: String
+    var fingerprint: String? = nil
 }
 
-private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelegate, CLLocationManagerDelegate {
+private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelegate, CLLocationManagerDelegate, CBPeripheralDelegate {
     static let shared = WallaaBackgroundBLEManager()
 
-    private let serviceUUID = CBUUID(string: "FCD2")
+    private let scanServices = [CBUUID(string: "FCD2"), CBUUID(string: "FEE0"), CBUUID(string: "EA00")]
     private let restoreIdentifierDefaultsKey = "wallaa.native.ble.restore.identifier"
     private let configDefaultsKey = "CapacitorStorage.wallaa.safe.background.config"
     private let nativeAlertDefaultsKey = "CapacitorStorage.wallaa.safe.native.alert"
     private let activeAlertDefaultsKey = "CapacitorStorage.wallaa.safe.active.alert"
 
-    private var central: CBCentralManager?
+
+    private let sentinelDefaultsKey = "CapacitorStorage.wallaa.safe.sentinel.native"
+private var central: CBCentralManager?
     private let locationManager = CLLocationManager()
     private var config: WallaaNativeConfig?
     private var lastFingerprint = ""
@@ -145,10 +178,17 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
     private var locationTimeout: DispatchWorkItem?
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
     private var sending = false
+    private var adminLocationRequestPending = false
+    private var adminLocationCompletion: ((UIBackgroundFetchResult) -> Void)?
+    private var adminLocationTimeout: DispatchWorkItem?
     private var liveAlertId = ""
     private var livePublishing = false
     private var liveLastSentAt = Date.distantPast
-    private var scanRearmWorkItem: DispatchWorkItem?
+
+    private var nativeSentinelState: WallaaNativeSentinelState?
+    private var sentinelPublishing = false
+    private var sentinelLastSentAt = Date.distantPast
+private var scanRearmWorkItem: DispatchWorkItem?
     private var lastScanStartedAt = Date.distantPast
     private var lastTargetDiscoveryAt = Date.distantPast
 
@@ -223,17 +263,366 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
         stopNativeScan(reason: "did-become-active")
     }
 
+    private var communityMacs: [UUID: String] = [:]
+    private var communityPending: [String: (rssi: Int, at: Date)] = [:]
+    private var communityLastSent: [String: Date] = [:]
+    private var communityTask: UIBackgroundTaskIdentifier = .invalid
+    private var communityLocationTimeout: DispatchWorkItem?
+    private var communityPublishing = false
+    private var communityPaused = false
+    private var communityNextAttempt = Date.distantPast
+    private var communityRequestedAlways = false
+    private var communityEnabled: Bool {
+        !communityPaused && config?.profile.networkObserverEnabled == true && !(config?.identity.authToken ?? "").isEmpty
+    }
+
+    private func beginCommunityTask() {
+        guard UIApplication.shared.applicationState != .active, communityTask == .invalid else {return}
+        communityTask=UIApplication.shared.beginBackgroundTask(withName:"WallaaNetworkSighting") {[weak self] in
+            self?.communityPending.removeAll();self?.endCommunityTask()
+        }
+    }
+    private func endCommunityTask() {
+        communityLocationTimeout?.cancel();communityLocationTimeout=nil
+        if communityTask != .invalid {UIApplication.shared.endBackgroundTask(communityTask);communityTask = .invalid}
+    }
+
+    private func observeCommunityTag(_ peripheral: CBPeripheral, advertisement: [String: Any], rssi: NSNumber) {
+        guard communityEnabled else { return }
+        let now=Date()
+        communityPending=communityPending.filter {now.timeIntervalSince($0.value.at)<60}
+        if let services=advertisement[CBAdvertisementDataServiceDataKey] as? [CBUUID:Data],
+           let info=services[CBUUID(string:"EA00")], info.count==21, info.first==0 {
+            let raw=[UInt8](info.suffix(6))
+            if !raw.allSatisfy({$0==0}) && !raw.allSatisfy({$0==255}) {
+                let mac=raw.map {String(format:"%02X",$0)}.joined()
+                communityMacs[peripheral.identifier]="MOKO:\(mac)"
+            }
+        }
+        guard let hardwareId=communityMacs[peripheral.identifier], hardwareId != config?.hardwareId,
+              (-127...20).contains(rssi.intValue),
+              now.timeIntervalSince(communityLastSent[hardwareId] ?? .distantPast)>=15 else {return}
+        if communityMacs.count>256 {communityMacs=[peripheral.identifier:hardwareId]}
+        if communityPending.count>=20 && communityPending[hardwareId]==nil {return}
+        communityPending[hardwareId]=(rssi:rssi.intValue,at:now)
+        guard now>=communityNextAttempt else {return}
+        beginCommunityTask()
+        if let location=locationManager.location, location.horizontalAccuracy>=0,
+           location.horizontalAccuracy<=100, abs(location.timestamp.timeIntervalSinceNow)<15 {
+            publishCommunityObservations(location)
+        } else if locationManager.authorizationStatus == .authorizedAlways && !sending && !adminLocationRequestPending && !communityPublishing {
+            locationManager.requestLocation()
+            communityLocationTimeout?.cancel()
+            let timeout=DispatchWorkItem {[weak self] in
+                self?.communityNextAttempt=Date().addingTimeInterval(30)
+                self?.communityPending.removeAll();self?.endCommunityTask()
+            }
+            communityLocationTimeout=timeout
+            DispatchQueue.main.asyncAfter(deadline:.now()+8,execute:timeout)
+        } else if !communityPublishing {endCommunityTask()}
+    }
+
+    private func publishCommunityObservations(_ location: CLLocation) {
+        guard communityEnabled, !communityPublishing, Date()>=communityNextAttempt, location.horizontalAccuracy>=0, location.horizontalAccuracy<=100,
+              abs(location.timestamp.timeIntervalSinceNow)<15, let config,
+              let token=config.identity.authToken, !token.isEmpty, var base=URL(string:config.apiUrl) else {return}
+        let now=Date()
+        communityPending=communityPending.filter {now.timeIntervalSince($0.value.at)<60}
+        let items=Array(communityPending.prefix(10))
+        guard !items.isEmpty else {return}
+        base.deleteLastPathComponent()
+        let url=base.appendingPathComponent("device-network").appendingPathComponent("observations")
+        let observations=items.map {item -> [String:Any] in
+            ["hardwareId":item.key,"rssi":item.value.rssi,"observedAt":ISO8601DateFormatter().string(from:item.value.at)]
+        }
+        let payload:[String:Any]=["observations":observations,"location":["latitude":location.coordinate.latitude,
+            "longitude":location.coordinate.longitude,"accuracy":location.horizontalAccuracy,
+            "capturedAt":ISO8601DateFormatter().string(from:location.timestamp)]]
+        guard let data=try? JSONSerialization.data(withJSONObject:payload) else {return}
+        var request=URLRequest(url:url);request.httpMethod="POST";request.httpBody=data;request.timeoutInterval=10
+        request.setValue("application/json",forHTTPHeaderField:"Content-Type")
+        request.setValue(config.identity.installationId ?? "",forHTTPHeaderField:"x-wallaa-installation-id")
+        request.setValue(token,forHTTPHeaderField:"x-wallaa-install-token")
+        communityLocationTimeout?.cancel();communityLocationTimeout=nil
+        communityPublishing=true
+        URLSession.shared.dataTask(with:request) {[weak self] _,response,_ in
+            DispatchQueue.main.async {
+                guard let self else {return}
+                self.communityPublishing=false
+                self.endCommunityTask()
+                if let response=response as? HTTPURLResponse, [401,403].contains(response.statusCode) {
+                    self.communityPaused=true;self.communityPending.removeAll()
+                    return
+                }
+                if let response=response as? HTTPURLResponse, (200..<300).contains(response.statusCode) {
+                    for item in items {
+                        self.communityLastSent[item.key]=now
+                        if self.communityPending[item.key]?.at==item.value.at {self.communityPending.removeValue(forKey:item.key)}
+                    }
+                } else {self.communityNextAttempt=Date().addingTimeInterval(30)}
+            }
+        }.resume()
+    }
+
+    private var mokoPeripheral: CBPeripheral?
+    private var mokoPasswordCharacteristic: CBCharacteristic?
+    private var mokoEventsCharacteristic: CBCharacteristic?
+    private var mokoAuthenticated = false
+    private var mokoAuthenticationBlocked = false
+    private var mokoStatus = "disabled"
+    private var mokoLastCount: Int?
+    private var mokoNeedsBaselineRead = false
+    private var mokoRetry: DispatchWorkItem?
+    private var mokoHandshakeTimeout: DispatchWorkItem?
+    private var mokoLastRssiAt = Date.distantPast
+    private var mokoRssi: Int?
+    private var mokoDisconnectedAt: Date?
+    private var guardianLastLocationAt = Date.distantPast
+    private var guardianPublishing = false
+
+    private var mokoConnectionWanted: Bool {
+        guard let config, config.armed, !(config.identity.authToken ?? "").isEmpty,
+              let hardwareId = config.hardwareId, hardwareId.hasPrefix("MOKO:"),
+              ["press", "any_press"].contains(config.trigger) else { return false }
+        return UserDefaults.standard.bool(forKey: "wallaa.moko.continuous.\(hardwareId)")
+    }
+
+    func configureMokoConnection(hardwareId: String, enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: "wallaa.moko.continuous.\(hardwareId)")
+        mokoAuthenticationBlocked = false
+        mokoRetry?.cancel()
+        start()
+        reconcileMokoConnection()
+    }
+
+    func mokoConnectionStatus() -> [String: Any] {
+        refreshConfiguration()
+        if mokoAuthenticated, let peripheral = mokoPeripheral, peripheral.state == .connected,
+           Date().timeIntervalSince(mokoLastRssiAt) >= 15 {
+            mokoLastRssiAt = Date()
+            peripheral.readRSSI()
+        }
+        var result: [String: Any] = ["state": mokoStatus,
+            "connected": mokoAuthenticated && mokoPeripheral?.state == .connected,
+            "ready": mokoStatus == "ready", "rssi": NSNull(), "disconnectedAt": NSNull()]
+        if let rssi = mokoRssi { result["rssi"] = rssi }
+        if let at = mokoDisconnectedAt { result["disconnectedAt"] = ISO8601DateFormatter().string(from: at) }
+        return result
+    }
+
+    private func reconcileMokoConnection() {
+        guard mokoConnectionWanted else {
+            mokoRetry?.cancel(); mokoHandshakeTimeout?.cancel()
+            if let peripheral = mokoPeripheral { central?.cancelPeripheralConnection(peripheral) }
+            mokoPeripheral = nil; mokoAuthenticated = false; mokoDisconnectedAt = nil; mokoStatus = "disabled"
+            return
+        }
+        guard !mokoAuthenticationBlocked, let central, central.state == .poweredOn,
+              let raw = config?.deviceId, let uuid = UUID(uuidString: raw) else { return }
+        if let peripheral = mokoPeripheral, peripheral.identifier != uuid {
+            central.cancelPeripheralConnection(peripheral)
+            mokoPeripheral = nil; mokoAuthenticated = false
+        }
+        if let peripheral = mokoPeripheral, peripheral.state == .connected || peripheral.state == .connecting { return }
+        if let peripheral = central.retrievePeripherals(withIdentifiers: [uuid]).first {
+            connectMoko(peripheral)
+        } else {
+            mokoStatus = "searching"
+            startScanIfNeeded(reason: "moko-discovery")
+        }
+    }
+
+    private func connectMoko(_ peripheral: CBPeripheral) {
+        guard mokoConnectionWanted, !mokoAuthenticationBlocked else { return }
+        mokoPeripheral = peripheral
+        peripheral.delegate = self
+        mokoStatus = "connecting"
+        central?.connect(peripheral, options: nil)
+    }
+
+    func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        guard peripheral.identifier.uuidString.caseInsensitiveCompare(config?.deviceId ?? "") == .orderedSame,
+              mokoConnectionWanted else { central.cancelPeripheralConnection(peripheral); return }
+        mokoPeripheral = peripheral; peripheral.delegate = self
+        mokoAuthenticated = false; mokoStatus = "authenticating"
+        mokoDisconnectedAt = nil
+        mokoPasswordCharacteristic = nil; mokoEventsCharacteristic = nil
+        peripheral.discoverServices([CBUUID(string: "AA00")])
+        mokoHandshakeTimeout?.cancel()
+        let timeout = DispatchWorkItem { [weak self] in
+            guard let self, !self.mokoAuthenticated else { return }
+            self.mokoStatus = "connection_failed"
+            self.central?.cancelPeripheralConnection(peripheral)
+        }
+        mokoHandshakeTimeout = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15, execute: timeout)
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+        guard peripheral == mokoPeripheral else { return }
+        guard error == nil, let service = peripheral.services?.first(where: { $0.uuid == CBUUID(string: "AA00") }) else {
+            mokoStatus = "unsupported"; mokoAuthenticationBlocked = true
+            central?.cancelPeripheralConnection(peripheral); return
+        }
+        peripheral.discoverCharacteristics([CBUUID(string: "AA07"), CBUUID(string: "AA08")], for: service)
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
+        guard peripheral == mokoPeripheral else { return }
+        guard error == nil,
+              let password = service.characteristics?.first(where: { $0.uuid == CBUUID(string: "AA07") }),
+              let events = service.characteristics?.first(where: { $0.uuid == CBUUID(string: "AA08") }) else {
+            mokoStatus = "unsupported"; mokoAuthenticationBlocked = true
+            central?.cancelPeripheralConnection(peripheral); return
+        }
+        mokoPasswordCharacteristic = password; mokoEventsCharacteristic = events
+        peripheral.setNotifyValue(true, for: password)
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+        guard peripheral == mokoPeripheral else { return }
+        guard error == nil, characteristic.isNotifying else {
+            mokoStatus = "connection_failed"; central?.cancelPeripheralConnection(peripheral); return
+        }
+        if characteristic.uuid == CBUUID(string: "AA07") {
+            guard let hardwareId = config?.hardwareId, let password = WallaaMokoKeychain.read(hardwareId),
+                  let command = WallaaMokoGATT.authenticationCommand(password) else {
+                mokoStatus = "password_required"; mokoAuthenticationBlocked = true
+                central?.cancelPeripheralConnection(peripheral); return
+            }
+            peripheral.writeValue(command, for: characteristic, type: .withResponse)
+        } else if characteristic.uuid == CBUUID(string: "AA08") {
+            // Read a baseline when supported; never replay an old connection counter as a new SOS.
+            if characteristic.properties.contains(.read) {
+                mokoNeedsBaselineRead = true
+                peripheral.readValue(for: characteristic)
+            } else {
+                mokoStatus = mokoLastCount == nil ? "synchronizing" : "ready"
+            }
+        }
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
+        guard peripheral == mokoPeripheral, error != nil else { return }
+        mokoStatus = "connection_failed"; central?.cancelPeripheralConnection(peripheral)
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+        guard peripheral == mokoPeripheral else { return }
+        if error != nil {
+            if characteristic.uuid == CBUUID(string: "AA08"), mokoNeedsBaselineRead {
+                mokoNeedsBaselineRead = false
+                mokoStatus = mokoLastCount == nil ? "synchronizing" : "ready"
+            }
+            return
+        }
+        guard let value = characteristic.value else { return }
+        if characteristic.uuid == CBUUID(string: "AA07") {
+            guard let accepted = WallaaMokoGATT.authenticationReply(value) else { return }
+            guard accepted else {
+                mokoStatus = "password_error"; mokoAuthenticationBlocked = true
+                central?.cancelPeripheralConnection(peripheral); return
+            }
+            mokoAuthenticated = true; mokoHandshakeTimeout?.cancel()
+            mokoStatus = "synchronizing"
+            if let hardwareId = config?.hardwareId {
+                mokoLastCount = UserDefaults.standard.object(forKey: "wallaa.moko.gatt.counter.\(hardwareId)") as? Int
+            }
+            if let events = mokoEventsCharacteristic { peripheral.setNotifyValue(true, for: events) }
+            reconcileLocationTracking()
+            return
+        }
+        guard characteristic.uuid == CBUUID(string: "AA08"), mokoAuthenticated,
+              let count = WallaaMokoGATT.connectionCount(value),
+              let hardwareId = config?.hardwareId else { return }
+        let previous = mokoLastCount
+        mokoLastCount = count
+        UserDefaults.standard.set(count, forKey: "wallaa.moko.gatt.counter.\(hardwareId)")
+        mokoStatus = "ready"
+        if mokoNeedsBaselineRead { mokoNeedsBaselineRead = false; return }
+        guard WallaaMokoGATT.shouldEmit(previous: previous, count: count, initialRead: false), mokoConnectionWanted,
+              let config, triggerMatches(config.trigger, event: "press") else { return }
+        triggerBackgroundAlert(button: WallaaDecodedButton(packetId: count, battery: nil, buttonCode: 1,
+                              event: "press", fingerprint: "moko-gatt:\(count)"), peripheralId: peripheral.identifier.uuidString)
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
+        if peripheral == mokoPeripheral, error == nil { mokoRssi = RSSI.intValue }
+    }
+
+    func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
+        guard peripheral == mokoPeripheral else { return }
+        mokoStatus = "disconnected"; mokoDisconnectedAt = Date(); scheduleMokoReconnect()
+    }
+
+    func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        guard peripheral == mokoPeripheral else { return }
+        mokoAuthenticated = false; mokoNeedsBaselineRead = false; mokoHandshakeTimeout?.cancel()
+        if mokoConnectionWanted && !mokoAuthenticationBlocked {
+            mokoStatus = "disconnected"; mokoDisconnectedAt = Date(); scheduleMokoReconnect()
+        }
+        reconcileLocationTracking()
+    }
+
+    private func scheduleMokoReconnect() {
+        guard mokoConnectionWanted, !mokoAuthenticationBlocked else { return }
+        mokoRetry?.cancel()
+        let retry = DispatchWorkItem { [weak self] in self?.reconcileMokoConnection() }
+        mokoRetry = retry
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: retry)
+    }
+
+    private var nativeGuardianShouldTrack: Bool {
+        mokoAuthenticated && config?.profile.liveProtectionEnabled == true && config?.profile.plan == "pro"
+    }
+
+    private func publishGuardianLocation(_ location: CLLocation) {
+        guard nativeGuardianShouldTrack, !guardianPublishing, location.horizontalAccuracy >= 0,
+              abs(location.timestamp.timeIntervalSinceNow) < 60,
+              Date().timeIntervalSince(guardianLastLocationAt) >= 10,
+              let config, let token = config.identity.authToken, !token.isEmpty,
+              var base = URL(string: config.apiUrl) else { return }
+        base.deleteLastPathComponent()
+        let url = base.appendingPathComponent("account").appendingPathComponent("live-location")
+        let payload: [String: Any] = ["location": ["latitude": location.coordinate.latitude,
+              "longitude": location.coordinate.longitude, "accuracy": location.horizontalAccuracy,
+              "capturedAt": ISO8601DateFormatter().string(from: location.timestamp)]]
+        guard let data = try? JSONSerialization.data(withJSONObject: payload) else { return }
+        var request = URLRequest(url: url); request.httpMethod = "POST"; request.httpBody = data; request.timeoutInterval = 10
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(config.identity.installationId ?? "", forHTTPHeaderField: "x-wallaa-installation-id")
+        request.setValue(token, forHTTPHeaderField: "x-wallaa-install-token")
+        guardianPublishing = true; guardianLastLocationAt = Date()
+        URLSession.shared.dataTask(with: request) { [weak self] _, _, _ in
+            DispatchQueue.main.async { self?.guardianPublishing = false }
+        }.resume()
+    }
+
     func refreshConfiguration() {
         guard let raw = UserDefaults.standard.string(forKey: configDefaultsKey),
               let data = raw.data(using: .utf8),
               let decoded = try? JSONDecoder().decode(WallaaNativeConfig.self, from: data) else {
             NSLog("[WALLAA][BLE] background config unavailable")
             config = nil
+            nativeSentinelState = nil
+            reconcileMokoConnection()
             stopNativeScan(reason: "missing-config")
+            reconcileLocationTracking()
             return
         }
+        if config?.profile.networkObserverEnabled != decoded.profile.networkObserverEnabled || config?.identity.authToken != decoded.identity.authToken {
+            communityPaused=false;communityNextAttempt = .distantPast
+        }
         config = decoded
+        if communityEnabled && !communityRequestedAlways && locationManager.authorizationStatus == .authorizedWhenInUse {
+            communityRequestedAlways=true
+            locationManager.requestAlwaysAuthorization()
+        }
+        if !communityEnabled {communityPending.removeAll();communityRequestedAlways=false;endCommunityTask()}
+        reconcileMokoConnection()
+        refreshNativeSentinelState()
         refreshLiveTrackingFromDefaults()
+        reconcileLocationTracking()
         if UIApplication.shared.applicationState != .active, central?.state == .poweredOn {
             startScanIfNeeded(reason: "config-refresh")
         }
@@ -241,7 +630,7 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
 
     private func configurationAllowsBackgroundSOS() -> Bool {
         guard let config else { return false }
-        return config.armed && !config.deviceId.isEmpty && !(config.identity.authToken ?? "").isEmpty
+        return communityEnabled || (config.armed && !config.deviceId.isEmpty && !(config.identity.authToken ?? "").isEmpty)
     }
 
     private func stopNativeScan(reason: String) {
@@ -254,7 +643,7 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
 
     private func startScanIfNeeded(forceRestart: Bool = false, reason: String = "normal") {
         guard let central else { return }
-        guard UIApplication.shared.applicationState != .active else {
+        guard UIApplication.shared.applicationState != .active || mokoConnectionWanted else {
             stopNativeScan(reason: "foreground-guard")
             return
         }
@@ -268,7 +657,7 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
             // iOS ignores AllowDuplicates while backgrounded. We explicitly re-arm the
             // scan after every target discovery so a later button advertisement from the
             // same peripheral can generate a fresh delegate callback.
-            central.scanForPeripherals(withServices: [serviceUUID], options: nil)
+            central.scanForPeripherals(withServices: scanServices, options: nil)
             lastScanStartedAt = Date()
         }
     }
@@ -287,7 +676,12 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
     }
 
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        if central.state != .poweredOn && mokoConnectionWanted {
+            mokoAuthenticated = false; mokoStatus = "bluetooth_disabled"
+            if mokoDisconnectedAt == nil { mokoDisconnectedAt = Date() }
+        }
         NSLog("[WALLAA][BLE] central state=\(central.state.rawValue)")
+        if central.state == .poweredOn { reconcileMokoConnection() }
         if central.state == .poweredOn, UIApplication.shared.applicationState != .active {
             startScanIfNeeded(forceRestart: true, reason: "central-powered-on")
         }
@@ -298,6 +692,10 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
         let peripherals = dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral] ?? []
         NSLog("[WALLAA][BLE] restored services=\(services.map{$0.uuidString}) peripherals=\(peripherals.map{$0.identifier.uuidString})")
         refreshConfiguration()
+        for peripheral in peripherals where peripheral.identifier.uuidString.caseInsensitiveCompare(config?.deviceId ?? "") == .orderedSame && mokoConnectionWanted {
+            mokoPeripheral = peripheral; peripheral.delegate = self
+            if peripheral.state == .connected { peripheral.discoverServices([CBUUID(string: "AA00")]) }
+        }
         if central.state == .poweredOn {
             startScanIfNeeded(forceRestart: true, reason: "state-restoration")
         }
@@ -307,8 +705,11 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
                         didDiscover peripheral: CBPeripheral,
                         advertisementData: [String : Any],
                         rssi RSSI: NSNumber) {
-        // Foreground is intentionally handled by the established JS/BTHome core.
+        if mokoConnectionWanted, peripheral.identifier.uuidString.caseInsensitiveCompare(config?.deviceId ?? "") == .orderedSame {
+            if mokoPeripheral == nil || mokoPeripheral?.state == .disconnected { connectMoko(peripheral) }
+        }
         guard UIApplication.shared.applicationState != .active else { return }
+        observeCommunityTag(peripheral, advertisement: advertisementData, rssi: RSSI)
         guard let config, config.armed else { return }
         guard peripheral.identifier.uuidString.caseInsensitiveCompare(config.deviceId) == .orderedSame else { return }
 
@@ -327,7 +728,7 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
             return
         }
 
-        let fingerprint = "\(peripheral.identifier.uuidString.lowercased()):\(button.packetId ?? -1):\(button.buttonCode)"
+        let fingerprint = "\(peripheral.identifier.uuidString.lowercased()):\(button.fingerprint ?? "\(button.packetId ?? -1):\(button.buttonCode)")"
         let now = Date()
         // The prior 12-second duplicate window could suppress a second legitimate SOS if
         // a device omitted/reused packetId. Keep only a short radio-burst debounce.
@@ -343,8 +744,45 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
         triggerBackgroundAlert(button: button, peripheralId: peripheral.identifier.uuidString)
     }
 
+    // MK Button repeats the triggered frame for the configured advertising duration.
+    // The full counter is shared with the foreground monitor through Capacitor Preferences.
+    private func decodeMokoButton(serviceData: [CBUUID: Data]) -> WallaaDecodedButton? {
+        guard let hardwareId = config?.hardwareId, hardwareId.hasPrefix("MOKO:"),
+              let data = serviceData[CBUUID(string: "FEE0")] else { return nil }
+        let bytes = [UInt8](data)
+        guard (9...12).contains(bytes.count), bytes[bytes.count - 2] <= 1 else { return nil }
+        let event: String
+        let code: Int
+        switch bytes[0] {
+        case 0x20: event = "press"; code = 1
+        case 0x21: event = "double_press"; code = 2
+        case 0x22: event = "long_press"; code = 4
+        default: return nil // inactivity and unknown firmware never trigger a button SOS
+        }
+        if let info = serviceData[CBUUID(string: "EA00")], info.count == 21, info.first == 0 {
+            let mac = info.suffix(6).map { String(format: "%02X", $0) }.joined()
+            guard hardwareId == "MOKO:\(mac)" else { return nil }
+        }
+        let key = "CapacitorStorage.wallaa.safe.moko.counters.\(hardwareId)"
+        var counters: [String: Int] = [:]
+        if let raw = UserDefaults.standard.string(forKey: key), let encoded = raw.data(using: .utf8),
+           let stored = try? JSONDecoder().decode([String: Int].self, from: encoded) {
+            counters = stored
+        }
+        let mode = String(bytes[0])
+        let counter = Int(bytes[2]) * 256 + Int(bytes[3])
+        let previous = counters[mode]
+        counters[mode] = counter
+        guard let encoded = try? JSONEncoder().encode(counters),
+              let raw = String(data: encoded, encoding: .utf8) else { return nil }
+        UserDefaults.standard.set(raw, forKey: key)
+        guard bytes[1] & 0x02 != 0, let previous, previous != counter else { return nil }
+        return WallaaDecodedButton(packetId: counter, battery: nil, buttonCode: code, event: event, fingerprint: "moko:\(mode):\(counter)")
+    }
+
     private func decodeButton(advertisementData: [String: Any]) -> WallaaDecodedButton? {
         guard let serviceData = advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID: Data] else { return nil }
+        if serviceData[CBUUID(string: "FEE0")] != nil { return decodeMokoButton(serviceData: serviceData) }
         guard let data = serviceData.first(where: { $0.key.uuidString.uppercased().contains("FCD2") })?.value else { return nil }
         let bytes = [UInt8](data)
         guard bytes.count >= 2 else { return nil }
@@ -397,10 +835,12 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
         pendingPeripheralId = peripheralId
         beginBackgroundTime()
 
+        if config?.profile.sosLocationEnabled == false { sendAlert(location: nil); return }
+
         // Use a recent native location immediately when available. Otherwise request one,
         // but never block the SOS for more than 1.5 seconds.
         if let location = locationManager.location,
-           abs(location.timestamp.timeIntervalSinceNow) < 300,
+           abs(location.timestamp.timeIntervalSinceNow) < 15,
            location.horizontalAccuracy >= 0 {
             sendAlert(location: location)
             return
@@ -420,8 +860,58 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
         }
     }
 
+    func handleAdminLocationRequest(completion: @escaping (UIBackgroundFetchResult) -> Void) {
+        refreshConfiguration()
+
+        guard let config,
+              !(config.identity.authToken ?? "").isEmpty else {
+            NSLog("[WALLAA][LOCATION][ADMIN] native config/auth unavailable")
+            completion(.failed)
+            return
+        }
+
+        let status = locationManager.authorizationStatus
+        guard status == .authorizedAlways || status == .authorizedWhenInUse else {
+            NSLog("[WALLAA][LOCATION][ADMIN] location authorization=\(status.rawValue)")
+            completion(.failed)
+            return
+        }
+
+        if adminLocationRequestPending {
+            NSLog("[WALLAA][LOCATION][ADMIN] request already pending")
+            completion(.noData)
+            return
+        }
+
+        adminLocationRequestPending = true
+        adminLocationCompletion = completion
+
+        if let recent = locationManager.location,
+           recent.horizontalAccuracy >= 0,
+           abs(recent.timestamp.timeIntervalSinceNow) < 60 {
+            publishAdminLocationSnapshot(recent)
+            return
+        }
+
+        locationManager.requestLocation()
+
+        let timeout = DispatchWorkItem { [weak self] in
+            guard let self, self.adminLocationRequestPending else { return }
+            NSLog("[WALLAA][LOCATION][ADMIN] location request timeout")
+            self.finishAdminLocationRequest(.failed)
+        }
+        adminLocationTimeout = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: timeout)
+    }
+
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
+        publishCommunityObservations(location)
+
+        if adminLocationRequestPending {
+            publishAdminLocationSnapshot(location)
+        }
+
         if sending {
             locationTimeout?.cancel()
             locationTimeout = nil
@@ -431,14 +921,106 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
         if !liveAlertId.isEmpty {
             publishLiveLocation(location)
         }
+
+        publishGuardianLocation(location)
+        if nativeSentinelShouldTrack {
+            publishNativeSentinelHeartbeat(location)
+        }
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        if !communityPending.isEmpty {communityNextAttempt=Date().addingTimeInterval(30);endCommunityTask()}
+        if adminLocationRequestPending {
+            NSLog("[WALLAA][LOCATION][ADMIN] location error=\(error.localizedDescription)")
+            finishAdminLocationRequest(.failed)
+        }
+
         if sending {
             locationTimeout?.cancel()
             locationTimeout = nil
             sendAlert(location: nil)
         }
+    }
+
+    private func publishAdminLocationSnapshot(_ location: CLLocation) {
+        guard adminLocationRequestPending,
+              location.horizontalAccuracy >= 0,
+              let config,
+              let token = config.identity.authToken,
+              !token.isEmpty,
+              var base = URL(string: config.apiUrl) else {
+            finishAdminLocationRequest(.failed)
+            return
+        }
+
+        adminLocationTimeout?.cancel()
+        adminLocationTimeout = nil
+
+        base.deleteLastPathComponent()
+        let url = base.appendingPathComponent("account").appendingPathComponent("location-snapshot")
+
+        let payload: [String: Any] = [
+            "location": [
+                "latitude": location.coordinate.latitude,
+                "longitude": location.coordinate.longitude,
+                "accuracy": NSNumber(value: Int(location.horizontalAccuracy.rounded())),
+                "altitude": location.altitude,
+                "speed": location.speed >= 0 ? NSNumber(value: location.speed) : NSNull(),
+                "heading": location.course >= 0 ? NSNumber(value: location.course) : NSNull(),
+                "capturedAt": ISO8601DateFormatter().string(from: location.timestamp)
+            ]
+        ]
+
+        guard let body = try? JSONSerialization.data(withJSONObject: payload) else {
+            finishAdminLocationRequest(.failed)
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        if let installationId = config.identity.installationId, !installationId.isEmpty {
+            request.setValue(installationId, forHTTPHeaderField: "x-wallaa-installation-id")
+        }
+        request.setValue(token, forHTTPHeaderField: "x-wallaa-install-token")
+        request.setValue(token, forHTTPHeaderField: "x-wallaa-auth-token")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = body
+
+        URLSession.shared.dataTask(with: request) { [weak self] _, response, error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+
+                if let error {
+                    NSLog("[WALLAA][LOCATION][ADMIN] upload error=\(error.localizedDescription)")
+                    self.finishAdminLocationRequest(.failed)
+                    return
+                }
+
+                guard let http = response as? HTTPURLResponse,
+                      (200..<300).contains(http.statusCode) else {
+                    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                    NSLog("[WALLAA][LOCATION][ADMIN] upload HTTP=\(status)")
+                    self.finishAdminLocationRequest(.failed)
+                    return
+                }
+
+                NSLog("[WALLAA][LOCATION][ADMIN] snapshot uploaded lat=\(location.coordinate.latitude) lng=\(location.coordinate.longitude)")
+                self.finishAdminLocationRequest(.newData)
+            }
+        }.resume()
+    }
+
+    private func finishAdminLocationRequest(_ result: UIBackgroundFetchResult) {
+        adminLocationTimeout?.cancel()
+        adminLocationTimeout = nil
+        adminLocationRequestPending = false
+
+        let completion = adminLocationCompletion
+        adminLocationCompletion = nil
+        completion?(result)
     }
 
     private func sendAlert(location: CLLocation?) {
@@ -456,6 +1038,7 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
             "safetyWord": config.profile.safetyWord ?? "",
             "language": config.profile.language ?? "en",
             "trigger": button.event,
+            "locationEnabled": config.profile.sosLocationEnabled != false,
             "device": [
                 "name": "Wallaa Button",
                 "id": pendingPeripheralId,
@@ -477,7 +1060,7 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
             }
         ]
         if let packetId = button.packetId { payload["eventPacketId"] = packetId }
-        if let location {
+        if let location, config.profile.sosLocationEnabled != false {
             payload["location"] = [
                 "latitude": location.coordinate.latitude,
                 "longitude": location.coordinate.longitude,
@@ -555,7 +1138,8 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
                 "source": "native-background"
             ]
             if let packetId = button.packetId { restored["packetId"] = packetId }
-            if let location {
+            if let networkLocation = json["location"] as? [String:Any] { restored["location"] = networkLocation }
+            if let location, self.config?.profile.sosLocationEnabled != false {
                 restored["location"] = [
                     "latitude": location.coordinate.latitude,
                     "longitude": location.coordinate.longitude,
@@ -568,7 +1152,7 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
                let string = String(data: encoded, encoding: .utf8) {
                 UserDefaults.standard.set(string, forKey: self.nativeAlertDefaultsKey)
             }
-            if (json["liveTracking"] as? Bool) == true {
+            if (json["liveTracking"] as? Bool) == true && self.config?.profile.sosLocationEnabled != false {
                 DispatchQueue.main.async { self.startLiveTracking(alertId: alertId) }
             }
             DispatchQueue.main.async { self.finishBackgroundSend() }
@@ -576,6 +1160,10 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
     }
 
     private func refreshLiveTrackingFromDefaults() {
+        if config?.profile.sosLocationEnabled == false {
+            if !liveAlertId.isEmpty { stopLiveTracking() }
+            return
+        }
         guard let raw = UserDefaults.standard.string(forKey: activeAlertDefaultsKey),
               let data = raw.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -595,7 +1183,7 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
         NSLog("[WALLAA][LIVE] start alert=\(alertId) auth=\(locationManager.authorizationStatus.rawValue)")
         let status = locationManager.authorizationStatus
         guard status == .authorizedAlways || status == .authorizedWhenInUse else { return }
-        locationManager.startUpdatingLocation()
+        reconcileLocationTracking()
         if let recent = locationManager.location,
            recent.horizontalAccuracy >= 0,
            abs(recent.timestamp.timeIntervalSinceNow) < 60 {
@@ -607,7 +1195,7 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
         if !liveAlertId.isEmpty { NSLog("[WALLAA][LIVE] stop alert=\(liveAlertId)") }
         liveAlertId = ""
         livePublishing = false
-        locationManager.stopUpdatingLocation()
+        reconcileLocationTracking()
     }
 
     private func publishLiveLocation(_ location: CLLocation, force: Bool = false) {
@@ -658,6 +1246,188 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
         }.resume()
     }
 
+    private var nativeSentinelShouldTrack: Bool {
+        guard let state = nativeSentinelState else { return false }
+        guard state.active == true, state.available == true else { return false }
+        guard let config, !(config.identity.authToken ?? "").isEmpty else { return false }
+        return true
+    }
+
+    private func refreshNativeSentinelState() {
+        guard let raw = UserDefaults.standard.string(forKey: sentinelDefaultsKey),
+              let data = raw.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode(WallaaNativeSentinelState.self, from: data) else {
+            nativeSentinelState = nil
+            return
+        }
+
+        nativeSentinelState = decoded
+    }
+
+    private func reconcileLocationTracking() {
+        let sentinelTracking = nativeSentinelShouldTrack
+        let guardianTracking = nativeGuardianShouldTrack
+        let needsLocation = !liveAlertId.isEmpty || sentinelTracking || guardianTracking
+
+        guard needsLocation else {
+            locationManager.stopUpdatingLocation()
+            if CLLocationManager.significantLocationChangeMonitoringAvailable() {
+                locationManager.stopMonitoringSignificantLocationChanges()
+            }
+            return
+        }
+
+        let status = locationManager.authorizationStatus
+
+        // WALLAA 4.0.74 — Sentinel background presence requires Always permission.
+        if (sentinelTracking || guardianTracking) && status != .authorizedAlways {
+            NSLog("[WALLAA][SENTINEL][NATIVE] Always location required, authorization=\(status.rawValue)")
+            if status == .authorizedWhenInUse || status == .notDetermined {
+                locationManager.requestAlwaysAuthorization()
+            }
+        }
+
+        guard status == .authorizedAlways || (!sentinelTracking && !guardianTracking && status == .authorizedWhenInUse) else {
+            locationManager.stopUpdatingLocation()
+            if CLLocationManager.significantLocationChangeMonitoringAvailable() {
+                locationManager.stopMonitoringSignificantLocationChanges()
+            }
+            return
+        }
+
+        locationManager.startUpdatingLocation()
+
+        if (sentinelTracking || guardianTracking) && status == .authorizedAlways && CLLocationManager.significantLocationChangeMonitoringAvailable() {
+            locationManager.startMonitoringSignificantLocationChanges()
+        } else if CLLocationManager.significantLocationChangeMonitoringAvailable() {
+            locationManager.stopMonitoringSignificantLocationChanges()
+        }
+
+        if sentinelTracking,
+           let recent = locationManager.location,
+           recent.horizontalAccuracy >= 0,
+           abs(recent.timestamp.timeIntervalSinceNow) < 60 {
+            publishNativeSentinelHeartbeat(recent, force: true)
+        }
+    }
+
+    private func publishNativeSentinelHeartbeat(_ location: CLLocation, force: Bool = false) {
+        guard nativeSentinelShouldTrack,
+              !sentinelPublishing,
+              location.horizontalAccuracy >= 0,
+              let config,
+              let token = config.identity.authToken,
+              !token.isEmpty else {
+            return
+        }
+
+        let now = Date()
+
+        if !force && now.timeIntervalSince(sentinelLastSentAt) < 60 {
+            return
+        }
+
+        guard var base = URL(string: config.apiUrl) else { return }
+
+        // config.apiUrl = .../api/alert -> .../api/sentinel/heartbeat
+        base.deleteLastPathComponent()
+
+        let url = base
+            .appendingPathComponent("sentinel")
+            .appendingPathComponent("heartbeat")
+
+        let payload: [String: Any] = [
+            "location": [
+                "latitude": location.coordinate.latitude,
+                "longitude": location.coordinate.longitude,
+                "accuracy": NSNumber(value: Int(location.horizontalAccuracy.rounded())),
+                "heading": location.course >= 0
+                    ? NSNumber(value: location.course)
+                    : NSNull()
+            ]
+        ]
+
+        guard let body = try? JSONSerialization.data(withJSONObject: payload) else {
+            return
+        }
+
+        sentinelPublishing = true
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        if let installationId = config.identity.installationId,
+           !installationId.isEmpty {
+            request.setValue(
+                installationId,
+                forHTTPHeaderField: "x-wallaa-installation-id"
+            )
+        }
+
+        request.setValue(token, forHTTPHeaderField: "x-wallaa-install-token")
+        request.setValue(token, forHTTPHeaderField: "x-wallaa-auth-token")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = body
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let self else { return }
+
+            DispatchQueue.main.async {
+                self.sentinelPublishing = false
+
+                if let error {
+                    NSLog(
+                        "[WALLAA][SENTINEL][NATIVE] heartbeat error=\(error.localizedDescription)"
+                    )
+                    return
+                }
+
+                guard let http = response as? HTTPURLResponse else {
+                    NSLog("[WALLAA][SENTINEL][NATIVE] heartbeat no-http-response")
+                    return
+                }
+
+                guard (200..<300).contains(http.statusCode) else {
+                    NSLog(
+                        "[WALLAA][SENTINEL][NATIVE] heartbeat HTTP=\(http.statusCode)"
+                    )
+                    return
+                }
+
+                self.sentinelLastSentAt = now
+
+                if let data,
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+
+                    if json["ignored"] as? Bool == true {
+                        self.nativeSentinelState = nil
+                        self.reconcileLocationTracking()
+                        NSLog(
+                            "[WALLAA][SENTINEL][NATIVE] backend ignored Sentinel; tracking stopped"
+                        )
+                        return
+                    }
+
+                    if let status = json["status"] as? String,
+                       status.lowercased() == "offline" {
+                        self.nativeSentinelState = nil
+                        self.reconcileLocationTracking()
+                        NSLog(
+                            "[WALLAA][SENTINEL][NATIVE] Sentinel offline; tracking stopped"
+                        )
+                        return
+                    }
+                }
+
+                NSLog(
+                    "[WALLAA][SENTINEL][NATIVE] heartbeat uploaded accuracy=\(Int(location.horizontalAccuracy.rounded()))"
+                )
+            }
+        }.resume()
+    }
+
     private func beginBackgroundTime() {
         guard backgroundTask == .invalid else { return }
         backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "WallaaHardwareSOS") { [weak self] in
@@ -676,4 +1446,86 @@ private final class WallaaBackgroundBLEManager: NSObject, CBCentralManagerDelega
             backgroundTask = .invalid
         }
     }
+}
+
+private enum WallaaMokoGATT {
+    static func authenticationCommand(_ password: String) -> Data? {
+        guard let bytes = password.data(using: .ascii), (1...16).contains(bytes.count) else { return nil }
+        var command = Data([0xEA, 0x01, 0x55, UInt8(bytes.count)])
+        command.append(bytes)
+        return command
+    }
+    static func authenticationReply(_ data: Data) -> Bool? {
+        let bytes = [UInt8](data)
+        guard bytes.count == 5, Array(bytes.prefix(4)) == [0xEB, 0x01, 0x55, 0x01] else { return nil }
+        return bytes[4] == 0xAA
+    }
+    static func connectionCount(_ data: Data) -> Int? {
+        let bytes = [UInt8](data)
+        guard bytes.count == 5, Array(bytes.prefix(4)) == [0xEB, 0x02, 0x06, 0x01] else { return nil }
+        return Int(bytes[4])
+    }
+    static func shouldEmit(previous: Int?, count: Int, initialRead: Bool) -> Bool {
+        guard !initialRead, let previous, (0...255).contains(previous), (1...255).contains(count) else { return false }
+        return previous != count
+    }
+}
+
+private enum WallaaMokoKeychain {
+    static func read(_ hardwareId: String) -> String? {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "it.wallaa.moko.connection", kSecAttrAccount as String: hardwareId,
+            kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+              let data = item as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+    static func write(_ password: String, hardwareId: String) -> Bool {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "it.wallaa.moko.connection", kSecAttrAccount as String: hardwareId]
+        let values: [String: Any] = [kSecValueData as String: Data(password.utf8),
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
+        let status = SecItemUpdate(query as CFDictionary, values as CFDictionary)
+        if status == errSecSuccess { return true }
+        guard status == errSecItemNotFound else { return false }
+        return SecItemAdd(query.merging(values) { _, value in value } as CFDictionary, nil) == errSecSuccess
+    }
+}
+
+@objc(WallaaMokoPlugin)
+public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "WallaaMokoPlugin"
+    public let jsName = "WallaaMoko"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "configure", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise)
+    ]
+    @objc func configure(_ call: CAPPluginCall) {
+        guard let hardwareId = call.getString("hardwareId"),
+              hardwareId.range(of: "^MOKO:[0-9A-F]{12}$", options: .regularExpression) != nil else {
+            call.reject("Pulsante MOKO non valido."); return
+        }
+        let enabled = call.getBool("enabled") ?? false
+        let existing = WallaaMokoKeychain.read(hardwareId)
+        if let password = call.getString("password"), !password.isEmpty,
+           existing == nil || call.getBool("useExistingPassword") != true {
+            guard let data = password.data(using: .ascii), (1...16).contains(data.count),
+                  WallaaMokoKeychain.write(password, hardwareId: hardwareId) else {
+                call.reject("Password del pulsante non valida o non salvabile."); return
+            }
+        }
+        DispatchQueue.main.async {
+            WallaaBackgroundBLEManager.shared.configureMokoConnection(hardwareId: hardwareId, enabled: enabled)
+            call.resolve(["enabled": enabled])
+        }
+    }
+    @objc func status(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { call.resolve(WallaaBackgroundBLEManager.shared.mokoConnectionStatus()) }
+    }
+}
+
+@objc(WallaaBridgeViewController)
+class WallaaBridgeViewController: CAPBridgeViewController {
+    override func capacitorDidLoad() { bridge?.registerPluginInstance(WallaaMokoPlugin()) }
 }

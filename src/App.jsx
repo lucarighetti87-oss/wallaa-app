@@ -30,6 +30,7 @@ import { useWallaaSafe } from './hooks/useWallaaSafe';
 import { detectDeviceLanguage, translate } from './i18n';
 import { getWallaaConversations } from './services/network.js';
 
+import WallaaBrandShield from './components/WallaaBrandShield';
 const emptyContact = {
   id: '', name: '', email: '', phone: '', role: 'guardian',
   permissions: { sosAlerts: true, liveLocation: true, disconnectAlerts: true }
@@ -38,6 +39,29 @@ const emptyContact = {
 export default function App() {
   const safe = useWallaaSafe();
   const [screen, setScreen] = useState('home');
+
+  // WALLAA 4.0.72 — every normal screen opens from the top.
+  // Chat is intentionally excluded because it owns its message scroll.
+  const navigateTo = (targetScreen) => {
+    setScreen(targetScreen);
+
+    if (targetScreen === 'chat') return;
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const main = document.querySelector('.app-main-v4');
+
+        if (main) {
+          main.scrollTop = 0;
+          main.scrollTo?.({ top: 0, left: 0, behavior: 'auto' });
+        }
+
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      });
+    });
+  };
   const [selectedConversation, setSelectedConversation] = useState(null);
 
   useEffect(() => {
@@ -81,6 +105,40 @@ export default function App() {
     safe.messagePush,
     safe.networkIdentity?.installationId,
     safe.networkIdentity?.authToken
+  ]);
+
+  // Push navigation:
+  // receiving a notification in foreground must NOT force navigation.
+  // Navigation happens only when the user explicitly opens the notification.
+  useEffect(() => {
+    const push = safe.centralMessagePush;
+    if (!push?.opened) return;
+
+    if (safe.activeAlert?.active) {
+      setScreen('active-alert');
+    }
+  }, [
+    safe.centralMessagePush,
+    safe.activeAlert?.id,
+    safe.activeAlert?.active
+  ]);
+
+  useEffect(() => {
+    const offer = safe.sentinelOffer;
+    if (!offer?.opened) return;
+
+    setScreen('sentinel');
+  }, [
+    safe.sentinelOffer
+  ]);
+
+  useEffect(() => {
+    const push = safe.disconnectPush;
+    if (!push?.opened) return;
+
+    setScreen('device');
+  }, [
+    safe.disconnectPush
   ]);
 
   const [drawer, setDrawer] = useState(false);
@@ -138,7 +196,7 @@ export default function App() {
       <div className="splash splash-radar-ready" role="status" aria-label={t('splash.loadingAria')}>
         <div className="splash-aura"/>
         <div className="splash-radar" aria-hidden="true"><i/><i/><i/></div>
-        <div className="splash-logo"><img src="/wallaa-app-icon.png" alt="Wallaa"/></div>
+        <div className="splash-logo"><WallaaBrandShield alt="Wallaa"/></div>
         <h1>WALLAA</h1>
         <p className="splash-brand-slogan">Stay safe. Press Wallaa.</p><p className="splash-subtitle">{t('splash.ecosystem')}</p>
         <div className="splash-state" aria-hidden="true">
@@ -163,7 +221,7 @@ export default function App() {
         <div className="splash-aura"/>
         <div className="splash-radar" aria-hidden="true"><i/><i/><i/></div>
         <div className="splash-logo">
-          <img src="/wallaa-app-icon.png" alt="Wallaa"/>
+          <WallaaBrandShield alt="Wallaa"/>
         </div>
         <h1>WALLAA</h1>
         <p className="splash-brand-slogan">Stay safe. Press Wallaa.</p>
@@ -229,13 +287,13 @@ export default function App() {
     setScreen(targetScreen);
   }
 
-  const common = { ...safe, onNavigate: setScreen, t, language };
+  const common = { ...safe, onNavigate: navigateTo, t, language };
   const showDock = ['home','map','messages','settings'].includes(screen);
   const showTopBar = ['home','contacts','map','messages','activity','settings','network','security-check'].includes(screen);
 
   return (
     <div className={`app-shell-v4 screen-${screen}`}>
-      {showTopBar && <V4TopBar onMenu={() => setDrawer(true)} onNotifications={() => setScreen('notifications')} onHome={() => setScreen('home')} t={t} />}
+      {showTopBar && <V4TopBar onMenu={() => setDrawer(true)} onNotifications={() => navigateTo('notifications')} onHome={() => navigateTo('home')} t={t} />}
       <main ref={mainRef} className="app-main-v4"><div className="screen-transition" key={screen}>
         {screen === 'home' && <HomeV4Screen {...common} onSOSStart={() => setSosActivation(true)} onSOSCancel={() => { if (!safe.busy) setSosActivation(false); }} onSafetyCheck={() => setScreen('security-check')} />}
         {screen === 'security-check' && <SecurityCheckScreen {...common} onBack={() => setScreen('home')} onRefreshSystemHealth={safe.refreshSystemHealth} />}
@@ -243,7 +301,7 @@ export default function App() {
         {screen === 'guardian' && <GuardianModeScreen profile={safe.profile} currentLocation={safe.currentLocation} locationStatus={safe.locationStatus} networkState={safe.networkState} contacts={safe.contacts} onToggle={(v)=>safe.setGuardianMode(v).catch((e)=>safe.setToast({type:'error',text:e.message}))} onRefreshLocation={safe.refreshCurrentLocation} onBack={()=>setScreen('home')} />}
         {screen === 'map' && <MapScreen activeAlert={safe.activeAlert} plan={safe.profile?.plan || 'basic'} networkIdentity={safe.networkIdentity} currentLocation={safe.currentLocation} locationStatus={safe.locationStatus} onRefreshLocation={safe.refreshCurrentLocation} t={t} language={language} />}
         {screen === 'sentinel' && <SentinelScreen networkIdentity={safe.networkIdentity} profile={safe.profile} currentLocation={safe.currentLocation} onRefreshLocation={safe.refreshCurrentLocation} onBack={() => setScreen('home')} onHome={() => setScreen('home')} onOpenChat={(conversation) => { setSelectedConversation(conversation); setScreen('chat'); }} sentinelOffer={safe.sentinelOffer} clearSentinelOffer={safe.clearSentinelOffer} setToast={safe.setToast} plan={safe.profile?.plan || 'basic'} />}
-        {screen === 'device' && <DeviceScreen onBack={() => setScreen('home')} onHome={() => setScreen('home')} device={safe.device} telemetry={safe.telemetry} pairingState={safe.pairingState} onPair={() => safe.pairDevice().catch(()=>{})} connectionGuard={safe.connectionGuard} onConnectionGuard={safe.setConnectionGuard} connectionStatus={safe.connectionStatus} signalQuality={safe.signalQuality} trigger={safe.trigger} onTrigger={safe.setTrigger} t={t} />}
+        {screen === 'device' && <DeviceScreen onBack={() => setScreen('home')} onHome={() => setScreen('home')} device={safe.device} telemetry={safe.telemetry} pairingState={safe.pairingState} onPair={() => safe.pairDevice().catch(()=>{})} networkOwnedDevices={safe.networkOwnedDevices} networkDevice={safe.networkDevice} onNetworkTracking={safe.setDeviceNetworkTracking} mokoConnection={safe.mokoConnection} onMokoConfigure={safe.setMokoConnectionOptions} connectionGuard={safe.connectionGuard} onConnectionGuard={safe.setConnectionGuard} connectionStatus={safe.connectionStatus} signalQuality={safe.signalQuality} trigger={safe.trigger} onTrigger={safe.setTrigger} t={t} />}
         {screen === 'activity' && <ActivityScreen activities={safe.activities} onClear={() => clearActivityFeed('activity')} t={t} language={language} />}
 
         {screen === 'messages' && (
@@ -271,6 +329,7 @@ export default function App() {
         {screen === 'active-alert' && <ActiveAlertScreen
           alert={safe.activeAlert}
           networkIdentity={safe.networkIdentity}
+            centralMessagePush={safe.centralMessagePush}
           currentLocation={safe.currentLocation}
           onHome={() => setScreen('home')}
           onOpenChat={(conversation) => {
@@ -283,12 +342,12 @@ export default function App() {
           t={t}
           language={language}
         />}
-        {screen === 'privacy' && <PrivacyCenterScreen profile={safe.profile} onNavigate={setScreen} onDeleteAccount={deleteAccount} t={t} />}
-        {screen === 'settings' && <SettingsScreen profile={safe.profile} onSaveProfile={safe.saveProfile} armed={safe.armed} onArmed={safe.setArmed} onReset={resetAll} appearance={safe.appearance} onAppearance={safe.setAppearance} onDeleteAccount={deleteAccount} onSignOut={safe.signOut} networkState={safe.networkState} systemHealth={safe.systemHealth} onRefreshSystemHealth={safe.refreshSystemHealth} onTestEmail={safe.sendTestEmail} onTestAlarmSound={safe.testAlarmSound} onNavigate={setScreen} connectionGuard={safe.connectionGuard} onConnectionGuard={safe.setConnectionGuard} connectionStatus={safe.connectionStatus} t={t} />}
+        {screen === 'privacy' && <PrivacyCenterScreen profile={safe.profile} onNavigate={navigateTo} onDeleteAccount={deleteAccount} t={t} />}
+        {screen === 'settings' && <SettingsScreen onNetworkObserver={safe.setNetworkObserver} profile={safe.profile} onSaveProfile={safe.saveProfile} armed={safe.armed} onArmed={safe.setArmed} onReset={resetAll} appearance={safe.appearance} onAppearance={safe.setAppearance} onDeleteAccount={deleteAccount} onSignOut={safe.signOut} networkState={safe.networkState} systemHealth={safe.systemHealth} onRefreshSystemHealth={safe.refreshSystemHealth} onTestEmail={safe.sendTestEmail} onTestAlarmSound={safe.testAlarmSound} onNavigate={navigateTo} connectionGuard={safe.connectionGuard} onConnectionGuard={safe.setConnectionGuard} connectionStatus={safe.connectionStatus} t={t} />}
       </div></main>
 
-      {showDock && <V4BottomNav active={screen} onChange={setScreen} t={t} />}
-      <SideMenu open={drawer} onClose={() => setDrawer(false)} onNavigate={setScreen} active={screen} profile={safe.profile} device={safe.device} telemetry={safe.telemetry} connectionStatus={safe.connectionStatus} t={t} />
+      {showDock && <V4BottomNav active={screen} onChange={navigateTo} t={t} />}
+      <SideMenu open={drawer} onClose={() => setDrawer(false)} onNavigate={navigateTo} active={screen} profile={safe.profile} device={safe.device} telemetry={safe.telemetry} connectionStatus={safe.connectionStatus} t={t} />
       <EmergencyDispatchOverlay open={safe.dispatchingAlert} stage={safe.dispatchStage} t={t} />
       <SOSActivation open={sosActivation && !safe.dispatchingAlert} onCancel={() => setSosActivation(false)} onConfirm={activateSOS} busy={safe.busy} t={t} />
 
