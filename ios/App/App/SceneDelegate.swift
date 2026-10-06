@@ -7,15 +7,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
-        // Main.storyboard already contains CAPBridgeViewController. Do not replace the
-        // storyboard-created window during scene connection. Only create a fallback window
-        // if UIKit did not provide one.
-        if window == nil {
-            let fallbackWindow = UIWindow(windowScene: windowScene)
-            fallbackWindow.rootViewController = WallaaBridgeViewController()
-            fallbackWindow.makeKeyAndVisible()
-            window = fallbackWindow
-        }
+        // Instantiate the Swift bridge explicitly. A storyboard-created non-nil window
+        // can contain a plain UIViewController, which never loads the web interface.
+        let appWindow = UIWindow(windowScene: windowScene)
+        appWindow.rootViewController = WallaaBridgeViewController()
+        window = appWindow
+        appWindow.makeKeyAndVisible()
 
         NSLog("[WALLAA][BOOT] SceneDelegate connected")
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
