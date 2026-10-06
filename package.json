@@ -1,7 +1,7 @@
 {
   "name": "wallaa-safe-button",
   "private": true,
-  "version": "4.0.88",
+  "version": "4.0.89",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -37,7 +37,7 @@
     "@vitejs/plugin-react": "4.4.1",
     "vite": "^6.4.4"
   },
-  "wallaaBuild": 88,
+  "wallaaBuild": 89,
   "overrides": {
     "xcode": {
       "uuid": "^11.1.1"
