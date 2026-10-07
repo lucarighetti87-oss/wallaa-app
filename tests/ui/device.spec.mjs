@@ -8,3 +8,7 @@ test('old MK1 without a MAC still has one gesture and a recovery action',async({
 test('idle pairing does not claim success before verification',async({page})=>{await page.goto('/tests/ui/index.html?screen=device&empty');await expect(page.getByText('Dispositivo collegato con successo',{exact:true})).toHaveCount(0);});
 
 test('generic legacy ownership is not presented as a verified MK1',async({page})=>{await page.goto('/tests/ui/index.html?screen=device&legacyHash');await expect(page.getByRole('button',{name:'Completa collegamento'})).toBeVisible();await expect(page.getByText('Da configurare',{exact:true})).toBeVisible();await expect(page.getByText('Associato al tuo account',{exact:true})).toHaveCount(0);});
+
+test('tapping a discovered device advances the recovery screen',async({page})=>{await page.goto('/tests/ui/index.html?screen=device&legacyHash&state=selecting');await page.getByRole('button',{name:/Pulsante vicino · 9F8B/}).tap();await expect(page.getByRole('status')).toContainText('Collegamento al pulsante');await expect(page.locator('.mk1-candidates')).toHaveCount(0);});
+
+test('setup failure remains visible beside the recovery action',async({page})=>{await page.goto('/tests/ui/index.html?screen=device&legacyHash&setupError');await expect(page.getByRole('alert')).toContainText('Collegamento non riuscito');await expect(page.getByRole('button',{name:'Completa collegamento'})).toBeVisible();});

@@ -23,7 +23,7 @@ test('pair, suppress pairing broadcasts, emit one new press and preserve full co
  await ble.stopBleScan();
  await ble.startWallaaMonitor({deviceId:device.id,hardwareId:device.hardwareId,onEvent:e=>events.push(e)});
  callback(advertisement(2));callback(advertisement(3,1));callback(advertisement(3));callback(advertisement(4));await tick();
- assert.equal(events.length,2);assert.equal(events[1].packetId,4);
+ assert.equal(events.length,3);assert.equal(events[1].packetId,3);assert.equal(events[2].packetId,4);
  await ble.stopBleScan();
 });
 test('a volunteer without a paired button reports a foreign tag only after participation is enabled',async()=>{

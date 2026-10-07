@@ -2,7 +2,7 @@ import { setNetworkParticipation, getOwnedNetworkDevices, reportNetworkObservati
 import { prepareMokoButton } from '../services/mokoSetup';
 import { MOKO_FACTORY_PASSWORD } from '../services/mokoSetupProtocol';
 import { BleClient } from '@capacitor-community/bluetooth-le';
-import { configureMokoConnection, getMokoConnectionStatus, supportsMokoConnection, beginMokoSetup, endMokoSetup } from '../services/mokoConnection';
+import { configureMokoConnection, getMokoConnectionStatus, supportsMokoConnection, beginMokoSetup, endMokoSetup, isMokoDiagnosticRun } from '../services/mokoConnection';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { storage } from '../services/storage';
@@ -69,6 +69,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const networkObservationBuffer = useRef(new Map());
   const [mokoConnection, setMokoConnection] = useState({ state: 'disabled', connected: false, ready: false });
   const [pairingState, setPairingState] = useState('idle');
+  const [pairingError,setPairingError]=useState('');
   const [pairingActive,setPairingActive]=useState(false);
   const [pairingCandidates,setPairingCandidates]=useState([]);
   const [pendingMokoDevice,setPendingMokoDevice]=useState(null);
@@ -394,6 +395,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
 
   const fireAlert = useCallback(async (event = 'manual_test', meta = {}) => {
     if(!['manual_test','manual_sos'].includes(event) && (pairingInProgressRef.current || deviceRef.current?.mokoSetupVerified===false))return null;
+    if(!['manual_test','manual_sos'].includes(event) && deviceRef.current?.hardwareId?.startsWith('MOKO:')){if(isMokoDiagnosticRun()){console.info('[WALLAA][MOKO] diagnostic foreground press received');return null;}}
     if (busyRef.current) return null;
     busyRef.current = true;
     setBusy(true);
@@ -1031,6 +1033,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     if(pairingActive||device?.mokoSetupVerified===false)return 'setup-required';
     if (!device?.id) return 'absent';
     if (device?.hardwareId?.startsWith('MOKO:') && device.mokoContinuousEnabled !== false && supportsMokoConnection() && ['press','any_press'].includes(trigger)) {
+      if (mokoConnection.state==='disabled'&&!armed)return 'protection-off';
       if (mokoConnection.connected) return 'connected';
       if (mokoConnection.disconnectedAt) return 'disconnected';
       return 'searching';
@@ -1045,7 +1048,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     if (lastSignalAgeSeconds <= 25) return 'connected';
     if (lastSignalAgeSeconds <= 60) return 'weak';
     return 'disconnected';
-  }, [device?.id, device?.hardwareId, device?.mokoContinuousEnabled, trigger, mokoConnection, eventOnlyButton, lastSignalAgeSeconds, device?.mokoSetupVerified, pairingState, pairingActive]);
+  }, [device?.id, device?.hardwareId, device?.mokoContinuousEnabled, armed, trigger, mokoConnection, eventOnlyButton, lastSignalAgeSeconds, device?.mokoSetupVerified, pairingState, pairingActive]);
 
   const guardExceeded = useMemo(() => Boolean(
     !pairingInProgressRef.current && device?.mokoSetupVerified!==false && device?.id && connectionGuard.enabled && (
@@ -1363,13 +1366,13 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   }, []);
 
   const cancelPairing=useCallback(()=>{pairingControllerRef.current?.abort(new Error('Associazione annullata.'));pairingChoiceRef.current?.reject(new Error('Associazione annullata.'));},[]);
-  const selectPairingCandidate=useCallback(candidate=>{pairingChoiceRef.current?.resolve(candidate);},[]);
+  const selectPairingCandidate=useCallback(candidate=>{const choice=pairingChoiceRef.current;if(!choice){setPairingError('La selezione è terminata. Ripeti il collegamento.');setPairingCandidates([]);return;}setPairingCandidates([]);setPairingState('connecting');choice.resolve(candidate);},[]);
   const pairDevice = useCallback(async ({password=MOKO_FACTORY_PASSWORD,existingDevice=null}={}) => {
     if(pairingInProgressRef.current)return;
     if(activeAlertRef.current?.active){const error=new Error('Prima di configurare il pulsante, termina l’allarme attivo.');setToast({type:'warning',text:error.message});throw error;}
     const previousDevice=deviceRef.current,previousTrigger=triggerRef.current;
     const controller=new AbortController();pairingControllerRef.current=controller;pairingInProgressRef.current=true;setPairingActive(true);
-    setPairingCandidates([]);setPairingState('scanning');let target=null,lastCounter=null,claimed=null,completed=false;
+    setPairingError('');setPairingCandidates([]);setPairingState('scanning');let target=null,lastCounter=null,claimed=null,completed=false;
     const nativeSnapshot=async next=>{
       const previous=await storage.getBackgroundConfig();
       await storage.setBackgroundConfig({...previous,version:2,armed:armedRef.current && next.mokoSetupVerified!==false,trigger:next.hardwareId?.startsWith('MOKO:')?'press':triggerRef.current,apiUrl:CONFIG.apiUrl,deviceId:next.id,hardwareId:next.hardwareId,claimToken:next.claimToken,profile:profileRef.current,contacts:contactsRef.current,identity:networkIdentityRef.current});
@@ -1385,14 +1388,15 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
         candidates=available;
         return new Promise((resolve,reject)=>{
         setPairingState('selecting');setPairingCandidates(candidates);
-        const timer=setTimeout(()=>reject(new Error('Selezione interrotta. Ripeti il collegamento.')),30000);
-        const abort=()=>reject(new Error('Associazione annullata.'));
+        const timer=setTimeout(()=>pairingChoiceRef.current?.reject(new Error('Selezione interrotta. Ripeti il collegamento.')),120000);
+        const abort=()=>pairingChoiceRef.current?.reject(new Error('Associazione annullata.'));
         signal.addEventListener('abort',abort,{once:true});
         pairingChoiceRef.current={resolve:value=>{clearTimeout(timer);signal.removeEventListener('abort',abort);pairingChoiceRef.current=null;resolve(value);},reject:error=>{clearTimeout(timer);signal.removeEventListener('abort',abort);pairingChoiceRef.current=null;reject(error);}};
       });}});
       if(controller.signal.aborted)throw controller.signal.reason;
       if(target.protocol==='moko-button'||target.hardwareId?.startsWith('MOKO:')){
         if(!supportsMokoConnection())throw new Error('La configurazione MK1 richiede l’app Wallaa per iPhone.');
+        await beginMokoSetup(); // Renew suppression after a potentially long device selection.
         const prepared=await prepareMokoButton({device:target,ble:BleClient,password,signal:controller.signal,onProgress:setPairingState,onCounter:count=>{lastCounter=count;},checkOwnership:device=>checkWallaaDeviceClaim(networkIdentityRef.current,device),claim:(device,eligibility)=>existingDevice?.claimToken&&eligibility.claimTokenValid?Promise.resolve({hardwareId:device.hardwareId,claimToken:existingDevice.claimToken}):claimWallaaDevice(networkIdentityRef.current,device),onClaim:async next=>{
           claimed=next;setDevice(next);deviceRef.current=next;await storage.setDevice(next);await nativeSnapshot(next);
         }});
@@ -1419,6 +1423,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       await pushActivity({type:'device',status:'success',titleKey:'activity.devicePaired'});
       setPairingState('done');setToast({type:'success',text:'Pulsante associato e verificato.'});return deviceRef.current;
     }catch(error){
+      setPairingError(error.message||'Collegamento non riuscito. Ripeti la procedura.');
       if(claimed){
         const incomplete={...claimed,mokoSetupVerified:false};
         if(previousDevice && previousDevice.hardwareId!==incomplete.hardwareId){
@@ -1561,7 +1566,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   );
 
   return {
-    loaded, profile, contacts, device, armed, trigger, activities, telemetry, pairingState, busy, dispatchingAlert, dispatchStage, ready, toast, lastAlert,
+    loaded, profile, contacts, device, armed, trigger, activities, telemetry, pairingState, pairingError, busy, dispatchingAlert, dispatchStage, ready, toast, lastAlert,
     networkIdentity, networkState, qrDataUrl, incomingAlert, sentinelOffer, connectionGuard, appearance, connectionStatus, lastSignalAgeSeconds,
     messagePush,
     centralMessagePush,

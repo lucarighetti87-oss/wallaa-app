@@ -45,5 +45,7 @@ export function consumeMokoFrame(frame, counters = {}) {
   const prior = counters[key];
   // An unknown stream is baselined, never treated as a fresh press just because an alarm is already broadcasting.
   const emit = frame.triggered && Number.isInteger(prior) && prior !== frame.counter;
-  return { emit, counters: { ...counters, [key]: frame.counter } };
+  // A standby packet can precede the alarm packet for the same new click.
+  // Do not consume that click until its alarm packet has been processed.
+  return { emit, counters: { ...counters, [key]: Number.isInteger(prior)&&!frame.triggered?prior:frame.counter } };
 }
