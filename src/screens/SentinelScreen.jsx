@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import SentinelApplicationScreen from './SentinelApplicationScreen';
 import { ArrowLeft, CheckCircle2, ChevronRight, MapPin, MessageCircle, ShieldCheck } from 'lucide-react';
+import { sentinelOfferState } from '../services/sentinelOfferState';
 import { storage } from '../services/storage';
 import WallaaBrandShield from '../components/WallaaBrandShield';
 import {
@@ -11,6 +12,7 @@ import {
   getNearbySentinels,
   getSentinelProfile,
   getCurrentSentinelOffer,
+  getSentinelOffer,
   getCurrentSentinelIncident,
   sendSentinelPresence,
   setSentinelAvailability
@@ -218,55 +220,50 @@ export default function SentinelScreen({ networkIdentity, profile, currentLocati
   const [nearby, setNearby] = useState([]);
   const [busy, setBusy] = useState(false);
   const [incident, setIncident] = useState(null);
-  const [serverOffer, setServerOffer] = useState(null);
+  const [visibleOffer,setVisibleOffer]=useState(sentinelOffer||null);
+  const offerRef=useRef(visibleOffer);
+  const refreshSequence=useRef(0);
+  const busyRef=useRef(false);
+  const serverClockOffset=useRef(0);
+  const [now,setNow]=useState(Date.now());
+  const rememberOffer=useCallback((value)=>{offerRef.current=value;setVisibleOffer(value);},[]);
+  useEffect(()=>{if(sentinelOffer?.offerId && sentinelOffer.offerId!==offerRef.current?.offerId)rememberOffer(sentinelOffer);},[sentinelOffer,rememberOffer]);
+  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[]);
   const [showApplication,setShowApplication] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!networkIdentity?.authToken) return;
-
-    try {
-      const [me, list, offerResult, incidentResult] = await Promise.all([
+    if(!networkIdentity?.authToken || busyRef.current)return;
+    const sequence=++refreshSequence.current;
+    try{
+      const [me,list,offerResult,incidentResult]=await Promise.all([
         getSentinelProfile(networkIdentity),
-        getNearbySentinels(networkIdentity, currentLocation)
-          .catch(() => ({ sentinels: [] })),
-        getCurrentSentinelOffer(networkIdentity)
-          .catch(() => null),
-        getCurrentSentinelIncident(networkIdentity)
-          .catch(() => null)
+        getNearbySentinels(networkIdentity,currentLocation).catch(()=>({sentinels:[]})),
+        getCurrentSentinelOffer(networkIdentity).catch(()=>null),
+        getCurrentSentinelIncident(networkIdentity).catch(()=>null)
       ]);
-
-      setState(me);
-      setNearby(list?.sentinels || []);
-
-      if (offerResult !== null) {
-        const authoritativeOffer = offerResult?.offer || null;
-        setServerOffer(authoritativeOffer);
-
-        if (!authoritativeOffer) {
-          clearSentinelOffer?.();
+      if(sequence!==refreshSequence.current)return;
+      let nextOffer=offerRef.current;
+      if(offerResult?.offer){nextOffer={...offerResult.offer,status:'offered',actionable:true,reason:null};}
+      else if(nextOffer?.offerId){
+        try{
+          const detail=await getSentinelOffer(networkIdentity,nextOffer.offerId);
+          if(sequence!==refreshSequence.current)return;
+          if(detail?.serverTime)serverClockOffset.current=Date.parse(detail.serverTime)-Date.now();
+          nextOffer=detail.offer||{...nextOffer,actionable:false,reason:'unavailable'};
+        }catch(error){
+          if(error.status===404)nextOffer={...nextOffer,actionable:false,reason:'unavailable'};
+          // A transient failure must not erase the notification the user is reading.
         }
       }
+      if(sequence!==refreshSequence.current)return;
+      if(offerResult?.serverTime)serverClockOffset.current=Date.parse(offerResult.serverTime)-Date.now();
+      setState(me);setNearby(list?.sentinels||[]);rememberOffer(nextOffer);
+      if(incidentResult!==null)setIncident(incidentResult?.incident||null);
+      else if(me?.activeIncident)setIncident(me.activeIncident);
+    }catch(error){if(sequence===refreshSequence.current)setToast?.({type:'error',text:error.message});}
+  },[networkIdentity?.authToken,networkIdentity?.installationId,currentLocation?.latitude,currentLocation?.longitude,setToast,rememberOffer]);
 
-      if (incidentResult !== null) {
-        setIncident(incidentResult?.incident || null);
-      } else if (me?.activeIncident) {
-        setIncident(me.activeIncident);
-      }
-    } catch (error) {
-      setToast?.({
-        type: 'error',
-        text: error.message
-      });
-    }
-  }, [
-    networkIdentity?.authToken,
-    currentLocation?.latitude,
-    currentLocation?.longitude,
-    clearSentinelOffer,
-    setToast
-  ]);
-
-  useEffect(() => { refresh(); const id = setInterval(refresh, 8000); return () => clearInterval(id); }, [refresh]);
+  useEffect(() => { refresh(); const id = setInterval(refresh, 5000); return () => {clearInterval(id);refreshSequence.current+=1;}; }, [refresh]);
   useEffect(() => { if (!currentLocation) onRefreshLocation?.().catch(() => {}); }, [currentLocation, onRefreshLocation]);
 
   // WALLAA_SENTINEL_ACTIVE_INTERVENTION_TRACKING
@@ -311,17 +308,18 @@ export default function SentinelScreen({ networkIdentity, profile, currentLocati
     networkIdentity?.authToken,
     onRefreshLocation
   ]);
-  const offer = serverOffer || sentinelOffer || null;
+  const offer=visibleOffer;
+  const offerState=sentinelOfferState(offer,now+serverClockOffset.current);
   const available = Boolean(state?.profile?.available);
   const verified = Boolean(state?.profile?.verified);
   const applicationStatus = state?.application?.status || null;
   const enabled = state?.enabled !== false;
 
   async function run(task) {
-    setBusy(true);
-    try { await task(); await refresh(); }
-    catch (error) { setToast?.({ type: 'error', text: error.message }); }
-    finally { setBusy(false); }
+    busyRef.current=true;refreshSequence.current+=1;setBusy(true);
+    try{await task();}
+    catch(error){setToast?.({type:'error',text:error.message});}
+    finally{busyRef.current=false;setBusy(false);await refresh();}
   }
 
   async function toggleAvailability() {
@@ -343,25 +341,25 @@ export default function SentinelScreen({ networkIdentity, profile, currentLocati
   }
 
   async function acceptOffer() {
-    if (!offer?.offerId) return;
+    if (!offer?.offerId || !offerState.available) return;
     await run(async () => {
       const result = await acceptSentinelOffer(
         networkIdentity,
         offer.offerId
       );
       setIncident(result.incident);
-      setServerOffer(null);
+      rememberOffer(null);
       clearSentinelOffer?.();
     });
   }
   async function declineOffer() {
-    if (!offer?.offerId) return;
+    if (!offer?.offerId || !offerState.available) return;
     await run(async () => {
       await declineSentinelOffer(
         networkIdentity,
         offer.offerId
       );
-      setServerOffer(null);
+      rememberOffer(null);
       clearSentinelOffer?.();
     });
   }
@@ -402,7 +400,7 @@ export default function SentinelScreen({ networkIdentity, profile, currentLocati
 
   return <section className="sentinel-page">
     <div className="sentinel-top"><button onClick={onBack}><ArrowLeft/></button><button className="sentinel-brand" onClick={onHome}><WallaaBrandShield alt="Wallaa"/><b>Wallaa</b></button><span/></div>
-    {offer && <div className="sentinel-offer"><div className="sentinel-offer-title"><span>RICHIESTA DI AIUTO</span><h2>INTERVENTO DISPONIBILE</h2></div><div className="sentinel-offer-radar"><i/><MapPin/><strong>{distanceLabel(offer.routeDistanceM || offer.distanceM)}</strong><small>{Number.isFinite(Number(offer.etaSeconds)) && Number(offer.etaSeconds) > 0 ? `tempo stimato ~${Math.max(1,Math.round(Number(offer.etaSeconds)/60))} min` : 'tempo stimato non disponibile'}</small></div><p>Prima di accettare vedi distanza stradale stimata e tempo indicativo di arrivo. La posizione precisa viene mostrata solo dopo l'accettazione.</p><div className="sentinel-offer-actions"><button disabled={busy} onClick={declineOffer}>Non posso</button><button disabled={busy} onClick={acceptOffer}>Accetta</button></div></div>}
+    {offer && <div className="sentinel-offer"><div className="sentinel-offer-title"><span>RICHIESTA DI AIUTO</span><h2>INTERVENTO DISPONIBILE</h2></div><div className="sentinel-offer-radar"><i/><MapPin/><strong>{distanceLabel(offer.routeDistanceM || offer.distanceM)}</strong><small>{Number.isFinite(Number(offer.etaSeconds)) && Number(offer.etaSeconds) > 0 ? `tempo stimato ~${Math.max(1,Math.round(Number(offer.etaSeconds)/60))} min` : 'tempo stimato non disponibile'}</small></div><p>Prima di accettare vedi distanza stradale stimata e tempo indicativo di arrivo. La posizione precisa viene mostrata solo dopo l'accettazione.</p><p className="sentinel-offer-status" role="status">{offerState.message}</p><div className="sentinel-offer-actions">{offerState.available || offerState.checking ? <><button disabled={busy || !offerState.available} onClick={declineOffer}>Non posso</button><button disabled={busy || !offerState.available} onClick={acceptOffer}>Accetta</button></> : <button type="button" onClick={()=>{rememberOffer(null);clearSentinelOffer?.();}}>Chiudi richiesta</button>}</div></div>}
     <div className="sentinel-hero"><img src="/sentinel-shield.png" alt="Wallaa Sentinel"/><div><small>WALLAA SENTINEL</small><h1>La rete che rende Wallaa più forte</h1><p>Persone verificate e disponibili nelle vicinanze possono aiutare quando serve.</p></div></div>
 
     {!state?.profile ? <div className="sentinel-join"><h2>Diventa Sentinel</h2><p>Metti la tua disponibilità al servizio della community Wallaa.</p><button className="sentinel-primary" disabled={busy} onClick={() => setShowApplication(true)}>Inizia candidatura</button></div> :

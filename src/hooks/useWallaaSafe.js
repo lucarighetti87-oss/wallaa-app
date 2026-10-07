@@ -78,6 +78,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [incomingAlert, setIncomingAlert] = useState(null);
   const [sentinelOffer, setSentinelOffer] = useState(null);
+  const clearSentinelOffer = useCallback(() => setSentinelOffer(null), []);
   const [messagePush, setMessagePush] = useState(null);
   const [centralMessagePush, setCentralMessagePush] = useState(null);
   const [connectionGuard, setConnectionGuardState] = useState({ enabled: true, delaySeconds: 60 });
@@ -1530,6 +1531,6 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     legalStatus, legalChecked, legalRequired, legalGatePending, legalError,
     setToast, setArmed, setTrigger, saveProfile, setGuardianMode, dismissResolvedAlert, completeOnboarding, loginAccount, signOut, acceptLegalUpdate, refreshLegalStatus, addOrUpdateContact, removeContact, pairDevice, disconnectDevice,
     fireAlert, closeActiveAlert, clearActivities, clearData, deleteAccount, refreshNetwork, scanNetworkQr, rotateQr, removeNetworkLink,
-    setIncomingAlert, clearSentinelOffer: () => setSentinelOffer(null), setConnectionGuard, setAppearance, refreshSystemHealth, sendTestEmail, testAlarmSound, refreshCurrentLocation
+    setIncomingAlert, clearSentinelOffer, setConnectionGuard, setAppearance, refreshSystemHealth, sendTestEmail, testAlarmSound, refreshCurrentLocation
   };
 }

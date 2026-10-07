@@ -145,3 +145,5 @@ export const getMySosSentinel = (identity, alertId) =>
   request(`/api/sentinel/dispatch/my-sos-sentinel/${encodeURIComponent(alertId)}`, {
     identity
   });
+
+export const getSentinelOffer = (identity,offerId) => request(`/api/sentinel/dispatch/offers/${encodeURIComponent(offerId)}`,{identity});

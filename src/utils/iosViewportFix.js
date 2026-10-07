@@ -21,7 +21,7 @@ export function installIOSViewportFix() {
 
       // ChatScreen controls its own scrolling.
       // Do not move the entire document when the iOS keyboard opens.
-      if (target.closest?.('.wallaa-chat-screen')) return;
+      if (target.closest?.('.wallaa-chat-screen, .wallaa-new-chat-sheet')) return;
 
       try {
         target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
