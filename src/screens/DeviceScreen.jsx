@@ -14,6 +14,8 @@ function triggerRings(value){
 
 export default function DeviceScreen({ pendingMokoDevice, onResumeSetup, pairingCandidates = [], onSelectCandidate, onCancelPair, onMokoSetup, networkOwnedDevices = [], networkDevice, onNetworkTracking, mokoConnection, onMokoConfigure, device, telemetry, pairingState, onPair, connectionStatus, signalQuality, trigger, onTrigger, onBack, onHome }) {
   const [mokoPassword, setMokoPassword] = useState('');
+  const isMoko=Boolean(device && (device.protocol==='moko-button'||device.hardwareId?.startsWith('MOKO:')||/^MK Button$/i.test(device.advertisedName||'')||!device.hardwareId));
+  const needsSetup=isMoko && (!device.hardwareId?.startsWith('MOKO:')||device.mokoSetupVerified!==true);
   const setupLabels={scanning:'Accendi il pulsante e tienilo vicino all’iPhone.',found:'Pulsante rilevato.',selecting:'Seleziona il pulsante che vuoi collegare.',checking:'Verifica dell’associazione…',connecting:'Collegamento al pulsante…',authenticating:'Verifica del dispositivo…',awaiting_press:'Premi una volta il pulsante. Questa prova non invia SOS.',confirm_press:'Premi ancora una volta per confermare il collegamento. Non viene inviato un SOS.',claiming:'Associazione al tuo account…',configuring:'Wallaa sta applicando le impostazioni…',verifying:'Verifica delle impostazioni…',checking_signal:'Verifica del segnale…',restoring:'Verifica del collegamento finale…',incomplete:'Configurazione da completare. Premi Riprova.',password_error:'La password del pulsante è stata modificata. Inseriscila per continuare.'};
   const setupBusy=['scanning','found','selecting','checking','connecting','authenticating','awaiting_press','confirm_press','claiming','configuring','verifying','checking_signal','restoring'].includes(pairingState);
   useEffect(()=>()=>onCancelPair?.(),[onCancelPair]);
@@ -33,16 +35,8 @@ export default function DeviceScreen({ pendingMokoDevice, onResumeSetup, pairing
       <header className="aa-pair-head"><button type="button" className="aa-pair-back" onClick={onBack} aria-label="Indietro"><ArrowLeft/></button><button type="button" className="aa-wordmark aa-wordmark-home" onClick={onHome} aria-label="Torna alla Home"><WallaaBrandShield alt="Wallaa"/><span><strong>Wallaa</strong><small>SAFETY</small></span></button><span className="aa-pair-head-spacer"/></header>
       <h1>Collega il tuo Wallaa</h1><p>Collega il tuo Wallaa Safety Button in pochi semplici passaggi.<br/><b>Il collegamento non attiva l’SOS.</b></p>
       <div className={`aa-pair-device ${scanning?'ready':'offline'}`}><WallaaButton3D status={scanning?'connected':'disconnected'} size="lg"/></div>
-      <section className="aa-pair-checks">
-        <div className={scanning?'done':''}><i><Check/></i><span><strong>{scanning?'Dispositivo rilevato':'Pronto per la ricerca'}</strong><small>Wallaa Button</small></span><Radio/></div>
-        <div className={detected?'done':''}><i><Check/></i><span><strong>Identità del pulsante</strong><small>verificata durante il collegamento</small></span></div>
-        <div className={detected?'done':''}><i><Check/></i><span><strong>Pressione di prova esclusa dall’SOS</strong><small>La conferma serve al collegamento</small></span></div>
-        <div className={pairingState==='paired'?'done':''}><i><Check/></i><span><strong>Dispositivo collegato con successo</strong><small>Pronto per l’uso</small></span></div>
-      </section>
-      <div className="aa-permanent-owner-notice">
-        <Shield/>
-        <span><strong>Associazione permanente</strong><small>Questo Wallaa Button verrà associato in modo permanente al tuo account. Una volta completata l’associazione, non potrà essere utilizzato con un altro account.</small></span>
-      </div>
+      <section className="v4-settings-card"><h2>{scanning?'Collegamento in corso':'Collega il pulsante'}</h2><p>Accendi il pulsante e tienilo vicino all’iPhone. Premi una volta soltanto quando Wallaa lo richiede.</p></section>
+      <div className="aa-permanent-owner-notice"><Shield/><span><strong>Il pulsante sarà legato al tuo account</strong><small>La pressione di conferma non invia un SOS.</small></span></div>
       {setupProgress}
       <button className="aa-primary-glow" type="button" onClick={()=>onPair?.({password:mokoPassword||undefined})} disabled={scanning}><Bluetooth/>{scanning?'Ricerca e associazione…':'Collega Wallaa Button'}</button>
       {networkOwnedDevices.length > 0 && <section className="v4-settings-card">
@@ -57,7 +51,7 @@ export default function DeviceScreen({ pendingMokoDevice, onResumeSetup, pairing
     </div>;
   }
 
-  const visualStatus = setupBusy?'weak':['connected','standby'].includes(connectionStatus) ? 'connected' : connectionStatus === 'weak' ? 'weak' : 'disconnected';
+  const visualStatus = needsSetup?'disconnected':setupBusy?'weak':['connected','standby'].includes(connectionStatus) ? 'connected' : connectionStatus === 'weak' ? 'weak' : 'disconnected';
   return <div className="aa-focus aa-device-screen aa-device-screen-v41">
     <header className="aa-device-screen-head">
       <button type="button" className="aa-device-back" onClick={onBack} aria-label="Indietro"><ArrowLeft/></button>
@@ -77,9 +71,9 @@ export default function DeviceScreen({ pendingMokoDevice, onResumeSetup, pairing
         <WallaaButton3D status={visualStatus} size="lg"/>
       </div>
       <div className="aa-device-hero-copy">
-        <span className={`aa-connection ${visualStatus}`}><i/>{connectionLabel(connectionStatus)}</span>
+        <span className={`aa-connection ${visualStatus}`}><i/>{connectionLabel(needsSetup?'setup-required':connectionStatus)}</span>
         <h2>Wallaa Button</h2>
-        <small>Dispositivo associato</small>
+        <small>{needsSetup?'Associazione da completare':'Associato al tuo account'}</small>
         <div className="aa-device-side-cta" aria-hidden="true"><ChevronRight/></div>
         <div className="aa-device-tagline"><i/><span>SEMPRE AL TUO FIANCO</span></div>
       </div>
@@ -91,18 +85,18 @@ export default function DeviceScreen({ pendingMokoDevice, onResumeSetup, pairing
       <div><ChevronRight className="aa-metric-chevron"/><Shield/><small>RSSI</small><strong>{telemetry.rssi!=null?`${telemetry.rssi} dBm`:'—'}</strong></div>
     </section>
 
-    {device.hardwareId?.startsWith('MOKO:') && <section className="v4-settings-card mk1-setup-card">
-      <h2>Il tuo MK1</h2>
+    {isMoko && <section className="v4-settings-card mk1-setup-card">
+      <h2>{device.hardwareId?.startsWith('MOKO:')?'Il tuo MK1':'Completa il tuo pulsante'}</h2>
       {pendingMokoDevice && !setupBusy && <div><p>Il nuovo pulsante è associato al tuo account, ma il collegamento è da completare. Il pulsante precedente resta selezionato.</p><button type="button" className="v4-primary" onClick={()=>onResumeSetup?.({password:mokoPassword||undefined})}>Completa il nuovo collegamento</button></div>}
-      <p>{device.mokoSetupVerified===false?'Configurazione da completare':mokoLabels[mokoConnection?.state]||'Verifica del collegamento'}</p>
-      <p>Un click invia l’SOS. Wallaa configura il pulsante e verifica il collegamento.</p>
+      <p>{needsSetup?'Completa il collegamento per usare l’SOS':mokoLabels[mokoConnection?.state]||'Verifica del collegamento'}</p>
+      <p>{needsSetup?'Wallaa controlla e configura il pulsante automaticamente.':'Un click invia l’SOS.'}</p>
       {setupProgress}
-      {!setupBusy && <button type="button" className="v4-primary" onClick={()=>onMokoSetup?.({password:mokoPassword||undefined})}>{device.mokoSetupVerified?'Verifica di nuovo il pulsante':device.mokoSetupVerified===false?'Riprova configurazione':'Configura automaticamente'}</button>}
+      {!setupBusy && <button type="button" className="v4-primary" onClick={()=>onMokoSetup?.({password:mokoPassword||undefined})}>{needsSetup?'Completa collegamento':'Verifica collegamento'}</button>}
       {['password_required','password_error'].includes(mokoConnection?.state) && pairingState!=='password_error' && <label>Password del pulsante<input className="input" type="password" autoComplete="off" value={mokoPassword} onChange={event=>setMokoPassword(event.target.value)} placeholder="Solo se è stata modificata"/></label>}
       <p>Movimento: {telemetry.motion == null ? 'in attesa di dati' : telemetry.motion ? 'rilevato' : 'fermo'}{telemetry.batteryVoltageMv ? ` · Batteria ${telemetry.batteryVoltageMv} mV` : ''}</p>
     </section>}
 
-    {device.hardwareId?.startsWith('MOKO:') && <section className="v4-settings-card">
+    {isMoko && <section className="v4-settings-card">
       <h2>Ritrova con la rete Wallaa</h2>
       <p>I telefoni degli utenti che partecipano alla rete possono segnalare il tuo pulsante quando lo rilevano nelle vicinanze.</p>
       <label className="v4-switch"><input type="checkbox" checked={networkDevice?.trackingEnabled === true} onChange={e=>onNetworkTracking?.(e.target.checked)}/><span/></label>
@@ -119,11 +113,11 @@ export default function DeviceScreen({ pendingMokoDevice, onResumeSetup, pairing
       <div className="aa-trigger-watermark" aria-hidden="true"><i/><i/><i/><span>SOS</span></div>
       <span>COMANDO SOS</span>
       <h2>Gesto del pulsante</h2>
-      <p>{device.hardwareId?.startsWith('MOKO:')?'Il comando SOS del tuo MK1 è una pressione singola.':'Scegli il gesto fisico che deve attivare una richiesta reale.'}</p>
+      <p>{isMoko?'Il comando SOS del tuo MK1 è una pressione singola.':'Scegli il gesto fisico che deve attivare una richiesta reale.'}</p>
       <div className="aa-trigger-list">
-        {(device.hardwareId?.startsWith('MOKO:')?TRIGGERS.filter(item=>item.value==='press'):TRIGGERS).map((item)=>{
-          const active = device.hardwareId?.startsWith('MOKO:')?true:trigger===item.value;
-          return <button type="button" key={item.value} className={active?'active':'inactive'} aria-pressed={active} onClick={()=>onTrigger?.(item.value)}>{triggerRings(item.value)}<span>{device.hardwareId?.startsWith('MOKO:')?'1 click = SOS':item.label||triggerLabel(item.value)}</span><span className={`aa-trigger-led ${active?'selected':'idle'}`} aria-hidden="true"><i/></span></button>;
+        {(isMoko?TRIGGERS.filter(item=>item.value==='press'):TRIGGERS).map((item)=>{
+          const active = isMoko?true:trigger===item.value;
+          return <button type="button" key={item.value} className={active?'active':'inactive'} aria-pressed={active} onClick={()=>onTrigger?.(item.value)}>{triggerRings(item.value)}<span>{isMoko?'1 click = SOS':item.label||triggerLabel(item.value)}</span><span className={`aa-trigger-led ${active?'selected':'idle'}`} aria-hidden="true"><i/></span></button>;
         })}
       </div>
       <div className="aa-trigger-footer"><i/><span>PROTEZIONE IN UN GESTO</span><i/></div>

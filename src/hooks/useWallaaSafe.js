@@ -69,6 +69,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const networkObservationBuffer = useRef(new Map());
   const [mokoConnection, setMokoConnection] = useState({ state: 'disabled', connected: false, ready: false });
   const [pairingState, setPairingState] = useState('idle');
+  const [pairingActive,setPairingActive]=useState(false);
   const [pairingCandidates,setPairingCandidates]=useState([]);
   const [pendingMokoDevice,setPendingMokoDevice]=useState(null);
   const pairingChoiceRef=useRef(null);
@@ -892,7 +893,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   }, [defaultLanguage, initializeAccountServices, resetLocalSession]);
 
   useEffect(() => {
-    if(pairingInProgressRef.current)return undefined;
+    if(pairingActive)return undefined;
     if (!loaded || !networkIdentity?.authToken || !appVisible || ((!device?.id || !armed) && !profile?.networkObserverEnabled)) {
       stopBleScan().catch(() => {});
       return undefined;
@@ -907,6 +908,12 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
         setTelemetry((prev) => ({ ...prev, battery:data.battery, rssi:data.rssi, seenAt:data.seenAt, ...(data.protocol === 'moko-button' ? { motion:data.motion, acceleration:data.acceleration, batteryVoltageMv:data.batteryVoltageMv } : {}) }));
         const current = deviceRef.current;
         const identity = networkIdentityRef.current;
+        if(current && data.protocol==='moko-button' && (!current.hardwareId?.startsWith('MOKO:')||current.protocol!=='moko-button')){
+          const recognized={...current,protocol:'moko-button',...(current.hardwareId?.startsWith('MOKO:')?{}:{mokoSetupVerified:false})};
+          deviceRef.current=recognized;setDevice(recognized);storage.setDevice(recognized).catch(()=>{});
+          triggerRef.current='press';setTriggerState('press');storage.setTrigger('press').catch(()=>{});
+          return;
+        }
         if (!deviceClaimMigrationRef.current && current?.id && !current?.claimToken && data?.portableIdentity && data?.hardwareId && identity?.authToken) {
           deviceClaimMigrationRef.current = true;
           claimWallaaDevice(identity, {
@@ -953,7 +960,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     }).catch((error) => setToast({ type: 'error', text: error.message || 'Impossibile avviare il monitor Bluetooth.' }));
 
     return () => { stopBleScan().catch(() => {}); };
-  }, [loaded, device?.id, device?.hardwareId, armed, appVisible, profile?.networkObserverEnabled, networkIdentity?.authToken, fireAlert, pushActivity, pairingState]);
+  }, [loaded, device?.id, device?.hardwareId, armed, appVisible, profile?.networkObserverEnabled, networkIdentity?.authToken, fireAlert, pushActivity, pairingState, pairingActive]);
 
   useEffect(() => {
     if (!loaded || !networkIdentity?.authToken || !device?.hardwareId?.startsWith('MOKO:') || !supportsMokoConnection()) return undefined;
@@ -1036,7 +1043,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const eventOnlyButton = Boolean(device?.id && (device.monitorMode || 'event-only') === 'event-only');
 
   const connectionStatus = useMemo(() => {
-    if(pairingInProgressRef.current||device?.mokoSetupVerified===false)return 'setup-required';
+    if(pairingActive||device?.mokoSetupVerified===false)return 'setup-required';
     if (!device?.id) return 'absent';
     if (device?.hardwareId?.startsWith('MOKO:') && device.mokoContinuousEnabled !== false && supportsMokoConnection() && ['press','any_press'].includes(trigger)) {
       if (mokoConnection.connected) return 'connected';
@@ -1053,7 +1060,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     if (lastSignalAgeSeconds <= 25) return 'connected';
     if (lastSignalAgeSeconds <= 60) return 'weak';
     return 'disconnected';
-  }, [device?.id, device?.hardwareId, device?.mokoContinuousEnabled, trigger, mokoConnection, eventOnlyButton, lastSignalAgeSeconds, device?.mokoSetupVerified, pairingState]);
+  }, [device?.id, device?.hardwareId, device?.mokoContinuousEnabled, trigger, mokoConnection, eventOnlyButton, lastSignalAgeSeconds, device?.mokoSetupVerified, pairingState, pairingActive]);
 
   const guardExceeded = useMemo(() => Boolean(
     !pairingInProgressRef.current && device?.mokoSetupVerified!==false && device?.id && connectionGuard.enabled && (
@@ -1376,7 +1383,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     if(pairingInProgressRef.current)return;
     if(activeAlertRef.current?.active){const error=new Error('Prima di configurare il pulsante, termina l’allarme attivo.');setToast({type:'warning',text:error.message});throw error;}
     const previousDevice=deviceRef.current,previousTrigger=triggerRef.current;
-    const controller=new AbortController();pairingControllerRef.current=controller;pairingInProgressRef.current=true;
+    const controller=new AbortController();pairingControllerRef.current=controller;pairingInProgressRef.current=true;setPairingActive(true);
     setPairingCandidates([]);setPairingState('scanning');let target=null,lastCounter=null,claimed=null,completed=false;
     const nativeSnapshot=async next=>{
       const previous=await storage.getBackgroundConfig();
@@ -1384,13 +1391,20 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     };
     try {
       await beginMokoSetup();await stopBleScan();
-      target=existingDevice||await pairWallaaButton({signal:controller.signal,onProgress:state=>setPairingState(state),selectMokoDevice:(candidates,signal)=>new Promise((resolve,reject)=>{
+      target=(existingDevice?.hardwareId?.startsWith('MOKO:')?existingDevice:null)||await pairWallaaButton({signal:controller.signal,onProgress:state=>setPairingState(state),selectMokoDevice:async(candidates,signal)=>{
+        setPairingState('checking');
+        const available=[];
+        for(const candidate of candidates){if(signal.aborted)throw signal.reason;const eligibility=await checkWallaaDeviceClaim(networkIdentityRef.current,candidate).catch(error=>{if(error.code==='DEVICE_ALREADY_OWNED')return {allowed:false};throw error;});if(eligibility.allowed)available.push(candidate);}
+        if(!available.length)throw new Error('I pulsanti rilevati appartengono già a un altro account. Accendi il tuo nuovo pulsante e riprova.');
+        if(available.length===1)return available[0];
+        candidates=available;
+        return new Promise((resolve,reject)=>{
         setPairingState('selecting');setPairingCandidates(candidates);
         const timer=setTimeout(()=>reject(new Error('Selezione interrotta. Ripeti il collegamento.')),30000);
         const abort=()=>reject(new Error('Associazione annullata.'));
         signal.addEventListener('abort',abort,{once:true});
         pairingChoiceRef.current={resolve:value=>{clearTimeout(timer);signal.removeEventListener('abort',abort);pairingChoiceRef.current=null;resolve(value);},reject:error=>{clearTimeout(timer);signal.removeEventListener('abort',abort);pairingChoiceRef.current=null;reject(error);}};
-      })});
+      });}});
       if(controller.signal.aborted)throw controller.signal.reason;
       if(target.protocol==='moko-button'||target.hardwareId?.startsWith('MOKO:')){
         if(!supportsMokoConnection())throw new Error('La configurazione MK1 richiede l’app Wallaa per iPhone.');
@@ -1434,7 +1448,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       await stopBleScan().catch(()=>{});
       if(!completed&&target?.hardwareId?.startsWith('MOKO:')&&lastCounter!==null)await captureMokoSetupBaseline(target).catch(()=>{});
       await endMokoSetup(!completed&&target?{hardwareId:target.hardwareId,baselineCount:lastCounter}:{}).catch(()=>{});
-      pairingInProgressRef.current=false;pairingControllerRef.current=null;pairingChoiceRef.current=null;setPairingCandidates([]);
+      pairingInProgressRef.current=false;setPairingActive(false);pairingControllerRef.current=null;pairingChoiceRef.current=null;setPairingCandidates([]);
     }
   },[pushActivity]);
   const setupMokoDevice=useCallback(options=>pairDevice({...options,existingDevice:deviceRef.current}),[pairDevice]);

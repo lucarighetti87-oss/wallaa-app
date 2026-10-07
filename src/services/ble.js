@@ -200,7 +200,7 @@ export async function pairWallaaButton({ onProgress, selectMokoDevice, signal } 
               try{
                 await stopBleScan();
                 const list=[...candidates.values()].sort((a,b)=>(b.rssi??-200)-(a.rssi??-200));
-                const selected=list.length===1?list[0]:await selectMokoDevice(list,signal);
+                const selected=await selectMokoDevice(list,signal);
                 if(!selected||signal?.aborted)throw new Error('Associazione annullata.');
                 resolve(selected);
               }catch(error){reject(error);}
@@ -270,7 +270,8 @@ export async function startWallaaMonitor({ deviceId, hardwareId, communityEnable
           }
           if (decoded.id !== deviceId) return;
           if (decoded.protocol === 'moko-button') {
-            if (!hardwareId?.startsWith('MOKO:') || (decoded.hardwareId && decoded.hardwareId !== hardwareId)) return;
+            if (hardwareId?.startsWith('MOKO:') && decoded.hardwareId && decoded.hardwareId!==hardwareId) return;
+            if(!hardwareId?.startsWith('MOKO:')){decoded.button=null;}
             const key = mokoCounterKey(hardwareId);
             const stored = await Preferences.get({ key });
             let counters = {};

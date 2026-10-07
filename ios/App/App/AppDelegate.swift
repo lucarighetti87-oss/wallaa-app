@@ -392,6 +392,18 @@ private var scanRearmWorkItem: DispatchWorkItem?
 
     var canStartMokoSetup: Bool { return !sending }
 
+    func beginMokoSetup(completion: @escaping (Bool) -> Void) {
+        let previous = mokoPeripheral
+        setMokoSetupInProgress(true)
+        let deadline = Date().addingTimeInterval(5)
+        func waitForDisconnect() {
+            if previous == nil || previous?.state == .disconnected { completion(true); return }
+            if Date() >= deadline { setMokoSetupInProgress(false); completion(false); return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { waitForDisconnect() }
+        }
+        waitForDisconnect()
+    }
+
     func setMokoSetupInProgress(_ active: Bool, allowConnection: Bool = false) {
         mokoSetupWatchdog?.cancel()
         mokoSetupInProgress = active
@@ -1547,8 +1559,10 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject("Un allarme è in invio. Attendi prima di configurare il pulsante.")
                 return
             }
-            WallaaBackgroundBLEManager.shared.setMokoSetupInProgress(true)
-            call.resolve()
+            WallaaBackgroundBLEManager.shared.beginMokoSetup { released in
+                if released { call.resolve() }
+                else { call.reject("Il collegamento precedente è ancora occupato. Chiudi MOKO e riprova.") }
+            }
         }
     }
     @objc func endSetup(_ call: CAPPluginCall) {

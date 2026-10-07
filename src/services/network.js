@@ -13,9 +13,10 @@ function headers(identity, json = true) {
   };
 }
 
-async function api(path, { method = 'GET', identity, body } = {}) {
+async function api(path, { method = 'GET', identity, body, signal } = {}) {
   const response = await fetch(`${CONFIG.apiBaseUrl}${path}`, {
     method,
+    ...(signal?{signal}:{}),
     headers: headers(identity, body !== undefined),
     ...(body !== undefined ? { body: JSON.stringify(body) } : {})
   });
@@ -290,4 +291,4 @@ export async function deleteWallaaConversation(identity, conversationId) {
   );
 }
 
-export async function checkWallaaDeviceClaim(identity,device){return api('/api/devices/check-claim',{method:'POST',identity,body:{hardwareId:device.hardwareId,claimToken:device.claimToken||''}});}
+export async function checkWallaaDeviceClaim(identity,device){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);try{return await api('/api/devices/check-claim',{method:'POST',identity,signal:controller.signal,body:{hardwareId:device.hardwareId,claimToken:device.claimToken||''}});}catch(error){if(error.name==='AbortError')throw new Error('Il servizio Wallaa non risponde. Riprova il collegamento.');throw error;}finally{clearTimeout(timer);}}
