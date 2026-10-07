@@ -1561,7 +1561,7 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             WallaaBackgroundBLEManager.shared.beginMokoSetup { released in
                 if released { call.resolve() }
-                else { call.reject("Il collegamento precedente è ancora occupato. Chiudi MOKO e riprova.") }
+                else { call.reject("Il collegamento precedente è ancora occupato. Attendi qualche secondo e riprova.") }
             }
         }
     }

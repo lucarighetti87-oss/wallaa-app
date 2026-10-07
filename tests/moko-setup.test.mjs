@@ -24,6 +24,7 @@ function fixture(options={}){
    let response;
    if(char===MOKO_GATT.password)response=[options.passwordError?0:0xaa];
    else if(flag===1){settings.set(`${command}:${payload[0]??''}`,payload);response=[options.rejectCommand===command?0:0xaa];}
+   else if(command===0x2b||command===0x2c)response=[...new TextEncoder().encode(command===0x2c?(options.software||'BXP-B-D'):'V2.0.3')];
    else if(command===0x20)response=options.wrongMac?[1,2,3,4,5,7]:[1,2,3,4,5,6];
    else{response=settings.get(`${command}:${payload[0]??''}`)||settings.get(`${command}:1`);if(options.badReadback&&command===0x36)response=[0,0];}
    queueMicrotask(()=>callbacks.get(char)?.(view([0xeb,flag,command,response.length,...response])));
@@ -73,4 +74,5 @@ test('successful write acknowledgements alone do not bypass readback verificatio
 
 test('a successful HTTP response without positive eligibility cannot start Bluetooth setup',async()=>{const f=fixture({unconfirmedOwner:true});await assert.rejects(prepareMokoButton(f.args),/disponibilità/);assert.equal(f.connections,0);});
 
-test('missing Device Information is explained before claim and settings writes',async()=>{const f=fixture({missingInfo:true});await assert.rejects(prepareMokoButton(f.args),/informazioni del pulsante/);assert.equal(f.claims,0);assert.ok(!f.stages.includes('configuring'));});
+test('new firmware without Device Information uses the official custom commands',async()=>{const f=fixture({missingInfo:true});const result=await prepareMokoButton(f.args);assert.equal(result.softwareVersion,'BXP-B-D');assert.equal(result.firmwareVersion,'V2.0.3');for(const command of [0x2b,0x2c])assert.ok(f.writes.some(w=>w.bytes[1]===0&&w.bytes[2]===command));});
+test('custom firmware information still rejects unsupported families before claim',async()=>{const f=fixture({missingInfo:true,software:'BXP-CR'});await assert.rejects(prepareMokoButton(f.args),/compatibilità/);assert.equal(f.claims,0);});

@@ -53,13 +53,18 @@ export async function prepareMokoButton({device,ble,password=MOKO_FACTORY_PASSWO
   const mac=await read(0x20);
   const actual='MOKO:'+Array.from(mac).map(n=>n.toString(16).padStart(2,'0').toUpperCase()).join('');
   if(actual!==device.hardwareId)throw new Error('Il pulsante collegato non corrisponde a quello selezionato.');
-  const text=async uuid=>new TextDecoder().decode(mokoBytes(await bounded(ble.read(device.id,MOKO_GATT.info,mokoUuid(uuid),{timeout:commandTimeout})))).replace(/\0+$/g,'').trim();
+  const decodeText=value=>new TextDecoder().decode(mokoBytes(value)).replace(/\0+$/g,'').trim();
   stage='informazioni del pulsante';
   if(ble.discoverServices)await bounded(ble.discoverServices(device.id));
   const refreshed=await bounded(ble.getServices(device.id));
   const infoService=refreshed.find(s=>match(s.uuid,MOKO_GATT.info));
-  for(const uuid of ['2a28','2a26'])if(!infoService?.characteristics?.some(c=>match(c.uuid,mokoUuid(uuid))))throw new Error('Le informazioni del pulsante non sono disponibili. Chiudi l’app MOKO e riprova.');
-  const software=await text('2a28'),firmware=await text('2a26');
+  // Vendor SDK MKBXDInterface: newer firmware uses AA01 commands 2c/2b
+  // when standard Device Information characteristics are absent.
+  const text=async(uuid,command)=>{
+   const standard=infoService?.characteristics?.some(c=>match(c.uuid,mokoUuid(uuid)));
+   return decodeText(standard?await bounded(ble.read(device.id,MOKO_GATT.info,mokoUuid(uuid),{timeout:commandTimeout})):await read(command));
+  };
+  const software=await text('2a28',0x2c),firmware=await text('2a26',0x2b);
   if(software!=='BXP-B-D'||!/^V?2\./i.test(firmware))throw new Error('Questa versione del pulsante richiede una verifica di compatibilità Wallaa.');
   stage='pressione di conferma';
   await bounded(ble.startNotifications(device.id,MOKO_GATT.service,MOKO_GATT.events,value=>{
@@ -95,7 +100,7 @@ export async function prepareMokoButton({device,ble,password=MOKO_FACTORY_PASSWO
   onProgress('verifying');ensure();
   return {...claimed,mokoProfileVersion:MOKO_PROFILE_VERSION,mokoSetupVerifiedAt:new Date().toISOString(),mokoConnectionBaseline:lastCounter,softwareVersion:software,firmwareVersion:firmware};
  }catch(error){
-  if(/Characteristic not found/i.test(error.message||''))throw new Error(`Collegamento Bluetooth incompleto (${stage}). Chiudi l’app MOKO e riprova con il pulsante vicino.`);
+  if(/Characteristic not found/i.test(error.message||''))throw new Error(`Collegamento Bluetooth incompleto (${stage}). Tieni il pulsante vicino all’iPhone e riprova.`);
   throw error;
  }finally{
   ending=true;clearTimeout(overall);signal?.removeEventListener('abort',cancel);controller.signal.removeEventListener('abort',abort);
