@@ -6,11 +6,12 @@ import {MOKO_GATT,mokoBytes,mokoUuid,MOKO_SINGLE_CLICK_PROFILE} from '../src/ser
 const device={id:'test-radio',hardwareId:'MOKO:010203040506',protocol:'moko-button'};
 const view=bytes=>{const b=Uint8Array.from(bytes);return new DataView(b.buffer);};
 function fixture(options={}){
- const callbacks=new Map(),settings=new Map(),writes=[],stages=[],claimed=[];let connections=0,claims=0;
- for(const step of MOKO_SINGLE_CLICK_PROFILE){const value=[...step.expected];if(step.command===0x35||step.command===0x36)value[1]=0;settings.set(`${step.command}:${step.read[0]??step.data[0]??''}`,value);}
+ const callbacks=new Map(),settings=new Map(),writes=[],stages=[],claimed=[];let connections=0,claims=0,registered=false;
+ for(const step of MOKO_SINGLE_CLICK_PROFILE){const value=[...step.expected];if(step.command===0x35||step.command===0x36)value[1]=0;if(step.command===0x39)value[0]=1;settings.set(`${step.command}:${step.read[0]??''}`,value);}
  const emit=count=>callbacks.get(MOKO_GATT.events)?.(view([0xeb,2,6,1,count]));
  const ble={
-  async connect(){connections++;},async disconnect(){},async stopNotifications(){},
+  async initialize(){},async getDevices(ids){assert.deepEqual(ids,[device.id]);registered=true;return[{deviceId:device.id}];},
+  async connect(){assert.equal(registered,true,'saved device must be registered with the Bluetooth plugin before connect');connections++;},async disconnect(){},async stopNotifications(){},
   async discoverServices(){},
   async getServices(){return [{uuid:'AA00',characteristics:['AA01','AA07','AA08'].map(uuid=>({uuid,properties:{read:uuid==='AA08'&&!options.noRead}}))},{uuid:'180A',characteristics:(options.missingInfo?[]:['2A28','2A26']).map(uuid=>({uuid}))}];},
   async startNotifications(id,service,char,callback){callbacks.set(char,callback);},
@@ -23,7 +24,7 @@ function fixture(options={}){
    assert.equal(header,0xea);assert.equal(length,payload.length);
    let response;
    if(char===MOKO_GATT.password)response=[options.passwordError?0:0xaa];
-   else if(flag===1){settings.set(`${command}:${payload[0]??''}`,payload);response=[options.rejectCommand===command?0:0xaa];}
+   else if(flag===1){settings.set(`${command}:${[0x22,0x39].includes(command)?'':payload[0]??''}`,payload);response=[options.rejectCommand===command?0:0xaa];}
    else if(command===0x2b||command===0x2c)response=[...new TextEncoder().encode(command===0x2c?(options.software||'BXP-B-D'):'V2.0.3')];
    else if(command===0x20)response=options.wrongMac?[1,2,3,4,5,7]:[1,2,3,4,5,6];
    else{response=settings.get(`${command}:${payload[0]??''}`)||settings.get(`${command}:1`);if(options.badReadback&&command===0x36)response=[0,0];}
@@ -40,7 +41,7 @@ function fixture(options={}){
 }
 test('factory setup confirms physical possession, configures and rereads every setting, and preserves identity/history',async()=>{
  const f=fixture();const result=await prepareMokoButton(f.args);
- assert.equal(f.claims,1);assert.equal(f.claimed[0].mokoSetupVerified,false);assert.equal(result.mokoConnectionBaseline,1);assert.equal(result.mokoProfileVersion,1);
+ assert.equal(f.claims,1);assert.equal(f.claimed[0].mokoSetupVerified,false);assert.equal(result.mokoConnectionBaseline,1);assert.equal(result.mokoProfileVersion,2);
  assert.ok(f.stages.indexOf('awaiting_press')<f.stages.indexOf('claiming'));
  const configuration=f.writes.filter(w=>w.char===MOKO_GATT.custom&&w.bytes[1]===1);
  assert.ok(configuration.length>=1);assert.ok(configuration.length<=MOKO_SINGLE_CLICK_PROFILE.length);
@@ -76,3 +77,6 @@ test('a successful HTTP response without positive eligibility cannot start Bluet
 
 test('new firmware without Device Information uses the official custom commands',async()=>{const f=fixture({missingInfo:true});const result=await prepareMokoButton(f.args);assert.equal(result.softwareVersion,'BXP-B-D');assert.equal(result.firmwareVersion,'V2.0.3');for(const command of [0x2b,0x2c])assert.ok(f.writes.some(w=>w.bytes[1]===0&&w.bytes[2]===command));});
 test('custom firmware information still rejects unsupported families before claim',async()=>{const f=fixture({missingInfo:true,software:'BXP-CR'});await assert.rejects(prepareMokoButton(f.args),/compatibilità/);assert.equal(f.claims,0);});
+
+test('verified profile upgrade needs a valid existing ownership token and disables deep sleep',async()=>{const f=fixture({noPress:true});f.args.device={...device,mokoSetupVerified:true};f.args.allowVerifiedUpgrade=true;f.args.checkOwnership=async()=>({allowed:true,claimTokenValid:true});const result=await prepareMokoButton(f.args);assert.equal(result.mokoProfileVersion,2);assert.ok(!f.stages.includes('awaiting_press'));assert.ok(f.writes.some(w=>w.bytes.join(',')==='234,1,57,1,0'));});
+test('a claimed-looking device without a valid token cannot bypass physical proof',async()=>{const f=fixture({noPress:true});f.args.device={...device,mokoSetupVerified:true};f.args.allowVerifiedUpgrade=true;await assert.rejects(prepareMokoButton(f.args),/pressione/);assert.equal(f.claims,0);});
