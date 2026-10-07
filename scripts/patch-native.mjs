@@ -28,6 +28,7 @@ if (fs.existsSync(iosPlist)) {
   // which makes UIKit treat a Boolean as a scene-configuration collection and crash at launch.
   plist = plist.replace(/\s*<key>ITSAppUsesNonExemptEncryption<\/key>\s*<(?:true|false)\/>/g, '');
   plist = ensurePlistKey(plist, 'ITSAppUsesNonExemptEncryption', '\t<false/>');
+  plist = ensurePlistKey(plist, 'UIUserInterfaceStyle', '\t<string>Dark</string>');
   plist = plist.replace(/<key>CFBundleDisplayName<\/key>\s*<string>[^<]*<\/string>/, '<key>CFBundleDisplayName</key>\n\t<string>WALLAA</string>');
   plist = ensurePlistKey(plist, 'NSBluetoothAlwaysUsageDescription', '\t<string>Wallaa Safe Button usa Bluetooth per ricevere gli eventi del Wallaa Button.</string>');
   plist = ensurePlistKey(plist, 'NSLocationWhenInUseUsageDescription', '\t<string>Wallaa Safe Button usa la posizione per inviarla alle persone di fiducia quando attivi un alert.</string>');

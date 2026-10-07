@@ -91,7 +91,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const [messagePush, setMessagePush] = useState(null);
   const [centralMessagePush, setCentralMessagePush] = useState(null);
   const [connectionGuard, setConnectionGuardState] = useState({ enabled: true, delaySeconds: 60 });
-  const [appearance, setAppearanceState] = useState({ mode: 'system' });
+  const [appearance, setAppearanceState] = useState({ mode: 'dark' });
   const [systemHealth, setSystemHealth] = useState({ status: 'idle' });
   const [legalStatus, setLegalStatus] = useState(null);
   const [legalChecked, setLegalChecked] = useState(false);
@@ -209,26 +209,9 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   }, []);
 
   useEffect(() => {
-    const media = globalThis.matchMedia?.('(prefers-color-scheme: dark)');
-    const apply = () => {
-      const systemDark = Boolean(media?.matches);
-      const mode = appearance.mode === 'system' ? (systemDark ? 'dark' : 'light') : appearance.mode;
-      document.documentElement.dataset.theme = mode;
-      document.documentElement.dataset.themePreference = appearance.mode;
-      document.documentElement.style.colorScheme = mode;
-    };
-    const refreshIfVisible = () => { if (document.visibilityState !== 'hidden') apply(); };
-    apply();
-    media?.addEventListener?.('change', apply);
-    document.addEventListener('visibilitychange', refreshIfVisible);
-    globalThis.addEventListener?.('pageshow', apply);
-    globalThis.addEventListener?.('focus', apply);
-    return () => {
-      media?.removeEventListener?.('change', apply);
-      document.removeEventListener('visibilitychange', refreshIfVisible);
-      globalThis.removeEventListener?.('pageshow', apply);
-      globalThis.removeEventListener?.('focus', apply);
-    };
+    document.documentElement.dataset.theme='dark';
+    document.documentElement.dataset.themePreference='dark';
+    document.documentElement.style.colorScheme='dark';
   }, [appearance.mode]);
 
   const pushActivity = useCallback(async (entry) => {
@@ -860,7 +843,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       setContacts(normalizedContacts); contactsRef.current = normalizedContacts;
       setDevice(savedDevice ? { ...savedDevice, name: 'Wallaa Button', monitorMode: savedDevice.monitorMode || 'event-only' } : null);
       setArmedState(savedArmed);
-      const restoredTrigger=savedDevice?.hardwareId?.startsWith('MOKO:')?'press':savedTrigger;
+      const restoredTrigger='press';
       setTriggerState(restoredTrigger);triggerRef.current=restoredTrigger;
       if(restoredTrigger!==savedTrigger)await storage.setTrigger(restoredTrigger);
       const retainedActivities = pruneActivities(savedActivities);
@@ -871,7 +854,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
         try { setQrDataUrl(await createQrDataUrl(identity.qrPayload)); } catch { /* cached QR can be rebuilt after sync */ }
       }
       setConnectionGuardState(savedGuard || { enabled: true, delaySeconds: 60 });
-      setAppearanceState(savedAppearance || { mode: 'system' });
+      setAppearanceState({mode:'dark'});await storage.setAppearance({mode:'dark'});
       setActiveAlert(savedActiveAlert?.active ? savedActiveAlert : null);
       activeAlertRef.current = savedActiveAlert?.active ? savedActiveAlert : null;
       await storage.setNetworkIdentity(identity);
@@ -1169,7 +1152,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   }, [armed, device?.id, connectionStatus, telemetry.battery, contacts, networkState.guardians, networkState.status, networkState.pushPermission]);
 
   const setArmed = useCallback(async (value) => { setArmedState(value); await storage.setArmed(value); }, []);
-  const setTrigger = useCallback(async (value) => {if(deviceRef.current?.hardwareId?.startsWith('MOKO:'))value='press';setTriggerState(value);triggerRef.current=value;await storage.setTrigger(value);}, []);
+  const setTrigger = useCallback(async (value) => {value='press';setTriggerState(value);triggerRef.current=value;await storage.setTrigger(value);}, []);
 
   const saveProfile = useCallback(async (next) => {
     const normalized = { ...next, name: profileName(next) || next.name || '' };
@@ -1467,7 +1450,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   }, []);
 
   const setAppearance = useCallback(async (mode) => {
-    const next = { mode };
+    const next = { mode:'dark' };
     setAppearanceState(next); await storage.setAppearance(next);
   }, []);
 

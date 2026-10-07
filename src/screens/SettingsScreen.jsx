@@ -1,6 +1,6 @@
 import {
   Bluetooth, CheckCircle2, CircleAlert, Database, Globe2, Mail, MapPin, QrCode,
-  RefreshCw, RotateCcw, Server, ShieldCheck, Smartphone, Sun, Trash2, UserRound, UsersRound, Radio, BellRing, Activity,
+  RefreshCw, RotateCcw, Server, ShieldCheck, Smartphone, Trash2, UserRound, UsersRound, Radio, BellRing, Activity,
   KeyRound, Eye, EyeOff, Volume2, FileText, ExternalLink, LogOut, Pencil, Crown, Navigation
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -199,7 +199,6 @@ export default function SettingsScreen({ onNetworkObserver,
       </section>
 
       <section className="v4-settings-card"><div className="settings-row-title"><Globe2 size={19}/><div><strong>{t('settings.language')}</strong><span>{t('v4.settings.languageBody')}</span></div></div><select value={profile.language||'en'} onChange={(e)=>onSaveProfile({...profile,language:e.target.value})}>{LANGUAGES.map((l)=><option key={l.code} value={l.code}>{l.label}</option>)}</select></section>
-      <section className="v4-settings-card"><div className="settings-row-title"><Sun size={19}/><div><strong>{t('v4.settings.appearance')}</strong><span>{t('v4.settings.appearanceBody')}</span></div></div><div className="appearance-segment">{['system','light','dark'].map((mode)=><button type="button" key={mode} className={appearance.mode===mode?'active':''} onClick={()=>onAppearance(mode)}>{mode==='system'?t('v4.settings.auto'):mode==='light'?t('v4.settings.light'):t('v4.settings.dark')}</button>)}</div></section>
 
       <section className="v405-legal-card"><div className="settings-row-title"><FileText size={19}/><div><strong>{t('v405.legal.title')}</strong><span>{t('v405.legal.subtitle')}</span></div></div><button className="v411-privacy-open" type="button" onClick={()=>onNavigate('privacy')}><ShieldCheck size={18}/><span>{t('v411.privacy.open')}</span><ExternalLink size={15}/></button><a href={CONFIG.privacyPolicyUrl} target="_blank" rel="noreferrer"><span>{t('v405.legal.privacy')}</span><ExternalLink size={16}/></a><a href={CONFIG.termsUrl} target="_blank" rel="noreferrer"><span>{t('v405.legal.terms')}</span><ExternalLink size={16}/></a></section>
       <section className="v4-legal-note"><strong>{t('v4.settings.important')}</strong><p>{t('v4.settings.legal')}</p></section>
