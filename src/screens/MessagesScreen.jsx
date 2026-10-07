@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   LockKeyhole,
   MessageCircle,
@@ -65,7 +66,9 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
 
   useEffect(() => {
     document.body.classList.toggle('wallaa-messages-composer-open', Boolean(newChatOpen));
-    return () => document.body.classList.remove('wallaa-messages-composer-open');
+    const previousOverflow=document.body.style.overflow;
+    if(newChatOpen)document.body.style.overflow='hidden';
+    return () => {document.body.classList.remove('wallaa-messages-composer-open');document.body.style.overflow=previousOverflow;};
   }, [newChatOpen]);
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState([]);
@@ -99,29 +102,21 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
 
   useEffect(() => {
     if (!newChatOpen) return;
-
-    const value = query.trim();
-
-    if (value.length < 2) {
-      setUsers([]);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      try {
-        setSearching(true);
-        const result = await getWallaaMessageUsers(networkIdentity, value);
-        setUsers(Array.isArray(result?.users) ? result.users : []);
-      } catch (e) {
-        setUsers([]);
-        setError(e?.message || 'Ricerca utenti non disponibile.');
-      } finally {
-        setSearching(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [query, newChatOpen, networkIdentity?.authToken]);
+    const value=query.trim();
+    let active=true;
+    setUsers([]);
+    setError('');
+    if(value.length<2){setSearching(false);return;}
+    setSearching(true);
+    const timer=setTimeout(async()=>{
+      try{
+        const result=await getWallaaMessageUsers(networkIdentity,value);
+        if(active)setUsers(Array.isArray(result?.users)?result.users:[]);
+      }catch(e){if(active)setError(e?.message||'Ricerca utenti non disponibile.');}
+      finally{if(active)setSearching(false);}
+    },300);
+    return()=>{active=false;clearTimeout(timer);};
+  },[query,newChatOpen,networkIdentity?.authToken]);
 
   const handleDeleteConversation = async (event, conversation) => {
     event.stopPropagation();
@@ -191,7 +186,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
         </button>
       </header>
 
-      {error && (
+      {error && !newChatOpen && (
         <div className="wallaa-message-error" role="alert">
           {error}
         </div>
@@ -316,7 +311,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
         </section>
       )}
 
-      {newChatOpen && (
+      {newChatOpen && createPortal(
         <div
           className="wallaa-new-chat-backdrop"
           role="presentation"
@@ -357,6 +352,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
               />
             </label>
 
+            {error && <div className="wallaa-message-error" role="alert">{error}</div>}
             <div className="wallaa-new-chat-results">
               {query.trim().length < 2 ? (
                 <div className="wallaa-new-chat-placeholder">
@@ -405,7 +401,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
               )}
             </div>
           </section>
-        </div>
+        </div>, document.body
       )}
     </div>
   );

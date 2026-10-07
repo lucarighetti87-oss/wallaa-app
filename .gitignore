@@ -6,3 +6,6 @@ xcuserdata/
 .env.local
 
 *.bak
+
+test-results/
+playwright-report/

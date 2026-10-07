@@ -8142,3 +8142,108 @@ body.wallaa-messages-composer-open [class*="tabbar"],
   visibility:hidden!important;
   pointer-events:none!important;
 }
+
+/* The messages surfaces are dark in both appearance modes. */
+.app-shell-v4 .wallaa-messages-screen,
+.wallaa-new-chat-backdrop .wallaa-new-chat-sheet {
+  color:#edf7ff!important;
+  color-scheme:dark;
+}
+.app-shell-v4 .wallaa-message-security strong,
+.app-shell-v4 .wallaa-conversation-copy strong,
+.app-shell-v4 .wallaa-messages-empty strong,
+.wallaa-new-chat-backdrop .wallaa-new-chat-sheet h2,
+.wallaa-new-chat-backdrop .wallaa-new-chat-placeholder strong,
+.wallaa-new-chat-backdrop .wallaa-message-user-result strong {
+  color:#edf7ff!important;
+}
+.app-shell-v4 .wallaa-message-security span,
+.app-shell-v4 .wallaa-conversation-preview p,
+.wallaa-new-chat-backdrop .wallaa-message-user-result span {
+  color:#a8c2d2!important;
+}
+.app-shell-v4 .wallaa-conversation-copy strong {font-size:15px!important;}
+.app-shell-v4 .wallaa-conversation-preview p {font-size:13px!important;}
+
+/* Portalled to body, outside animated/scrolling app ancestors. */
+body > .wallaa-new-chat-backdrop,
+html.ios-keyboard-open body > .wallaa-new-chat-backdrop {
+  position:fixed!important;
+  inset:auto!important;
+  top:var(--visual-viewport-offset-top,0px)!important;
+  left:0!important;
+  right:0!important;
+  bottom:auto!important;
+  height:var(--visual-viewport-height,100dvh)!important;
+  width:100%!important;
+  z-index:10000!important;
+  display:flex!important;
+  align-items:flex-end!important;
+  padding:8px 8px 0!important;
+  background:rgba(0,8,14,.76)!important;
+  overflow:hidden!important;
+}
+body > .wallaa-new-chat-backdrop .wallaa-new-chat-sheet,
+html.ios-keyboard-open body > .wallaa-new-chat-backdrop .wallaa-new-chat-sheet {
+  position:relative!important;
+  inset:auto!important;
+  width:min(560px,100%)!important;
+  height:min(620px,calc(var(--visual-viewport-height,100dvh) - 16px))!important;
+  max-height:calc(var(--visual-viewport-height,100dvh) - 16px)!important;
+  margin:0!important;
+  padding:16px 16px max(12px,env(safe-area-inset-bottom))!important;
+  transform:none!important;
+  animation:none!important;
+  transition:none!important;
+}
+.wallaa-new-chat-backdrop .wallaa-new-chat-sheet > header {gap:12px!important;}
+.wallaa-new-chat-backdrop .wallaa-new-chat-sheet h2 {font-size:20px!important;line-height:1.2;}
+.wallaa-new-chat-backdrop .wallaa-new-chat-search {margin-top:14px!important;min-height:52px!important;}
+.wallaa-new-chat-backdrop .wallaa-new-chat-results,
+html.ios-keyboard-open .wallaa-new-chat-backdrop .wallaa-new-chat-results {
+  flex:1 1 auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow-y:auto!important;
+  margin-top:12px;
+}
+.wallaa-new-chat-backdrop .wallaa-new-chat-placeholder {min-height:120px!important;}
+.wallaa-new-chat-backdrop .wallaa-message-user-result {
+  width:100%;
+  min-height:78px;
+  display:grid;
+  grid-template-columns:50px minmax(0,1fr);
+  align-items:center;
+  gap:12px;
+  margin:0 0 10px;
+  padding:12px;
+  border:1px solid rgba(50,207,255,.22);
+  border-radius:16px;
+  background:#071b29;
+  color:#edf7ff;
+  text-align:left;
+  font:inherit;
+  appearance:none;
+  -webkit-appearance:none;
+}
+.wallaa-new-chat-backdrop .wallaa-message-user-result > div:last-child {min-width:0;display:grid;gap:4px;}
+.wallaa-new-chat-backdrop .wallaa-message-user-result strong,
+.wallaa-new-chat-backdrop .wallaa-message-user-result span {
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.wallaa-new-chat-backdrop .wallaa-message-user-result strong {font-size:15px;}
+.wallaa-new-chat-backdrop .wallaa-message-user-result span {font-size:13px;}
+.wallaa-new-chat-backdrop .wallaa-message-user-result:disabled {opacity:.6;}
+.sentinel-offer .sentinel-offer-status {
+  color:#eaf8ff;
+  background:rgba(255,255,255,.07);
+  padding:12px;
+  border-radius:12px;
+  line-height:1.45;
+}
+
+.app-shell-v4 .sentinel-page h1,
+.app-shell-v4 .sentinel-page h2 {color:#edf7ff!important;}
