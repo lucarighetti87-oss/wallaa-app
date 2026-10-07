@@ -6,3 +6,5 @@ test('physical proof has explicit no-SOS instructions and can be cancelled',asyn
 
 test('old MK1 without a MAC still has one gesture and a recovery action',async({page})=>{await page.goto('/tests/ui/index.html?screen=device&unidentified');await expect(page.locator('.aa-trigger-list button')).toHaveCount(0);await expect(page.getByRole('button',{name:'Completa collegamento'})).toBeVisible();await expect(page.getByText('Associato al tuo account',{exact:true})).toHaveCount(0);});
 test('idle pairing does not claim success before verification',async({page})=>{await page.goto('/tests/ui/index.html?screen=device&empty');await expect(page.getByText('Dispositivo collegato con successo',{exact:true})).toHaveCount(0);});
+
+test('generic legacy ownership is not presented as a verified MK1',async({page})=>{await page.goto('/tests/ui/index.html?screen=device&legacyHash');await expect(page.getByRole('button',{name:'Completa collegamento'})).toBeVisible();await expect(page.getByText('Da configurare',{exact:true})).toBeVisible();await expect(page.getByText('Associato al tuo account',{exact:true})).toHaveCount(0);});
