@@ -9,3 +9,6 @@ export async function getMokoConnectionStatus() {
   if (!supportsMokoConnection()) return { state: 'unsupported', connected: false, ready: false };
   return native.status();
 }
+
+export async function beginMokoSetup(){if(supportsMokoConnection())await native.beginSetup();}
+export async function endMokoSetup(options={}){if(supportsMokoConnection())await native.endSetup(options);}
