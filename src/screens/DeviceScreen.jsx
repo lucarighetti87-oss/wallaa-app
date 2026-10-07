@@ -1,16 +1,10 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, BatteryMedium, Bluetooth, Check, ChevronRight, Radio, Shield } from 'lucide-react';
 import WallaaButton3D from '../components/WallaaButton3D';
-import { TRIGGERS } from '../config';
 
 import WallaaBrandShield from '../components/WallaaBrandShield';
 function signalLabel(value){return value||'—';}
 function connectionLabel(status){if(status==='setup-required')return'Da configurare';if(status==='connected')return'Connesso';if(status==='standby')return'Pronto';if(status==='weak')return'Segnale debole';return'Disconnesso';}
-function triggerLabel(value){return value.split('_').map((part)=>part.charAt(0).toUpperCase()+part.slice(1)).join(' ');}
-function triggerRings(value){
-  const count = value === 'double_press' ? 2 : value === 'triple_press' ? 3 : 1;
-  return <span className={`aa-trigger-rings count-${count}`} aria-hidden="true">{Array.from({length:count},(_,i)=><i key={i}/>)}</span>;
-}
 
 export default function DeviceScreen({ pendingMokoDevice, onResumeSetup, pairingCandidates = [], onSelectCandidate, onCancelPair, onMokoSetup, networkOwnedDevices = [], networkDevice, onNetworkTracking, mokoConnection, onMokoConfigure, device, telemetry, pairingState, onPair, connectionStatus, signalQuality, trigger, onTrigger, onBack, onHome }) {
   const [mokoPassword, setMokoPassword] = useState('');
@@ -112,14 +106,8 @@ export default function DeviceScreen({ pendingMokoDevice, onResumeSetup, pairing
     <section className="aa-trigger-card aa-trigger-card-v41">
       <div className="aa-trigger-watermark" aria-hidden="true"><i/><i/><i/><span>SOS</span></div>
       <span>COMANDO SOS</span>
-      <h2>Gesto del pulsante</h2>
-      <p>{isMoko?'Il comando SOS del tuo MK1 è una pressione singola.':'Scegli il gesto fisico che deve attivare una richiesta reale.'}</p>
-      <div className="aa-trigger-list">
-        {(isMoko?TRIGGERS.filter(item=>item.value==='press'):TRIGGERS).map((item)=>{
-          const active = isMoko?true:trigger===item.value;
-          return <button type="button" key={item.value} className={active?'active':'inactive'} aria-pressed={active} onClick={()=>onTrigger?.(item.value)}>{triggerRings(item.value)}<span>{isMoko?'1 click = SOS':item.label||triggerLabel(item.value)}</span><span className={`aa-trigger-led ${active?'selected':'idle'}`} aria-hidden="true"><i/></span></button>;
-        })}
-      </div>
+      <h2>Premi per inviare SOS</h2>
+      <p>La prima pressione del pulsante può attivare l’SOS. Non serve premere più volte.</p>
       <div className="aa-trigger-footer"><i/><span>PROTEZIONE IN UN GESTO</span><i/></div>
     </section>
 
