@@ -5,6 +5,7 @@ const KEYS = {
   contacts: 'wallaa.safe.contacts',
   contactsRecovery: 'wallaa.safe.contacts.recovery',
   device: 'wallaa.safe.device',
+  pendingMokoDevice: 'wallaa.safe.moko.pending',
   armed: 'wallaa.safe.armed',
   trigger: 'wallaa.safe.trigger',
   activities: 'wallaa.safe.activities',
@@ -39,6 +40,8 @@ export const storage = {
   setContactsRecovery: (value) => setJson(KEYS.contactsRecovery, value),
   getDevice: () => getJson(KEYS.device, null),
   setDevice: (value) => setJson(KEYS.device, value),
+  getPendingMokoDevice: () => getJson(KEYS.pendingMokoDevice,null),
+  setPendingMokoDevice: value => setJson(KEYS.pendingMokoDevice,value),
 
   async getArmed() {
     const { value } = await Preferences.get({ key: KEYS.armed });

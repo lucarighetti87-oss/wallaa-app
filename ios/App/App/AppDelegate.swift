@@ -364,6 +364,9 @@ private var scanRearmWorkItem: DispatchWorkItem?
         }.resume()
     }
 
+    private var mokoSetupInProgress = false
+    private var mokoSetupConnectionPaused = false
+    private var mokoSetupWatchdog: DispatchWorkItem?
     private var mokoPeripheral: CBPeripheral?
     private var mokoPasswordCharacteristic: CBCharacteristic?
     private var mokoEventsCharacteristic: CBCharacteristic?
@@ -381,10 +384,25 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private var guardianPublishing = false
 
     private var mokoConnectionWanted: Bool {
-        guard let config, config.armed, !(config.identity.authToken ?? "").isEmpty,
+        guard !mokoSetupConnectionPaused, let config, config.armed, !(config.identity.authToken ?? "").isEmpty,
               let hardwareId = config.hardwareId, hardwareId.hasPrefix("MOKO:"),
               ["press", "any_press"].contains(config.trigger) else { return false }
         return UserDefaults.standard.bool(forKey: "wallaa.moko.continuous.\(hardwareId)")
+    }
+
+    var canStartMokoSetup: Bool { return !sending }
+
+    func setMokoSetupInProgress(_ active: Bool, allowConnection: Bool = false) {
+        mokoSetupWatchdog?.cancel()
+        mokoSetupInProgress = active
+        mokoSetupConnectionPaused = active && !allowConnection
+        if active {
+            let timeout = DispatchWorkItem { [weak self] in self?.setMokoSetupInProgress(false) }
+            mokoSetupWatchdog = timeout
+            DispatchQueue.main.asyncAfter(deadline: .now() + 180, execute: timeout)
+        }
+        refreshConfiguration()
+        reconcileMokoConnection()
     }
 
     func configureMokoConnection(hardwareId: String, enabled: Bool) {
@@ -825,6 +843,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     }
 
     private func triggerBackgroundAlert(button: WallaaDecodedButton, peripheralId: String) {
+        guard !mokoSetupInProgress else { return }
         guard !sending else {
             NSLog("[WALLAA][SOS] background send already in progress; ignoring duplicate burst")
             return
@@ -1499,7 +1518,9 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "WallaaMoko"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "configure", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "beginSetup", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "endSetup", returnType: CAPPluginReturnPromise)
     ]
     @objc func configure(_ call: CAPPluginCall) {
         guard let hardwareId = call.getString("hardwareId"),
@@ -1518,6 +1539,28 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             WallaaBackgroundBLEManager.shared.configureMokoConnection(hardwareId: hardwareId, enabled: enabled)
             call.resolve(["enabled": enabled])
+        }
+    }
+    @objc func beginSetup(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard WallaaBackgroundBLEManager.shared.canStartMokoSetup else {
+                call.reject("Un allarme è in invio. Attendi prima di configurare il pulsante.")
+                return
+            }
+            WallaaBackgroundBLEManager.shared.setMokoSetupInProgress(true)
+            call.resolve()
+        }
+    }
+    @objc func endSetup(_ call: CAPPluginCall) {
+        if let hardwareId = call.getString("hardwareId"),
+           hardwareId.range(of: "^MOKO:[0-9A-F]{12}$", options: .regularExpression) != nil,
+           let counter = call.getInt("baselineCount"), (0...255).contains(counter) {
+            UserDefaults.standard.set(counter, forKey: "wallaa.moko.gatt.counter.\(hardwareId)")
+        }
+        let keepSuppressed = call.getBool("keepSuppressed") ?? false
+        DispatchQueue.main.async {
+            WallaaBackgroundBLEManager.shared.setMokoSetupInProgress(keepSuppressed, allowConnection: true)
+            call.resolve()
         }
     }
     @objc func status(_ call: CAPPluginCall) {

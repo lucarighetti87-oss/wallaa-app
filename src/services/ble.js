@@ -167,7 +167,7 @@ export async function stopBleScan() {
   finally { scanning = false; }
 }
 
-export async function pairWallaaButton({ onProgress } = {}) {
+export async function pairWallaaButton({ onProgress, selectMokoDevice, signal } = {}) {
   if (!Capacitor.isNativePlatform() && !navigator.bluetooth) {
     throw new Error('Bluetooth non disponibile in questo browser. Usa l’app su iPhone/Android.');
   }
@@ -177,7 +177,11 @@ export async function pairWallaaButton({ onProgress } = {}) {
 
   return new Promise(async (resolve, reject) => {
     let timer;
+    let candidateTimer;
+    const candidates=new Map();
     let finishing = false;
+    const cancel=()=>{clearTimeout(timer);clearTimeout(candidateTimer);stopBleScan().catch(()=>{});reject(new Error('Associazione annullata.'));};
+    signal?.addEventListener('abort',cancel,{once:true});
     try {
       onProgress?.('scanning');
       scanning = true;
@@ -189,10 +193,26 @@ export async function pairWallaaButton({ onProgress } = {}) {
           if (!decoded?.id || finishing) return;
           onProgress?.('found', decoded);
 
+          if(decoded.protocol==='moko-button' && decoded.hardwareId?.startsWith('MOKO:') && selectMokoDevice){
+            candidates.set(decoded.id,{...decoded,name:'Wallaa Button',pairedAt:new Date().toISOString()});
+            if(!candidateTimer)candidateTimer=setTimeout(async()=>{
+              if(finishing||signal?.aborted)return;finishing=true;clearTimeout(timer);
+              try{
+                await stopBleScan();
+                const list=[...candidates.values()].sort((a,b)=>(b.rssi??-200)-(a.rssi??-200));
+                const selected=list.length===1?list[0]:await selectMokoDevice(list,signal);
+                if(!selected||signal?.aborted)throw new Error('Associazione annullata.');
+                resolve(selected);
+              }catch(error){reject(error);}
+              finally{signal?.removeEventListener('abort',cancel);}
+            },1200);
+            return;
+          }
           // Durante il pairing accettiamo il dispositivo solo dopo una vera pressione,
           // così evitiamo di associare beacon BTHome casuali nelle vicinanze.
           if (!decoded.button || (decoded.protocol === 'moko-button' && !decoded.hardwareId?.startsWith('MOKO:'))) return;
           finishing = true;
+          clearTimeout(candidateTimer);signal?.removeEventListener('abort',cancel);
           clearTimeout(timer);
           if (decoded.protocol === 'moko-button') {
             try {
@@ -218,10 +238,11 @@ export async function pairWallaaButton({ onProgress } = {}) {
 
       timer = setTimeout(async () => {
         await stopBleScan();
+        clearTimeout(candidateTimer);signal?.removeEventListener('abort',cancel);
         reject(new Error('Nessun Wallaa Button rilevato. Premi il pulsante e riprova.'));
       }, 30000);
     } catch (error) {
-      clearTimeout(timer);
+      clearTimeout(timer);clearTimeout(candidateTimer);signal?.removeEventListener('abort',cancel);
       await stopBleScan().catch(() => {});
       reject(error);
     }
@@ -296,4 +317,20 @@ export async function startWallaaMonitor({ deviceId, hardwareId, communityEnable
     scanning = false;
     throw error;
   }
+}
+
+export async function captureMokoSetupBaseline(device){
+ await ensureBle();await stopBleScan();
+ return new Promise((resolve,reject)=>{
+  const counters={};let timer;let ended=false;
+  const finish=async(error)=>{if(ended)return;ended=true;clearTimeout(timer);try{await stopBleScan().catch(()=>{});if(error)reject(error);else{await Preferences.set({key:mokoCounterKey(device.hardwareId),value:JSON.stringify(counters)});resolve(counters);}}catch(failure){reject(failure);}};
+  timer=setTimeout(()=>finish(new Error('Non ho confermato il segnale del pulsante. Ripeti la configurazione.')),5000);
+  scanning=true;
+  BleClient.requestLEScan({services:MOKO_SERVICE_UUIDS,allowDuplicates:true},result=>{
+   if(ended||result.device?.deviceId!==device.id)return;
+   const frame=parseMokoAlarm(findMokoData(result.serviceData,'fee0'));if(!frame)return;
+   counters[String(frame.frameType)]=frame.counter;
+   if(frame.frameType===0x20)finish();
+  }).catch(error=>finish(error));
+ });
 }

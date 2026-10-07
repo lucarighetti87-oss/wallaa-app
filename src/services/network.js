@@ -289,3 +289,5 @@ export async function deleteWallaaConversation(identity, conversationId) {
     }
   );
 }
+
+export async function checkWallaaDeviceClaim(identity,device){return api('/api/devices/check-claim',{method:'POST',identity,body:{hardwareId:device.hardwareId,claimToken:device.claimToken||''}});}
