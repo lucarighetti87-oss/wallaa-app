@@ -488,7 +488,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private func receiveMokoTelemetry(_ value:Data) {
         guard let command=mokoTelemetryCommand, let parsed=WallaaMokoGATT.telemetryReply(value,command:command) else { return }
         for (key,value) in parsed { mokoTelemetry[key]=value }
-        if !parsed.isEmpty { mokoTelemetry["sampledAt"]=ISO8601DateFormatter().string(from:Date()) }
+        if !parsed.isEmpty { mokoTelemetry["sampledAt"]=ISO8601DateFormatter().string(from:Date());UserDefaults.standard.set(mokoTelemetry,forKey:"wallaa.moko.telemetry") }
         readNextMokoTelemetry()
     }
 
@@ -664,7 +664,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     }
 
     func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
-        if peripheral == mokoPeripheral, error == nil, (-127...0).contains(RSSI.intValue) { mokoRssi = RSSI.intValue }
+        if peripheral == mokoPeripheral, error == nil, (-127...0).contains(RSSI.intValue) { mokoRssi = RSSI.intValue;UserDefaults.standard.set(["rssi":RSSI.intValue,"sampledAt":ISO8601DateFormatter().string(from:Date())],forKey:"wallaa.moko.radio") }
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
@@ -1432,7 +1432,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
            let recent = locationManager.location,
            recent.horizontalAccuracy >= 0,
            abs(recent.timestamp.timeIntervalSinceNow) < 60 {
-            publishNativeSentinelHeartbeat(recent, force: true)
+            publishNativeSentinelHeartbeat(recent)
         }
     }
 

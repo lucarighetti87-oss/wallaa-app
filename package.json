@@ -1,13 +1,13 @@
 {
   "name": "wallaa-safe-button",
   "private": true,
-  "version": "4.0.99",
+  "version": "4.0.100",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test tests/bthome.test.mjs tests/moko-button.test.mjs tests/moko-monitor.test.mjs tests/sos-gps-fallback.test.mjs tests/native-release-version.test.mjs tests/sentinel-offer.test.mjs tests/moko-setup.test.mjs",
+    "test": "node --test tests/bthome.test.mjs tests/moko-button.test.mjs tests/moko-monitor.test.mjs tests/sos-gps-fallback.test.mjs tests/native-release-version.test.mjs tests/sentinel-offer.test.mjs tests/moko-setup.test.mjs tests/button-health.test.mjs",
     "cap:sync": "npx cap sync && node scripts/patch-native.mjs",
     "ios:add": "npx cap add ios && npm run cap:sync",
     "ios:open": "npx cap open ios",
@@ -39,7 +39,7 @@
     "@vitejs/plugin-react": "4.4.1",
     "vite": "^6.4.4"
   },
-  "wallaaBuild": 99,
+  "wallaaBuild": 100,
   "overrides": {
     "xcode": {
       "uuid": "^11.1.1"
