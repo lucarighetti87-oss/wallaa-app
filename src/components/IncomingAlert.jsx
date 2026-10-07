@@ -29,7 +29,7 @@ function LiveMap({lat,lng,accuracy}){
     <div className="incoming-map-vignette"/>
     {accuracy>0&&<div className="incoming-accuracy" style={{width:`${clamp(accuracy/2,34,120)}px`,height:`${clamp(accuracy/2,34,120)}px`}}/>}
     <div className="incoming-live-pin"><i/><MapPin size={21}/></div>
-    <span className="incoming-live-badge"><i/> LIVE</span>
+    <span className="incoming-live-badge"><i/> POSIZIONE SOS</span>
   </div>;
 }
 
@@ -43,7 +43,8 @@ export default function IncomingAlert({ alert, onClose, t, language }) {
   }, [alert?.id, alert?.opened]);
   if (!alert) return null;
   const lat=Number(alert.location?.latitude), lng=Number(alert.location?.longitude), accuracy=Number(alert.location?.accuracy||0);
-  const valid=Number.isFinite(lat)&&Number.isFinite(lng);
+  const valid=alert.location?.latitude!=null&&alert.location?.longitude!=null&&Number.isFinite(lat)&&Number.isFinite(lng);
+  const active=alert.status==='active'||alert.remote;
   const mapsUrl=alert.location?.mapsUrl||(valid?`https://www.google.com/maps?q=${lat},${lng}`:'#');
   const owner=alert.ownerName||'Wallaa';
   const phone=String(alert.ownerPhone||'').trim();
@@ -52,8 +53,8 @@ export default function IncomingAlert({ alert, onClose, t, language }) {
   return <div className="incoming-alert-backdrop wallaa-sos-v462" role="alertdialog" aria-modal="true" aria-label="SOS Wallaa ricevuto">
     <section className="incoming-alert-card wallaa-sos-card">
       <header className="wallaa-sos-top"><div className="wallaa-sos-brand"><span>W</span><div><strong>WALLAA</strong><small>SAFETY NETWORK</small></div></div><button className="incoming-close" onClick={acknowledge} aria-label={t('common.close')}><X size={20}/></button></header>
-      <div className="wallaa-sos-status"><span className="wallaa-sos-icon"><ShieldAlert size={24}/></span><div><small><BellRing size={13}/> SOS RICEVUTO</small><h2>{owner}</h2><p>ha bisogno di te adesso.</p></div></div>
-      <div className="incoming-audible-status"><Volume2 size={16}/><span>Sirena Guardian attiva — conferma per interromperla</span></div>
+      <div className="wallaa-sos-status"><span className="wallaa-sos-icon"><ShieldAlert size={24}/></span><div><small><BellRing size={13}/> {active?'SOS ATTIVO':'SOS CONCLUSO'}</small><h2>{owner}</h2><p>{active?'ha bisogno di aiuto.':'Questo allarme è stato chiuso.'}</p></div></div>
+      {active&&<div className="incoming-audible-status"><Volume2 size={16}/><span>{alert.opened?'Allarme aperto · resta attivo fino alla chiusura':'Conferma la presa visione per interrompere la sirena'}</span></div>}
       <div className="wallaa-sos-map-wrap">
         <LiveMap lat={valid?lat:NaN} lng={valid?lng:NaN} accuracy={accuracy}/>
         <div className="wallaa-sos-map-meta"><div><small>{alert.location?.approximate ? 'ZONA APPROSSIMATIVA · RETE WALLAA' : 'POSIZIONE SOS · AGGIORNAMENTO AUTOMATICO'}</small><strong>{valid?`${lat.toFixed(6)}, ${lng.toFixed(6)}`:'In attesa del GPS…'}</strong></div><span>{accuracy>0?`±${Math.round(accuracy)} m · `:''}{formatDateTime(alert.location?.capturedAt||alert.at,language)}</span></div>
@@ -63,7 +64,7 @@ export default function IncomingAlert({ alert, onClose, t, language }) {
         {phoneHref&&<a className="incoming-call-cta" href={phoneHref}><Phone size={19}/>Chiama la persona</a>}
         {valid&&<a className="incoming-map-cta" href={mapsUrl} target="_blank" rel="noreferrer"><MapPin size={19}/>Apri in Mappe <ExternalLink size={14}/></a>}
       </div>
-      <button className="incoming-dismiss" onClick={acknowledge}>Ho visto l’alert</button>
+      <button className="incoming-dismiss" onClick={acknowledge}>{active?'Ho visto l’allarme':'Chiudi dettagli'}</button>{active&&<small className="incoming-disclaimer">La presa visione non chiude il SOS. Lo ritrovi nella Home.</small>}
       <small className="incoming-disclaimer">Wallaa non sostituisce i servizi pubblici di emergenza.</small>
     </section>
   </div>;

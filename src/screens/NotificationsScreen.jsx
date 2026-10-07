@@ -1,3 +1,4 @@
+import {useState} from 'react';
 import { ArrowLeft, BellRing, CheckCircle2, MapPin, ShieldCheck, Trash2, TriangleAlert } from 'lucide-react';
 import { activityTitle, formatDateTime } from '../utils/format';
 
@@ -7,7 +8,9 @@ function IconFor({ entry }) {
   return <CheckCircle2 size={18}/>;
 }
 
-export default function NotificationsScreen({ activities = [], onClear, onBack, t, language }) {
+export default function NotificationsScreen({ activities = [], onClear, onBack, onOpenAlert, t, language }) {
+  const [selected,setSelected]=useState(null),[error,setError]=useState('');
+  async function open(entry){setSelected(entry);setError('');if(entry.alertId&&onOpenAlert){try{await onOpenAlert(entry.alertId);setSelected(null);}catch(e){setError(e.message||'Evento non disponibile.');}}}
   const rows = [...activities].sort((a,b) => new Date(b.at || 0) - new Date(a.at || 0));
   const unread = rows.filter((x) => x.type === 'alert' || x.type === 'network-alert').length;
   const handleClear = (event) => {
@@ -33,17 +36,18 @@ export default function NotificationsScreen({ activities = [], onClear, onBack, 
         <button type="button" onClick={handleClear} disabled={!rows.length}><Trash2/><span>Cancella tutto</span></button>
       </section>
 
+      {selected&&<div className="notification-detail-backdrop"><section className="notification-detail" role="dialog" aria-modal="true" aria-label="Dettagli notifica"><BellRing/><h2>{activityTitle(selected,language)}</h2><time>{formatDateTime(selected.at,language)}</time><p>{selected.detail||'Aggiornamento del tuo servizio Wallaa.'}</p>{error&&<p role="alert">{error}</p>}{selected.location?.mapsUrl&&<a href={selected.location.mapsUrl} target="_blank" rel="noreferrer">Apri posizione</a>}<button type="button" onClick={()=>setSelected(null)}>Chiudi dettagli</button></section></div>}
       <section className="aa-notifications-feed aa-notifications-feed-v38">
         {rows.map((entry) => {
           const title = activityTitle(entry, language);
           const emergency = entry.type === 'alert' || entry.type === 'network-alert';
           return (
-            <article className={`aa-notification-row ${emergency?'emergency':''}`} key={entry.id}>
+            <article onClick={()=>open(entry)} onKeyDown={event=>{if(event.target===event.currentTarget&&(event.key==='Enter'||event.key===' ')){event.preventDefault();open(entry);}}} role="button" tabIndex={0} aria-label={`Apri notifica: ${title}`} className={`aa-notification-row ${emergency?'emergency':''}`} key={entry.id}>
               <i><IconFor entry={entry}/></i>
               <div className="aa-notification-copy">
                 <strong>{title}</strong>
                 <small>{entry.detail || (emergency ? 'Aggiornamento sicurezza Wallaa' : 'Evento Wallaa')}</small>
-                {entry.location?.mapsUrl && <a href={entry.location.mapsUrl} target="_blank" rel="noreferrer"><MapPin size={13}/>Apri posizione</a>}
+                {entry.location?.mapsUrl && <a href={entry.location.mapsUrl} target="_blank" rel="noreferrer" onClick={event=>event.stopPropagation()}><MapPin size={13}/>Apri posizione</a>}
               </div>
               <time>{formatDateTime(entry.at, language)}</time>
             </article>

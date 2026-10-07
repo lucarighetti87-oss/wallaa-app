@@ -434,6 +434,17 @@ private var scanRearmWorkItem: DispatchWorkItem?
         reconcileMokoConnection()
     }
 
+    func safetyPermissionStatus()->[String:Any] {
+        let location:String
+        switch locationManager.authorizationStatus {case .authorizedAlways:location="always";case .authorizedWhenInUse:location="when-in-use";case .denied:location="denied";case .restricted:location="restricted";default:location="not-determined"}
+        return ["location":location,"bluetooth":CBManager.authorization == .allowedAlways,"backgroundRefresh":UIApplication.shared.backgroundRefreshStatus == .available,"lowPower":ProcessInfo.processInfo.isLowPowerModeEnabled]
+    }
+    func requestSafetyLocation() {
+        guard UIApplication.shared.applicationState == .active else { return }
+        if locationManager.authorizationStatus == .notDetermined { locationManager.requestWhenInUseAuthorization() }
+        else if locationManager.authorizationStatus == .authorizedWhenInUse { locationManager.requestAlwaysAuthorization() }
+    }
+
     func mokoConnectionStatus(refresh:Bool=false) -> [String: Any] {
         if refresh { mokoTelemetryAt = .distantPast;mokoLastRssiAt = .distantPast }
         refreshConfiguration()
@@ -1395,7 +1406,8 @@ private var scanRearmWorkItem: DispatchWorkItem?
         // WALLAA 4.0.74 — Sentinel background presence requires Always permission.
         if (sentinelTracking || guardianTracking) && status != .authorizedAlways {
             NSLog("[WALLAA][SENTINEL][NATIVE] Always location required, authorization=\(status.rawValue)")
-            if status == .authorizedWhenInUse || status == .notDetermined {
+            if !communityRequestedAlways && UIApplication.shared.applicationState == .active && (status == .authorizedWhenInUse || status == .notDetermined) {
+                communityRequestedAlways=true
                 locationManager.requestAlwaysAuthorization()
             }
         }
@@ -1635,6 +1647,9 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "configure", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "permissions", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestLocation", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openSettings", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "beginSetup", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endSetup", returnType: CAPPluginReturnPromise)
     ]
@@ -1680,6 +1695,21 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin {
             WallaaBackgroundBLEManager.shared.setMokoSetupInProgress(keepSuppressed, allowConnection: true)
             call.resolve()
         }
+    }
+    @objc func permissions(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let base=WallaaBackgroundBLEManager.shared.safetyPermissionStatus()
+            UNUserNotificationCenter.current().getNotificationSettings { settings in
+                var result=base;result["notifications"]=settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
+                call.resolve(result)
+            }
+        }
+    }
+    @objc func requestLocation(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { WallaaBackgroundBLEManager.shared.requestSafetyLocation();call.resolve() }
+    }
+    @objc func openSettings(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { if let url=URL(string:UIApplication.openSettingsURLString){UIApplication.shared.open(url)};call.resolve() }
     }
     @objc func status(_ call: CAPPluginCall) {
         DispatchQueue.main.async { call.resolve(WallaaBackgroundBLEManager.shared.mokoConnectionStatus(refresh:call.getBool("refresh") ?? false)) }

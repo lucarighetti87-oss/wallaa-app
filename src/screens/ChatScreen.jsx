@@ -37,6 +37,8 @@ export default function ChatScreen({
   const threadRef = useRef(null);
   const shouldStickToBottomRef = useRef(true);
   const lastMessageIdRef = useRef(null);
+  const requestRef = useRef(0);
+  const [syncError,setSyncError] = useState('');
 
   const isThreadNearBottom = () => {
     const thread = threadRef.current;
@@ -59,15 +61,18 @@ export default function ChatScreen({
   const loadMessages = async ({ silent = false } = {}) => {
     if (!current.id || !networkIdentity?.authToken) return;
 
+    const request = ++requestRef.current;
     try {
       if (!silent) setLoading(true);
-      setError('');
+      if (!silent) setError('');
 
       const result = await getWallaaConversationMessages(
         networkIdentity,
         current.id
       );
 
+      if (request !== requestRef.current) return;
+      setSyncError('');
       setMessages(Array.isArray(result?.messages) ? result.messages : []);
 
       if (result?.conversation) {
@@ -81,26 +86,30 @@ export default function ChatScreen({
         }));
       }
     } catch (e) {
+      if (request !== requestRef.current) return;
+      setSyncError('Aggiornamento non disponibile. Riproviamo automaticamente.');
       if (!silent) {
         setError(e?.message || 'Impossibile caricare i messaggi.');
       }
     } finally {
-      if (!silent) setLoading(false);
+      if (request === requestRef.current) setLoading(false);
     }
   };
 
   useEffect(() => {
+    setLoading(true);setMessages([]);setBody('');setError('');
     loadMessages();
+    return () => { requestRef.current++; };
   }, [current.id, networkIdentity?.authToken]);
 
   useEffect(() => {
     if (!current.id || !networkIdentity?.authToken) return undefined;
 
     const refresh = () => {
-      loadMessages({ silent: true });
+      if(document.visibilityState==='visible') loadMessages({ silent: true });
     };
 
-    const timer = window.setInterval(refresh, 1200);
+    const timer = window.setInterval(refresh, 3000);
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') refresh();
@@ -170,7 +179,7 @@ export default function ChatScreen({
   const handleSend = async () => {
     const value = body.trim();
 
-    if (!value || !current.id || sending) return;
+    if (!value || !current.id || sending || sentinelClosed) return;
 
     try {
       shouldStickToBottomRef.current = true;
@@ -186,12 +195,14 @@ export default function ChatScreen({
       const message = result?.message;
 
       if (message) {
-        setMessages((items) => [...items, message]);
+        requestRef.current++;
+        setMessages((items) => items.some(item=>item.id===message.id)?items:[...items, message]);
       } else {
         await loadMessages();
       }
 
       setBody('');
+      loadMessages({silent:true});
     } catch (e) {
       setError(e?.message || 'Invio del messaggio non riuscito.');
     } finally {
@@ -233,7 +244,7 @@ export default function ChatScreen({
   };
 
   const handleKeyDown = (event) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent?.isComposing) {
       event.preventDefault();
       handleSend();
     }
@@ -256,7 +267,7 @@ export default function ChatScreen({
           </strong>
           <span>
             <LockKeyhole size={10} />
-            {current.role || 'Wallaa'}
+            {isSentinelConversation ? 'Chat di soccorso · Sentinel' : 'Conversazione Wallaa'}
           </span>
         </div>
 
@@ -272,6 +283,8 @@ export default function ChatScreen({
         )}
       </header>
 
+      {isSentinelConversation && <div className="wallaa-chat-context"><ShieldCheck size={18}/><span><strong>{sentinelClosed?'Intervento concluso':'Intervento Sentinel'}</strong><small>Parli con {current.name || current.title || 'la persona assegnata'}. Questa chat è separata dalla Centrale.</small></span></div>}
+      {syncError && <div className="wallaa-chat-sync" role="status">{syncError}</div>}
       {error && (
         <div className="wallaa-message-error wallaa-chat-error" role="alert">
           {error}
@@ -312,6 +325,7 @@ export default function ChatScreen({
                 key={message.id}
                 className={`wallaa-chat-message ${mine ? 'mine' : 'theirs'}`}
               >
+                <b className="wallaa-chat-sender">{mine?'Tu':current.name || current.title || 'Utente Wallaa'}</b>
                 <p>{message.body}</p>
                 <span>
                   {message.createdAt
@@ -320,7 +334,7 @@ export default function ChatScreen({
                         minute: '2-digit'
                       })
                     : ''}
-                  {mine && <Check size={12} />}
+                  {mine && <><Check size={12} /> Inviato</>}
                 </span>
               </div>
             );
@@ -344,7 +358,8 @@ export default function ChatScreen({
       <footer className="wallaa-chat-composer">
         <div>
           <textarea
-            rows="1"
+            rows="2"
+            maxLength={4000}
             value={body}
             onChange={(event) => setBody(event.target.value)}
             onKeyDown={handleKeyDown}
@@ -354,7 +369,7 @@ export default function ChatScreen({
                 scrollThreadToBottom();
               }, 80);
             }}
-            placeholder="Scrivi un messaggio..."
+            placeholder={isSentinelConversation?'Scrivi nella chat di soccorso…':'Scrivi un messaggio…'}
             aria-label="Messaggio"
             disabled={sending}
           />
@@ -365,13 +380,13 @@ export default function ChatScreen({
             onClick={handleSend}
             disabled={!body.trim() || sending}
           >
-            <Send size={18} />
+            {sending?'Invio…':<Send size={18} />}
           </button>
         </div>
 
         <small>
           <LockKeyhole size={9} />
-          Comunicazione privata Wallaa
+          {sending?'Invio in corso…':'Inviato = salvato nella conversazione; non indica lettura.'}
         </small>
       </footer>
       )}
