@@ -128,6 +128,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   useEffect(() => { contactsRef.current = contacts; }, [contacts]);
   useEffect(() => { profileRef.current = profile; }, [profile]);
   useEffect(() => { deviceRef.current = device; }, [device]);
+  useEffect(()=>{setTelemetry({battery:null,rssi:null,seenAt:null});},[device?.hardwareId]);
   useEffect(() => { telemetryRef.current = telemetry; }, [telemetry]);
   useEffect(() => { connectionGuardRef.current = connectionGuard; }, [connectionGuard]);
   useEffect(() => { activeAlertRef.current = activeAlert; }, [activeAlert]);
@@ -962,13 +963,20 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
         if (stopped) return;
         if(status.ready&&status.connected){if(nativeReadySinceRef.current===null)nativeReadySinceRef.current=Date.now();}else nativeReadySinceRef.current=null;
         setMokoConnection(status);
-        if (status.connected) setTelemetry(prev => ({...prev, rssi:status.rssi ?? prev.rssi, seenAt:new Date().toISOString()}));
+        if (status.connected) setTelemetry(prev => ({...prev, ...status.telemetry, rssi:status.rssi ?? prev.rssi, seenAt:new Date().toISOString()}));
       } catch (error) { if (!stopped) setMokoConnection({state:'unavailable',connected:false,ready:false}); }
     };
     refresh();
     const timer = setInterval(refresh, 1500);
     return () => { stopped = true; clearInterval(timer); };
   }, [loaded, networkIdentity?.authToken, device?.hardwareId, device?.mokoContinuousEnabled]);
+
+  const refreshButtonStatus=useCallback(async()=>{
+    const current=deviceRef.current;if(!current?.hardwareId?.startsWith('MOKO:'))return;
+    const status=await getMokoConnectionStatus({refresh:true});setMokoConnection(status);
+    if(!status.connected)await configureMokoConnection({hardwareId:current.hardwareId,enabled:true,useExistingPassword:true});
+    setToast({type:'info',text:'Aggiornamento del collegamento e dei dati del WB-001.'});
+  },[]);
 
   const setMokoConnectionOptions = useCallback(async ({enabled, password}) => {
     const current = deviceRef.current;
@@ -1586,7 +1594,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     networkIdentity, networkState, qrDataUrl, incomingAlert, sentinelOffer, connectionGuard, appearance, connectionStatus, lastSignalAgeSeconds,
     messagePush,
     centralMessagePush,
-    pendingMokoDevice,resumeMokoSetup,pairingCandidates,selectPairingCandidate,cancelPairing,setupMokoDevice,networkOwnedDevices, networkDevice, setNetworkObserver, setDeviceNetworkTracking, mokoConnection, setMokoConnectionOptions, signalQuality, safetyLevel, activeAlert, resolvedAlert, systemHealth, currentLocation, locationStatus, authenticated: Boolean(networkIdentity?.authToken && profile?.onboardingComplete),
+    refreshButtonStatus,pendingMokoDevice,resumeMokoSetup,pairingCandidates,selectPairingCandidate,cancelPairing,setupMokoDevice,networkOwnedDevices, networkDevice, setNetworkObserver, setDeviceNetworkTracking, mokoConnection, setMokoConnectionOptions, signalQuality, safetyLevel, activeAlert, resolvedAlert, systemHealth, currentLocation, locationStatus, authenticated: Boolean(networkIdentity?.authToken && profile?.onboardingComplete),
     legalStatus, legalChecked, legalRequired, legalGatePending, legalError,
     setToast, setArmed, setTrigger, saveProfile, setGuardianMode, dismissResolvedAlert, completeOnboarding, loginAccount, signOut, acceptLegalUpdate, refreshLegalStatus, addOrUpdateContact, removeContact, pairDevice, disconnectDevice,
     fireAlert, closeActiveAlert, clearActivities, clearData, deleteAccount, refreshNetwork, scanNetworkQr, rotateQr, removeNetworkLink,

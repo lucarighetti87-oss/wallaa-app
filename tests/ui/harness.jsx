@@ -1,6 +1,7 @@
 import React,{useCallback,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import MessagesScreen from '../../src/screens/MessagesScreen.jsx';
+import SettingsScreen from '../../src/screens/SettingsScreen.jsx';
 import DeviceScreen from '../../src/screens/DeviceScreen.jsx';
 import SentinelScreen from '../../src/screens/SentinelScreen.jsx';
 import '../../src/styles.css';
@@ -35,7 +36,8 @@ function Harness(){
  const [selected,setSelected]=useState(null);
  const clear=useCallback(()=>setPush(null),[]);
  const identity={installationId:'ui-test',authToken:'test-only'};
- if(parameters.get('screen')==='device')return <DeviceScreen device={parameters.has('empty')?null:{id:'test',protocol:parameters.has('legacy')?'bthome':'moko-button',hardwareId:parameters.has('legacyHash')?'LEGACY-TESTOLD':parameters.has('unidentified')?'':parameters.has('legacy')?'BTHOME:123':'MOKO:785005009F8B',mokoSetupVerified:!parameters.has('incomplete')}} telemetry={{}} pairingError={parameters.has('setupError')?'Collegamento non riuscito. Ripeti la procedura.':''} pairingState={selected?'connecting':parameters.get('state')||'idle'} pairingCandidates={[{id:'near-one',hardwareId:'MOKO:785005009F8B',rssi:-67},{id:'near-two',hardwareId:'MOKO:785005009F76',rssi:-100}]} onSelectCandidate={setSelected} connectionStatus={parameters.has('incomplete')?'setup-required':'connected'} trigger='press' mokoConnection={{state:'ready'}} onCancelPair={()=>{}}/>;
+ if(parameters.get('screen')==='settings')return <div className="app-shell-v4 screen-settings"><SettingsScreen device={{hardwareId:'MOKO:785005009F8B'}} networkDevice={{trackingEnabled:true}} profile={{language:'it',plan:'pro'}} systemHealth={{status:'ready'}} networkState={{status:'ready'}} t={key=>key} onSaveProfile={()=>{}} onNavigate={()=>{}}/></div>;
+ if(parameters.get('screen')==='device')return <div className="app-shell-v4 screen-device"><main className="app-main-v4"><div className="screen-transition"><DeviceScreen device={parameters.has('empty')?null:{id:'test',protocol:parameters.has('legacy')?'bthome':'moko-button',hardwareId:parameters.has('legacyHash')?'LEGACY-TESTOLD':parameters.has('unidentified')?'':parameters.has('legacy')?'BTHOME:123':'MOKO:785005009F8B',mokoSetupVerified:!parameters.has('incomplete')}} telemetry={parameters.has('readings')?{battery:100,batteryVoltageMv:3054,rssi:Number(parameters.get('rssi')||-82),hardwareVersion:'MKBN Series',sampledAt:new Date().toISOString()}:{} } pairingError={parameters.has('setupError')?'Collegamento non riuscito. Ripeti la procedura.':''} pairingState={selected?'connecting':parameters.get('state')||'idle'} pairingCandidates={[{id:'near-one',hardwareId:'MOKO:785005009F8B',rssi:-67},{id:'near-two',hardwareId:'MOKO:785005009F76',rssi:-100}]} onSelectCandidate={setSelected} connectionStatus={parameters.has('incomplete')?'setup-required':'connected'} trigger='press' mokoConnection={{state:'ready'}} onCancelPair={()=>{}}/></div></main></div>;
  if(parameters.get('screen')==='sentinel')return <div className="app-shell-v4"><SentinelScreen networkIdentity={identity} sentinelOffer={push} clearSentinelOffer={clear} currentLocation={{latitude:45,longitude:9}} setToast={()=>{}} profile={{plan:'pro'}}/></div>;
  return <div className="app-shell-v4 screen-messages"><div className="app-main-v4"><div className="screen-transition"><MessagesScreen networkIdentity={identity} onOpenChat={()=>{}}/></div></div><nav className="v4-bottom-nav">Navigation</nav></div>;
 }

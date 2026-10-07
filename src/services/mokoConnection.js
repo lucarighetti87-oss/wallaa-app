@@ -7,9 +7,9 @@ export async function configureMokoConnection({ hardwareId, enabled, password, u
   if (!supportsMokoConnection()) return { supported: false };
   return native.configure({ hardwareId, enabled, ...(password ? { password } : {}), useExistingPassword });
 }
-export async function getMokoConnectionStatus() {
+export async function getMokoConnectionStatus(options={}) {
   if (!supportsMokoConnection()) return { state: 'unsupported', connected: false, ready: false };
-  const status=await native.status();diagnosticMode=status.diagnostic===true;return status;
+  const status=await native.status(options);diagnosticMode=status.diagnostic===true;return status;
 }
 
 export async function beginMokoSetup(){if(supportsMokoConnection())await native.beginSetup();}

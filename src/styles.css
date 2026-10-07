@@ -1,3 +1,4 @@
+@font-face{font-family:"Plus Jakarta Sans";src:url("/fonts/PlusJakartaSans.ttf") format("truetype");font-style:normal;font-weight:200 800;font-display:swap}
 :root {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", sans-serif;
   color: #0a1730;
@@ -8249,3 +8250,27 @@ html.ios-keyboard-open .wallaa-new-chat-backdrop .wallaa-new-chat-results {
 .app-shell-v4 .sentinel-page h2 {color:#edf7ff!important;}
 
 .mk1-setup-status{padding:14px;border:1px solid #23506a;border-radius:14px;color:#eaf8ff!important;background:#061b29;line-height:1.5}.mk1-candidates{display:grid;gap:10px;margin:12px 0}.mk1-candidates button{display:grid;grid-template-columns:24px 1fr;gap:8px;text-align:left;padding:14px;border:1px solid #23506a;border-radius:14px;background:#061b29;color:#edf7ff}.mk1-candidates small{grid-column:2;color:#a5bece}.mk1-setup-card h2{color:#edf7ff!important}
+
+/* WB-001: one typography and spacing scale, isolated from legacy settings cards. */
+.app-shell-v4 .wb-device-screen,.app-shell-v4 .wb-device-details{font-family:inherit!important;display:flex!important;flex-direction:column!important;gap:16px!important}
+.app-shell-v4 .wb-device-screen>*,.app-shell-v4 .wb-device-details>*{margin-top:0!important;margin-bottom:0!important}
+.app-shell-v4 .wb-device-screen button,.app-shell-v4 .wb-device-details button{font-family:inherit!important}
+.app-shell-v4 .wb-card{display:flex;flex-direction:column;gap:16px;padding:22px;border:1px solid rgba(53,206,240,.35);border-radius:24px;background:linear-gradient(135deg,#061f2e,#04121e);color:#edf8ff;font-family:inherit!important}
+.app-shell-v4 .wb-card h2{font-size:21px!important;line-height:1.3!important;margin:0!important;letter-spacing:-.02em;font-weight:800}
+.app-shell-v4 .wb-card p{font-size:14px!important;line-height:1.6!important;margin:0!important;color:#acc3d1}
+.app-shell-v4 .wb-card .v4-primary{width:100%;min-height:48px;border-radius:14px;font-size:14px!important;margin:0!important;font-family:inherit!important}
+.app-shell-v4 .wb-device-screen .aa-device-side-cta{cursor:pointer;color:#e9f9ff;background:#061f2e;border:1px solid #28738a;z-index:3;pointer-events:auto!important}
+.app-shell-v4 .wb-device-screen .aa-device-metrics strong{font-size:17px!important;line-height:1.3!important;word-break:normal}
+.app-shell-v4 .wb-device-screen .aa-device-metrics>div{min-width:0!important;gap:8px!important}
+.app-shell-v4 .wb-device-screen .aa-trigger-card{padding:22px!important;border-radius:24px!important;min-height:0!important}
+.app-shell-v4 .wb-device-screen .aa-trigger-card h2{font-size:21px!important;margin:10px 0!important}
+.app-shell-v4 .wb-device-screen .aa-trigger-card p{font-size:14px!important;line-height:1.6!important;margin:0!important}
+.wb-diagnostics{margin:0;display:grid;gap:0}.wb-diagnostics>div{padding:13px 0;border-bottom:1px solid #174052;display:grid;grid-template-columns:1fr 1.2fr;gap:16px}.wb-diagnostics>div:last-child{border:0}.wb-diagnostics dt{font-size:13px;color:#9db7c7}.wb-diagnostics dd{margin:0;text-align:right;font-size:13px;color:#eefaff;overflow-wrap:anywhere}.wb-hint{font-size:12px!important;line-height:1.6!important;color:#91adbf}.wb-device-details h1{font-size:30px;letter-spacing:-.03em}.wb-network-settings p{font-size:13px;line-height:1.6}
+
+.wb-signal.good{color:#20dea0!important}.wb-signal.medium{color:#ffb454!important}.wb-signal.weak{color:#ff627b!important}.wb-signal.unknown{color:#91adbf!important}
+
+.app-shell-v4 .wb-device-screen .aa-device-hero-visual,.app-shell-v4 .wb-device-screen .aa-device-hero-visual *{pointer-events:none!important}.app-shell-v4 .wb-device-screen .aa-device-hero-copy{position:relative;z-index:4}
+
+.app-shell-v4 .wb-device-screen .wb-signal.good,.wb-device-details .wb-signal.good{color:#20dea0!important}.app-shell-v4 .wb-device-screen .wb-signal.medium,.wb-device-details .wb-signal.medium{color:#ffb454!important}.app-shell-v4 .wb-device-screen .wb-signal.weak,.wb-device-details .wb-signal.weak{color:#ff627b!important}
+
+.wb-network-settings .v4-switch{position:relative!important;display:inline-block!important;width:52px!important;height:30px!important}.wb-network-settings .v4-switch input{display:block!important;position:absolute!important;inset:0!important;width:100%!important;height:100%!important;opacity:0!important;margin:0!important;z-index:2!important;cursor:pointer}.wb-network-settings .v4-switch span{pointer-events:none}

@@ -3,12 +3,15 @@ import { ArrowLeft, BatteryMedium, Bluetooth, Check, ChevronRight, Radio, Shield
 import WallaaButton3D from '../components/WallaaButton3D';
 
 import WallaaBrandShield from '../components/WallaaBrandShield';
-function signalLabel(value){return value||'—';}
+function signalLabel(value){return ({Weak:'Debole',Medium:'Discreto',Strong:'Buono',Searching:'Ricerca',Standby:'In attesa'})[value]||value||'In attesa';}
 function connectionLabel(status){if(status==='setup-required')return'Da configurare';if(status==='connected')return'Connesso';if(status==='searching')return'Collegamento in corso';if(status==='protection-off')return'Protezione disattivata';if(status==='standby')return'Pronto';if(status==='weak')return'Segnale debole';return'Disconnesso';}
 
-export default function DeviceScreen({ pairingError='', pendingMokoDevice, onResumeSetup, pairingCandidates = [], onSelectCandidate, onCancelPair, onMokoSetup, networkOwnedDevices = [], networkDevice, onNetworkTracking, mokoConnection, onMokoConfigure, device, telemetry, pairingState, onPair, connectionStatus, signalQuality, trigger, onTrigger, onBack, onHome }) {
+export default function DeviceScreen({ onRefreshDevice, pairingError='', pendingMokoDevice, onResumeSetup, pairingCandidates = [], onSelectCandidate, onCancelPair, onMokoSetup, networkOwnedDevices = [], networkDevice, onNetworkTracking, mokoConnection, onMokoConfigure, device, telemetry, pairingState, onPair, connectionStatus, signalQuality, trigger, onTrigger, onBack, onHome }) {
+  const [showDetails,setShowDetails]=useState(false);
   const [mokoPassword, setMokoPassword] = useState('');
   const isMoko=Boolean(device && (device.protocol==='moko-button'||device.hardwareId?.startsWith('MOKO:')||/^MK Button$/i.test(device.advertisedName||'')||!device.hardwareId||/^LEGACY-/i.test(device.hardwareId)));
+  const signalTone=telemetry.rssi==null?'unknown':telemetry.rssi>=-65?'good':telemetry.rssi>=-79?'medium':'weak';
+  const signalText={good:'Buono',medium:'Medio',weak:'Debole',unknown:'In attesa'}[signalTone];
   const needsSetup=isMoko && (!device.hardwareId?.startsWith('MOKO:')||device.mokoSetupVerified!==true);
   const setupLabels={scanning:'Accendi il pulsante e tienilo vicino all’iPhone.',found:'Pulsante rilevato.',selecting:'Seleziona il pulsante che vuoi collegare.',checking:'Verifica dell’associazione…',connecting:'Collegamento al pulsante…',authenticating:'Verifica del dispositivo…',awaiting_press:'Premi una volta il pulsante. Questa prova non invia SOS.',confirm_press:'Premi ancora una volta per confermare il collegamento. Non viene inviato un SOS.',claiming:'Associazione al tuo account…',configuring:'Wallaa sta applicando le impostazioni…',verifying:'Verifica delle impostazioni…',checking_signal:'Verifica del segnale…',restoring:'Verifica del collegamento finale…',incomplete:'Configurazione da completare. Premi Riprova.',password_error:'La password del pulsante è stata modificata. Inseriscila per continuare.'};
   const setupBusy=['scanning','found','selecting','checking','connecting','authenticating','awaiting_press','confirm_press','claiming','configuring','verifying','checking_signal','restoring'].includes(pairingState);
@@ -34,20 +37,16 @@ export default function DeviceScreen({ pairingError='', pendingMokoDevice, onRes
       <div className="aa-permanent-owner-notice"><Shield/><span><strong>Il pulsante sarà legato al tuo account</strong><small>La pressione di conferma non invia un SOS.</small></span></div>
       {setupProgress}
       <button className="aa-primary-glow" type="button" onClick={()=>onPair?.({password:mokoPassword||undefined})} disabled={scanning}><Bluetooth/>{scanning?'Ricerca e associazione…':'Collega Wallaa Button'}</button>
-      {networkOwnedDevices.length > 0 && <section className="v4-settings-card">
-        <h2>I tuoi pulsanti nella rete Wallaa</h2>
-        <p>Puoi vedere gli avvistamenti anche da questo telefono, senza associare di nuovo il pulsante.</p>
-        {networkOwnedDevices.map(item=><div key={item.hardwareId}>
-          <strong>{item.name}</strong>
-          {item.lastObservation ? <p><a href={item.lastObservation.mapsUrl} target="_blank" rel="noreferrer">Ultima zona rilevata</a> · {new Date(item.lastObservation.capturedAt).toLocaleString()}</p> : <p>{item.trackingEnabled?'Nessun avvistamento recente':'Localizzazione di rete disattivata'}</p>}
-        </div>)}
-      </section>}
       <small className="aa-pair-footer">Premi il Wallaa Button quando richiesto. La pressione usata per il pairing viene ignorata dal flusso SOS.</small>
     </div>;
   }
 
+  if(showDetails)return <div className="aa-focus wb-device-details"><button type="button" className="aa-secondary-back" onClick={()=>setShowDetails(false)}><ArrowLeft/>Torna al pulsante</button><header><span>DIAGNOSTICA</span><h1>Dettagli WB-001</h1><p>Dati reali comunicati dal dispositivo e stato del collegamento.</p></header><section className="wb-card"><dl className="wb-diagnostics">{[
+    ['Stato',connectionLabel(connectionStatus)],['Identificativo univoco',device.hardwareId?.replace('MOKO:','')||'Da verificare'],['ID del dispositivo',device.deviceCode||'Non comunicato'],['Seriale di fabbrica',device.serialNumber||'Non comunicato dal dispositivo'],['Firmware',device.firmwareVersion||'Non disponibile'],['Software',device.softwareVersion||'Non disponibile'],['Hardware',telemetry.hardwareVersion||'Non disponibile'],['Produzione',telemetry.productionDate||'Non disponibile'],['Batteria',telemetry.battery!=null?`${telemetry.battery}%`:'In attesa di lettura'],['Tensione',telemetry.batteryVoltageMv?`${telemetry.batteryVoltageMv} mV`:'In attesa di lettura'],['RSSI',<span className={`wb-signal ${signalTone}`}>{telemetry.rssi!=null?`${telemetry.rssi} dBm · ${signalText}`:'In attesa di lettura'}</span>],['Ultima lettura',telemetry.sampledAt?new Date(telemetry.sampledAt).toLocaleString():'In attesa di lettura'],['Profilo verificato',device.mokoSetupVerified?`Versione ${device.mokoProfileVersion||1}`:'Da completare']
+  ].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></section><p className="wb-hint">Il codice Bluetooth identifica il pulsante; non viene presentato come un seriale di fabbrica. Un segnale debole può rendere instabile il collegamento: avvicina il pulsante e ripeti la verifica.</p></div>;
+
   const visualStatus = needsSetup?'disconnected':setupBusy?'weak':['connected','standby'].includes(connectionStatus) ? 'connected' : connectionStatus === 'weak' ? 'weak' : 'disconnected';
-  return <div className="aa-focus aa-device-screen aa-device-screen-v41">
+  return <div className="aa-focus aa-device-screen aa-device-screen-v41 wb-device-screen">
     <header className="aa-device-screen-head">
       <button type="button" className="aa-device-back" onClick={onBack} aria-label="Indietro"><ArrowLeft/></button>
       <button type="button" className="aa-wordmark aa-wordmark-home" onClick={onHome} aria-label="Torna alla Home"><WallaaBrandShield alt="Wallaa"/><span><strong>Wallaa</strong><small>SAFETY</small></span></button>
@@ -69,39 +68,25 @@ export default function DeviceScreen({ pairingError='', pendingMokoDevice, onRes
         <span className={`aa-connection ${visualStatus}`}><i/>{connectionLabel(needsSetup?'setup-required':connectionStatus)}</span>
         <h2>{isMoko?'WB-001':'Wallaa Button'}</h2>
         <small>{needsSetup?'Associazione da completare':'Associato al tuo account'}</small>
-        <div className="aa-device-side-cta" aria-hidden="true"><ChevronRight/></div>
+        <button type="button" className="aa-device-side-cta" aria-label="Apri dettagli WB-001" onClick={()=>setShowDetails(true)}><ChevronRight/></button>
         <div className="aa-device-tagline"><i/><span>SEMPRE AL TUO FIANCO</span></div>
       </div>
     </section>
 
     <section className="aa-device-metrics aa-device-metrics-v41">
-      <div><ChevronRight className="aa-metric-chevron"/><BatteryMedium/><small>Batteria</small><strong>{telemetry.battery!=null?`${telemetry.battery}%`:'—'}</strong></div>
-      <div><ChevronRight className="aa-metric-chevron"/><Radio/><small>Segnale</small><strong>{signalLabel(signalQuality)}</strong></div>
-      <div><ChevronRight className="aa-metric-chevron"/><Shield/><small>RSSI</small><strong>{telemetry.rssi!=null?`${telemetry.rssi} dBm`:'—'}</strong></div>
+      <div><BatteryMedium/><small>Batteria</small><strong>{telemetry.battery!=null?`${telemetry.battery}%`:telemetry.batteryVoltageMv?`${(telemetry.batteryVoltageMv/1000).toFixed(2)} V`:'In lettura'}</strong></div>
+      <div><Radio/><small>Qualità segnale</small><strong className={`wb-signal ${signalTone}`}>{signalText}</strong></div>
+      <div><Shield/><small>Signal</small><strong className={`wb-signal ${signalTone}`}>{telemetry.rssi!=null?`${telemetry.rssi} dBm`:'In attesa'}</strong></div>
     </section>
 
-    {isMoko && <section className="v4-settings-card mk1-setup-card">
+    {isMoko && <section className="wb-card wb-control-card">
       <h2>{device.hardwareId?.startsWith('MOKO:')?'Il tuo WB-001':'Completa il tuo pulsante'}</h2>
       {pendingMokoDevice && !setupBusy && <div><p>Il nuovo pulsante è associato al tuo account, ma il collegamento è da completare. Il pulsante precedente resta selezionato.</p><button type="button" className="v4-primary" onClick={()=>onResumeSetup?.({password:mokoPassword||undefined})}>Completa il nuovo collegamento</button></div>}
       <p>{needsSetup?'Completa il collegamento per usare l’SOS':mokoLabels[mokoConnection?.state]||'Verifica del collegamento'}</p>
-      <p>{needsSetup?'Wallaa controlla e configura il pulsante automaticamente.':'Un click invia l’SOS.'}</p>
+      {needsSetup && <p>Wallaa controlla e configura il pulsante automaticamente.</p>}
       {setupProgress}
-      {!setupBusy && <button type="button" className="v4-primary" onClick={()=>onMokoSetup?.({password:mokoPassword||undefined})}>{needsSetup?'Completa collegamento':'Verifica collegamento'}</button>}
+      {!setupBusy && <button type="button" className="v4-primary" onClick={()=>needsSetup?onMokoSetup?.({password:mokoPassword||undefined}):onRefreshDevice?.()}>{needsSetup?'Completa collegamento':'Aggiorna stato'}</button>}
       {['password_required','password_error'].includes(mokoConnection?.state) && pairingState!=='password_error' && <label>Password del pulsante<input className="input" type="password" autoComplete="off" value={mokoPassword} onChange={event=>setMokoPassword(event.target.value)} placeholder="Solo se è stata modificata"/></label>}
-      <p>Movimento: {telemetry.motion == null ? 'in attesa di dati' : telemetry.motion ? 'rilevato' : 'fermo'}{telemetry.batteryVoltageMv ? ` · Batteria ${telemetry.batteryVoltageMv} mV` : ''}</p>
-    </section>}
-
-    {isMoko && <section className="v4-settings-card">
-      <h2>Ritrova con la rete Wallaa</h2>
-      <p>I telefoni degli utenti che partecipano alla rete possono segnalare il tuo pulsante quando lo rilevano nelle vicinanze.</p>
-      <label className="v4-switch"><input type="checkbox" checked={networkDevice?.trackingEnabled === true} onChange={e=>onNetworkTracking?.(e.target.checked)}/><span/></label>
-      {networkDevice?.unavailable && <p>La rete richiede l’aggiornamento del servizio Wallaa.</p>}
-      {networkDevice?.lastObservation ? <div>
-        <p>Ultimo rilevamento: {new Date(networkDevice.lastObservation.capturedAt).toLocaleString()}</p>
-        <p>Zona approssimativa: circa {networkDevice.lastObservation.accuracy} m intorno al telefono che lo ha rilevato.</p>
-        <a href={networkDevice.lastObservation.mapsUrl} target="_blank" rel="noreferrer">Apri la zona sulla mappa</a>
-      </div> : <p>Nessun rilevamento recente dalla rete.</p>}
-      <p>Il punto indica la posizione del telefono ricevente. La disponibilità dipende dai partecipanti presenti e dai permessi dei loro telefoni.</p>
     </section>}
 
     <section className="aa-trigger-card aa-trigger-card-v41">
