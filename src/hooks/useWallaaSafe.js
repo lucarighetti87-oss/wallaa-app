@@ -1,6 +1,6 @@
 import { setNetworkParticipation, getOwnedNetworkDevices, reportNetworkObservations, getDeviceNetworkLocation, setDeviceNetworkTracking as saveDeviceNetworkTracking } from '../services/deviceNetwork';
 import { prepareMokoButton } from '../services/mokoSetup';
-import { MOKO_FACTORY_PASSWORD } from '../services/mokoSetupProtocol';
+import { MOKO_FACTORY_PASSWORD, MOKO_PROFILE_VERSION } from '../services/mokoSetupProtocol';
 import { BleClient } from '@capacitor-community/bluetooth-le';
 import { configureMokoConnection, getMokoConnectionStatus, supportsMokoConnection, beginMokoSetup, endMokoSetup, isMokoDiagnosticRun } from '../services/mokoConnection';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -113,6 +113,8 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const busyRef = useRef(false);
   const networkIdentityRef = useRef(null);
   const disconnectNotifiedRef = useRef(false);
+  const nativeReadySinceRef=useRef(null);
+  const profileUpgradeAttemptRef=useRef(null);
   const lastHeartbeatStatusRef = useRef('');
   const pushInitializedRef = useRef(false);
   const profileSyncTimerRef = useRef(null);
@@ -958,6 +960,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       try {
         const status = await getMokoConnectionStatus();
         if (stopped) return;
+        if(status.ready&&status.connected){if(nativeReadySinceRef.current===null)nativeReadySinceRef.current=Date.now();}else nativeReadySinceRef.current=null;
         setMokoConnection(status);
         if (status.connected) setTelemetry(prev => ({...prev, rssi:status.rssi ?? prev.rssi, seenAt:new Date().toISOString()}));
       } catch (error) { if (!stopped) setMokoConnection({state:'unavailable',connected:false,ready:false}); }
@@ -1108,11 +1111,12 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
 
   useEffect(() => {
     if (!['connected', 'standby'].includes(connectionStatus) || !disconnectNotifiedRef.current) return;
+    if(device?.hardwareId?.startsWith('MOKO:') && (!mokoConnection.ready||nativeReadySinceRef.current===null||clock-nativeReadySinceRef.current<30000))return;
     disconnectNotifiedRef.current = false;
     const language = profileRef.current?.language || 'en';
     setToast({ type: 'success', text: translate(language, 'v4.guard.reconnectToast') });
     pushActivity({ type: 'reconnect', status: 'success', title: translate(language, 'v4.guard.reconnectActivity') }).catch(() => {});
-  }, [connectionStatus, pushActivity]);
+  }, [connectionStatus, pushActivity, clock, device?.hardwareId, mokoConnection.ready]);
 
   const signalQuality = useMemo(() => {
     const rssi = telemetry.rssi;
@@ -1367,7 +1371,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
 
   const cancelPairing=useCallback(()=>{pairingControllerRef.current?.abort(new Error('Associazione annullata.'));pairingChoiceRef.current?.reject(new Error('Associazione annullata.'));},[]);
   const selectPairingCandidate=useCallback(candidate=>{const choice=pairingChoiceRef.current;if(!choice){setPairingError('La selezione è terminata. Ripeti il collegamento.');setPairingCandidates([]);return;}setPairingCandidates([]);setPairingState('connecting');choice.resolve(candidate);},[]);
-  const pairDevice = useCallback(async ({password=MOKO_FACTORY_PASSWORD,existingDevice=null}={}) => {
+  const pairDevice = useCallback(async ({password=MOKO_FACTORY_PASSWORD,existingDevice=null,upgrade=false}={}) => {
     if(pairingInProgressRef.current)return;
     if(activeAlertRef.current?.active){const error=new Error('Prima di configurare il pulsante, termina l’allarme attivo.');setToast({type:'warning',text:error.message});throw error;}
     const previousDevice=deviceRef.current,previousTrigger=triggerRef.current;
@@ -1395,9 +1399,9 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       });}});
       if(controller.signal.aborted)throw controller.signal.reason;
       if(target.protocol==='moko-button'||target.hardwareId?.startsWith('MOKO:')){
-        if(!supportsMokoConnection())throw new Error('La configurazione MK1 richiede l’app Wallaa per iPhone.');
+        if(!supportsMokoConnection())throw new Error('La configurazione WB-001 richiede l’app Wallaa per iPhone.');
         await beginMokoSetup(); // Renew suppression after a potentially long device selection.
-        const prepared=await prepareMokoButton({device:target,ble:BleClient,password,signal:controller.signal,onProgress:setPairingState,onCounter:count=>{lastCounter=count;},checkOwnership:device=>checkWallaaDeviceClaim(networkIdentityRef.current,device),claim:(device,eligibility)=>existingDevice?.claimToken&&eligibility.claimTokenValid?Promise.resolve({hardwareId:device.hardwareId,claimToken:existingDevice.claimToken}):claimWallaaDevice(networkIdentityRef.current,device),onClaim:async next=>{
+        const prepared=await prepareMokoButton({device:target,ble:BleClient,password,allowVerifiedUpgrade:upgrade,signal:controller.signal,onProgress:setPairingState,onCounter:count=>{lastCounter=count;},checkOwnership:device=>checkWallaaDeviceClaim(networkIdentityRef.current,device),claim:(device,eligibility)=>existingDevice?.claimToken&&eligibility.claimTokenValid?Promise.resolve({hardwareId:device.hardwareId,claimToken:existingDevice.claimToken}):claimWallaaDevice(networkIdentityRef.current,device),onClaim:async next=>{
           claimed=next;setDevice(next);deviceRef.current=next;await storage.setDevice(next);await nativeSnapshot(next);
         }});
         setPairingState('checking_signal');await captureMokoSetupBaseline(prepared);
@@ -1444,6 +1448,18 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const setupMokoDevice=useCallback(options=>pairDevice({...options,existingDevice:deviceRef.current}),[pairDevice]);
   const resumeMokoSetup=useCallback(options=>pairDevice({...options,existingDevice:pendingMokoDevice}),[pairDevice,pendingMokoDevice]);
   useEffect(()=>{if(!loaded)return;let active=true;storage.getPendingMokoDevice().then(saved=>{if(active&&saved?.userId===networkIdentity?.userId)setPendingMokoDevice(saved.device);});return()=>{active=false;};},[loaded,networkIdentity?.userId]);
+
+  useEffect(()=>{
+    const current=deviceRef.current;
+    if(!loaded||!appVisible||pairingActive||activeAlert?.active||!current?.hardwareId?.startsWith('MOKO:')||current.mokoSetupVerified!==true||(current.mokoProfileVersion||0)>=MOKO_PROFILE_VERSION)return;
+    const key=`${networkIdentity?.userId}:${current.hardwareId}:${MOKO_PROFILE_VERSION}`;
+    if(profileUpgradeAttemptRef.current===key)return;
+    profileUpgradeAttemptRef.current=key;
+    checkWallaaDeviceClaim(networkIdentityRef.current,current).then(eligibility=>{
+      if(eligibility.claimTokenValid!==true){setToast({type:'warning',text:'Apri Il mio pulsante per verificare il collegamento del WB-001.'});return;}
+      return pairDevice({existingDevice:current,upgrade:true});
+    }).catch(error=>setToast({type:'error',text:error.message||'Apri Il mio pulsante per completare l’aggiornamento.'}));
+  },[loaded,appVisible,pairingActive,activeAlert?.active,device?.hardwareId,device?.mokoSetupVerified,device?.mokoProfileVersion,networkIdentity?.userId,pairDevice]);
 
   const disconnectDevice = useCallback(async () => {
     await stopBleScan(); setDevice(null); deviceRef.current = null; disconnectNotifiedRef.current = false; lastHeartbeatStatusRef.current = '';

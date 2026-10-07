@@ -1,7 +1,7 @@
 export const MOKO_FACTORY_PASSWORD='Moko4321';
-export const MOKO_PROFILE_VERSION=1;
+export const MOKO_PROFILE_VERSION=2;
 export const mokoUuid=short=>`0000${short.toLowerCase()}-0000-1000-8000-00805f9b34fb`;
-export const MOKO_GATT={service:mokoUuid('aa00'),custom:mokoUuid('aa01'),password:mokoUuid('aa07'),events:mokoUuid('aa08'),info:mokoUuid('180a')};
+export const MOKO_GATT={service:mokoUuid('aa00'),custom:mokoUuid('aa01'),password:mokoUuid('aa07'),disconnect:mokoUuid('aa02'),events:mokoUuid('aa08'),info:mokoUuid('180a')};
 export function mokoBytes(input){
  if(input instanceof ArrayBuffer)return new Uint8Array(input);
  if(ArrayBuffer.isView(input))return new Uint8Array(input.buffer,input.byteOffset,input.byteLength);
@@ -25,6 +25,7 @@ export function mokoWrite(command,data){return Uint8Array.from([0xea,1,command,d
 // Official SDK: MKBXDInterface+MKBXDConfig / MKBXDAdopter. No reset, password,
 // identity, power-off, or event-history deletion commands are used.
 export const MOKO_SINGLE_CLICK_PROFILE=[
+ {command:0x39,data:[0],read:[],expected:[0]},
  {command:0x22,data:[1],read:[],expected:[1]},
  {command:0x33,data:[0,0],read:[0],expected:[0,0]},
  {command:0x34,data:[0,1,0,3,0xe8,0],read:[0],expected:[0,1,0,3,0xe8,0]},

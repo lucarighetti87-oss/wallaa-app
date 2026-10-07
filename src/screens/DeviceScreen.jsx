@@ -67,7 +67,7 @@ export default function DeviceScreen({ pairingError='', pendingMokoDevice, onRes
       </div>
       <div className="aa-device-hero-copy">
         <span className={`aa-connection ${visualStatus}`}><i/>{connectionLabel(needsSetup?'setup-required':connectionStatus)}</span>
-        <h2>Wallaa Button</h2>
+        <h2>{isMoko?'WB-001':'Wallaa Button'}</h2>
         <small>{needsSetup?'Associazione da completare':'Associato al tuo account'}</small>
         <div className="aa-device-side-cta" aria-hidden="true"><ChevronRight/></div>
         <div className="aa-device-tagline"><i/><span>SEMPRE AL TUO FIANCO</span></div>
@@ -81,7 +81,7 @@ export default function DeviceScreen({ pairingError='', pendingMokoDevice, onRes
     </section>
 
     {isMoko && <section className="v4-settings-card mk1-setup-card">
-      <h2>{device.hardwareId?.startsWith('MOKO:')?'Il tuo MK1':'Completa il tuo pulsante'}</h2>
+      <h2>{device.hardwareId?.startsWith('MOKO:')?'Il tuo WB-001':'Completa il tuo pulsante'}</h2>
       {pendingMokoDevice && !setupBusy && <div><p>Il nuovo pulsante è associato al tuo account, ma il collegamento è da completare. Il pulsante precedente resta selezionato.</p><button type="button" className="v4-primary" onClick={()=>onResumeSetup?.({password:mokoPassword||undefined})}>Completa il nuovo collegamento</button></div>}
       <p>{needsSetup?'Completa il collegamento per usare l’SOS':mokoLabels[mokoConnection?.state]||'Verifica del collegamento'}</p>
       <p>{needsSetup?'Wallaa controlla e configura il pulsante automaticamente.':'Un click invia l’SOS.'}</p>
