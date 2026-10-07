@@ -26,3 +26,9 @@ assert(WallaaMokoGATT.shouldStartHandshake(connected:true,authenticated:false,ph
 assert(!WallaaMokoGATT.shouldStartHandshake(connected:true,authenticated:false,phase:"authenticating"))
 assert(!WallaaMokoGATT.shouldStartHandshake(connected:true,authenticated:true,phase:"ready"))
 print("3 verifiche del ripristino superate")
+
+assert(WallaaMokoGATT.telemetryReply(Data([0xeb,0,0x62,1,100]),command:0x62)?["battery"] as? Int == 100)
+assert(WallaaMokoGATT.telemetryReply(Data([0xeb,0,0x4a,2,0x0b,0xee]),command:0x4a)?["batteryVoltageMv"] as? Int == 3054)
+assert(WallaaMokoGATT.telemetryReply(Data([0xeb,0,0x62,1,255]),command:0x62)?.isEmpty == true)
+assert(WallaaMokoGATT.telemetryReply(Data([0xeb,1,0x62,1,100]),command:0x62) == nil)
+print("4 verifiche telemetria superate")

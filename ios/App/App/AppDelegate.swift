@@ -377,6 +377,13 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private var mokoStatus = "disabled"
     private var mokoLastCount: Int?
     private var mokoLastLoggedStatus = ""
+    private var mokoTelemetry: [String:Any] = [:]
+    private var mokoTelemetryHardwareId = ""
+    private var mokoTelemetryAt = Date.distantPast
+    private var mokoTelemetryQueue: [UInt8] = []
+    private var mokoTelemetryCommand: UInt8?
+    private var mokoTelemetryTimeout: DispatchWorkItem?
+    private var mokoConnectTimeout: DispatchWorkItem?
     private var mokoRetry: DispatchWorkItem?
     private var mokoHandshakeTimeout: DispatchWorkItem?
     private var mokoLastRssiAt = Date.distantPast
@@ -427,14 +434,16 @@ private var scanRearmWorkItem: DispatchWorkItem?
         reconcileMokoConnection()
     }
 
-    func mokoConnectionStatus() -> [String: Any] {
+    func mokoConnectionStatus(refresh:Bool=false) -> [String: Any] {
+        if refresh { mokoTelemetryAt = .distantPast;mokoLastRssiAt = .distantPast }
         refreshConfiguration()
         if mokoAuthenticated, let peripheral = mokoPeripheral, peripheral.state == .connected,
            Date().timeIntervalSince(mokoLastRssiAt) >= 15 {
             mokoLastRssiAt = Date()
             peripheral.readRSSI()
         }
-        var result: [String: Any] = ["state": mokoStatus,
+        refreshMokoTelemetryIfNeeded()
+        var result: [String: Any] = ["telemetry":mokoTelemetry,"state": mokoStatus,
             "connected": mokoAuthenticated && mokoPeripheral?.state == .connected && mokoEventsCharacteristic?.isNotifying == true && mokoStatus == "ready",
             "ready": mokoStatus == "ready", "rssi": NSNull(), "disconnectedAt": NSNull()]
         #if DEBUG
@@ -450,9 +459,32 @@ private var scanRearmWorkItem: DispatchWorkItem?
         return result
     }
 
+    private func refreshMokoTelemetryIfNeeded() {
+        guard mokoStatus == "ready", mokoAuthenticated, mokoConnectionWanted, let hardwareId=config?.hardwareId else { return }
+        if mokoTelemetryHardwareId != hardwareId { mokoTelemetry=[:];mokoTelemetryAt = .distantPast;mokoTelemetryHardwareId=hardwareId }
+        guard mokoTelemetryCommand == nil, mokoTelemetryQueue.isEmpty, Date().timeIntervalSince(mokoTelemetryAt)>=60 else { return }
+        mokoTelemetryAt=Date();mokoTelemetryQueue=[0x62,0x4a,0x2d,0x2e,0x5a];readNextMokoTelemetry()
+    }
+    private func readNextMokoTelemetry() {
+        mokoTelemetryTimeout?.cancel();mokoTelemetryCommand=nil
+        guard mokoStatus == "ready", mokoConnectionWanted, let peripheral=mokoPeripheral,
+              peripheral.state == .connected, let custom=mokoControlCharacteristics.first(where:{$0.uuid==CBUUID(string:"AA01")}), !mokoTelemetryQueue.isEmpty else { mokoTelemetryQueue=[];return }
+        let command=mokoTelemetryQueue.removeFirst();mokoTelemetryCommand=command
+        peripheral.writeValue(Data([0xea,0,command,0]),for:custom,type:.withResponse)
+        let timeout=DispatchWorkItem{[weak self] in self?.readNextMokoTelemetry()}
+        mokoTelemetryTimeout=timeout;DispatchQueue.main.asyncAfter(deadline:.now()+2,execute:timeout)
+    }
+    private func receiveMokoTelemetry(_ value:Data) {
+        guard let command=mokoTelemetryCommand, let parsed=WallaaMokoGATT.telemetryReply(value,command:command) else { return }
+        for (key,value) in parsed { mokoTelemetry[key]=value }
+        if !parsed.isEmpty { mokoTelemetry["sampledAt"]=ISO8601DateFormatter().string(from:Date()) }
+        readNextMokoTelemetry()
+    }
+
     private func reconcileMokoConnection() {
         guard mokoConnectionWanted else {
-            mokoRetry?.cancel(); mokoHandshakeTimeout?.cancel()
+            mokoTelemetryTimeout?.cancel();mokoTelemetryCommand=nil;mokoTelemetryQueue=[]
+            mokoConnectTimeout?.cancel();mokoRetry?.cancel(); mokoHandshakeTimeout?.cancel()
             if let peripheral = mokoPeripheral { central?.cancelPeripheralConnection(peripheral) }
             mokoPeripheral = nil; mokoAuthenticated = false; mokoDisconnectedAt = nil; mokoStatus = "disabled"
             return
@@ -467,7 +499,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
             if WallaaMokoGATT.shouldStartHandshake(connected:true,authenticated:mokoAuthenticated,phase:mokoStatus) { beginMokoAuthentication(peripheral) }
             return
         }
-        if let peripheral = mokoPeripheral, peripheral.state == .connecting { return }
+        if let peripheral = mokoPeripheral, peripheral.state == .connecting || peripheral.state == .disconnecting { return }
         if let peripheral = central.retrievePeripherals(withIdentifiers: [uuid]).first {
             connectMoko(peripheral)
         } else {
@@ -483,6 +515,15 @@ private var scanRearmWorkItem: DispatchWorkItem?
         if peripheral.state == .connected { beginMokoAuthentication(peripheral);return }
         mokoStatus = "connecting"
         central?.connect(peripheral, options: nil)
+        mokoConnectTimeout?.cancel()
+        let timeout=DispatchWorkItem { [weak self,weak peripheral] in
+            guard let self,let peripheral,self.mokoPeripheral==peripheral,peripheral.state == .connecting else { return }
+            self.mokoStatus="disconnected"
+            if self.mokoDisconnectedAt == nil { self.mokoDisconnectedAt=Date() }
+            self.central?.cancelPeripheralConnection(peripheral)
+            self.scheduleMokoReconnect()
+        }
+        mokoConnectTimeout=timeout;DispatchQueue.main.asyncAfter(deadline:.now()+20,execute:timeout)
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
@@ -493,6 +534,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
 
     private func beginMokoAuthentication(_ peripheral: CBPeripheral) {
         guard central?.state == .poweredOn, mokoConnectionWanted else { return }
+        mokoConnectTimeout?.cancel()
         mokoPeripheral = peripheral; peripheral.delegate = self
         mokoAuthenticated = false; mokoStatus = "authenticating"
         NSLog("[WALLAA][MOKO] connected, authenticating")
@@ -564,6 +606,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
 
     func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
         guard peripheral == mokoPeripheral, error != nil else { return }
+        if characteristic.uuid==CBUUID(string:"AA01") { readNextMokoTelemetry();return }
         mokoStatus = "connection_failed"; central?.cancelPeripheralConnection(peripheral)
     }
 
@@ -571,6 +614,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
         guard peripheral == mokoPeripheral else { return }
         if let error { NSLog("[WALLAA][MOKO] characteristic update error: \(error.localizedDescription)"); return }
         guard let value = characteristic.value else { return }
+        if characteristic.uuid==CBUUID(string:"AA01") { receiveMokoTelemetry(value);return }
         if characteristic.uuid == CBUUID(string:"AA02") { NSLog("[WALLAA][MOKO] device disconnect code=\(value.count > 4 ? Int(value[4]) : -1)");return }
         if characteristic.uuid == CBUUID(string: "AA07") {
             guard let accepted = WallaaMokoGATT.authenticationReply(value) else { return }
@@ -609,7 +653,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     }
 
     func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
-        if peripheral == mokoPeripheral, error == nil { mokoRssi = RSSI.intValue }
+        if peripheral == mokoPeripheral, error == nil, (-127...0).contains(RSSI.intValue) { mokoRssi = RSSI.intValue }
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
@@ -1518,6 +1562,22 @@ private var scanRearmWorkItem: DispatchWorkItem?
 }
 
 private enum WallaaMokoGATT {
+    static func telemetryReply(_ data:Data,command:UInt8)->[String:Any]? {
+        let b=[UInt8](data)
+        guard b.count>=4,b[0]==0xeb,b[1]==0,b[2]==command,b.count==Int(b[3])+4 else { return nil }
+        let payload=Array(b.dropFirst(4))
+        if command==0x62 || command==0x4a {
+            guard !payload.isEmpty,payload.count<=4 else { return [:] }
+            let number=payload.reduce(0){($0<<8)|Int($1)}
+            if command==0x62 { return number<=100 ? ["battery":number] : [:] }
+            return (1...6000).contains(number) ? ["batteryVoltageMv":number] : [:]
+        }
+        let value=String(bytes:payload,encoding:.utf8)?.trimmingCharacters(in:.controlCharacters) ?? ""
+        guard !value.isEmpty else { return [:] }
+        let key: String
+        switch command {case 0x2d:key="hardwareVersion";case 0x2e:key="productModel";case 0x5a:key="productionDate";default:return [:]}
+        return [key:value]
+    }
     static func shouldStartHandshake(connected:Bool,authenticated:Bool,phase:String)->Bool {
         connected && !authenticated && !["authenticating","synchronizing"].contains(phase)
     }
@@ -1622,7 +1682,7 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
     @objc func status(_ call: CAPPluginCall) {
-        DispatchQueue.main.async { call.resolve(WallaaBackgroundBLEManager.shared.mokoConnectionStatus()) }
+        DispatchQueue.main.async { call.resolve(WallaaBackgroundBLEManager.shared.mokoConnectionStatus(refresh:call.getBool("refresh") ?? false)) }
     }
 }
 

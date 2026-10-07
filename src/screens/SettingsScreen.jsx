@@ -21,7 +21,7 @@ function formatDateOfBirth(value) {
   return `${match[3]}/${match[2]}/${match[1]}`;
 }
 
-export default function SettingsScreen({ onNetworkObserver,
+export default function SettingsScreen({ device, networkDevice, onNetworkTracking, onNetworkObserver,
   profile, onSaveProfile, armed, onArmed, onReset, appearance, onAppearance, onDeleteAccount, onSignOut,
   networkState, systemHealth, onRefreshSystemHealth, onTestEmail, onTestAlarmSound, onNavigate, connectionStatus, t
 }) {
@@ -198,6 +198,7 @@ export default function SettingsScreen({ onNetworkObserver,
         <div className="v409-guard-explain"><ShieldCheck size={17}/><span>{t('v409.guard.explain')}</span></div>
       </section>
 
+      {device?.hardwareId?.startsWith('MOKO:') && <section className="v4-settings-card wb-network-settings"><div className="settings-row-title"><Radio size={19}/><div><strong>Ritrova con la rete Wallaa</strong><span>I partecipanti alla rete possono segnalare il tuo WB-001 nelle vicinanze.</span></div></div><label className="v4-switch"><input aria-label="Attiva ritrovamento WB-001" type="checkbox" checked={networkDevice?.trackingEnabled===true} onChange={e=>onNetworkTracking?.(e.target.checked)}/><span/></label>{networkDevice?.lastObservation?<><p>Ultimo rilevamento: {new Date(networkDevice.lastObservation.capturedAt).toLocaleString()}</p><p>Zona approssimativa: circa {Math.round(networkDevice.lastObservation.accuracy)} m intorno al telefono ricevente.</p><a href={networkDevice.lastObservation.mapsUrl} target="_blank" rel="noreferrer">Apri la zona sulla mappa</a></>:<p>Nessun rilevamento recente.</p>}<p>Il punto indica la posizione del telefono ricevente, non una posizione GPS autonoma del pulsante.</p></section>}
       <section className="v4-settings-card"><div className="settings-row-title"><Globe2 size={19}/><div><strong>{t('settings.language')}</strong><span>{t('v4.settings.languageBody')}</span></div></div><select value={profile.language||'en'} onChange={(e)=>onSaveProfile({...profile,language:e.target.value})}>{LANGUAGES.map((l)=><option key={l.code} value={l.code}>{l.label}</option>)}</select></section>
 
       <section className="v405-legal-card"><div className="settings-row-title"><FileText size={19}/><div><strong>{t('v405.legal.title')}</strong><span>{t('v405.legal.subtitle')}</span></div></div><button className="v411-privacy-open" type="button" onClick={()=>onNavigate('privacy')}><ShieldCheck size={18}/><span>{t('v411.privacy.open')}</span><ExternalLink size={15}/></button><a href={CONFIG.privacyPolicyUrl} target="_blank" rel="noreferrer"><span>{t('v405.legal.privacy')}</span><ExternalLink size={16}/></a><a href={CONFIG.termsUrl} target="_blank" rel="noreferrer"><span>{t('v405.legal.terms')}</span><ExternalLink size={16}/></a></section>
