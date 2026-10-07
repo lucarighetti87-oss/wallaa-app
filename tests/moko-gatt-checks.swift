@@ -21,3 +21,8 @@ assert(!WallaaMokoGATT.controlChannelsReady(["AA01","AA07"]))
 assert(!WallaaMokoGATT.controlChannelsReady(["AA02","AA07"]))
 assert(WallaaMokoGATT.controlChannelsReady(["aa01","aa02","aa07"]))
 print("4 verifiche dei canali di autenticazione superate")
+
+assert(WallaaMokoGATT.shouldStartHandshake(connected:true,authenticated:false,phase:"restoring"))
+assert(!WallaaMokoGATT.shouldStartHandshake(connected:true,authenticated:false,phase:"authenticating"))
+assert(!WallaaMokoGATT.shouldStartHandshake(connected:true,authenticated:true,phase:"ready"))
+print("3 verifiche del ripristino superate")

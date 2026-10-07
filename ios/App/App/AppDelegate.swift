@@ -463,7 +463,11 @@ private var scanRearmWorkItem: DispatchWorkItem?
             central.cancelPeripheralConnection(peripheral)
             mokoPeripheral = nil; mokoAuthenticated = false
         }
-        if let peripheral = mokoPeripheral, peripheral.state == .connected || peripheral.state == .connecting { return }
+        if let peripheral = mokoPeripheral, peripheral.state == .connected {
+            if WallaaMokoGATT.shouldStartHandshake(connected:true,authenticated:mokoAuthenticated,phase:mokoStatus) { beginMokoAuthentication(peripheral) }
+            return
+        }
+        if let peripheral = mokoPeripheral, peripheral.state == .connecting { return }
         if let peripheral = central.retrievePeripherals(withIdentifiers: [uuid]).first {
             connectMoko(peripheral)
         } else {
@@ -476,6 +480,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
         guard mokoConnectionWanted, !mokoAuthenticationBlocked else { return }
         mokoPeripheral = peripheral
         peripheral.delegate = self
+        if peripheral.state == .connected { beginMokoAuthentication(peripheral);return }
         mokoStatus = "connecting"
         central?.connect(peripheral, options: nil)
     }
@@ -483,6 +488,11 @@ private var scanRearmWorkItem: DispatchWorkItem?
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         guard peripheral.identifier.uuidString.caseInsensitiveCompare(config?.deviceId ?? "") == .orderedSame,
               mokoConnectionWanted else { central.cancelPeripheralConnection(peripheral); return }
+        beginMokoAuthentication(peripheral)
+    }
+
+    private func beginMokoAuthentication(_ peripheral: CBPeripheral) {
+        guard central?.state == .poweredOn, mokoConnectionWanted else { return }
         mokoPeripheral = peripheral; peripheral.delegate = self
         mokoAuthenticated = false; mokoStatus = "authenticating"
         NSLog("[WALLAA][MOKO] connected, authenticating")
@@ -520,7 +530,8 @@ private var scanRearmWorkItem: DispatchWorkItem?
         mokoControlCharacteristics = (service.characteristics ?? []).filter { [CBUUID(string:"AA01"),CBUUID(string:"AA02"),CBUUID(string:"AA07")].contains($0.uuid) }
         guard mokoControlCharacteristics.count == 3 else { mokoStatus = "connection_failed"; central?.cancelPeripheralConnection(peripheral); return }
         NSLog("[WALLAA][MOKO] subscribing control channels")
-        for channel in mokoControlCharacteristics { peripheral.setNotifyValue(true, for:channel) }
+        for channel in mokoControlCharacteristics where !channel.isNotifying { peripheral.setNotifyValue(true, for:channel) }
+        authenticateMokoIfReady(peripheral)
     }
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
@@ -530,6 +541,15 @@ private var scanRearmWorkItem: DispatchWorkItem?
         }
         NSLog("[WALLAA][MOKO] notification enabled: \(characteristic.uuid.uuidString)")
         if characteristic.uuid != CBUUID(string:"AA08") {
+            authenticateMokoIfReady(peripheral)
+        } else if characteristic.uuid == CBUUID(string: "AA08") {
+            // The confirmed setup counter is the baseline for this stream.
+            mokoStatus = mokoLastCount == nil ? "synchronizing" : "ready"
+            if mokoStatus == "ready" { mokoHandshakeTimeout?.cancel(); mokoDisconnectedAt = nil }
+        }
+    }
+
+    private func authenticateMokoIfReady(_ peripheral: CBPeripheral) {
             guard !mokoAuthenticationSent, mokoControlCharacteristics.count == 3, WallaaMokoGATT.controlChannelsReady(Set(mokoControlCharacteristics.filter{$0.isNotifying}.map{$0.uuid.uuidString})) else { return }
             guard let passwordChannel = mokoPasswordCharacteristic else { return }
             guard let hardwareId = config?.hardwareId, let password = WallaaMokoKeychain.read(hardwareId),
@@ -540,11 +560,6 @@ private var scanRearmWorkItem: DispatchWorkItem?
             mokoAuthenticationSent = true
             NSLog("[WALLAA][MOKO] authenticating after control subscriptions")
             peripheral.writeValue(command, for: passwordChannel, type: .withResponse)
-        } else if characteristic.uuid == CBUUID(string: "AA08") {
-            // The confirmed setup counter is the baseline for this stream.
-            mokoStatus = mokoLastCount == nil ? "synchronizing" : "ready"
-            if mokoStatus == "ready" { mokoHandshakeTimeout?.cancel(); mokoDisconnectedAt = nil }
-        }
     }
 
     func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
@@ -742,9 +757,10 @@ private var scanRearmWorkItem: DispatchWorkItem?
         refreshConfiguration()
         for peripheral in peripherals where peripheral.identifier.uuidString.caseInsensitiveCompare(config?.deviceId ?? "") == .orderedSame && mokoConnectionWanted {
             mokoPeripheral = peripheral; peripheral.delegate = self
-            if peripheral.state == .connected { peripheral.discoverServices([CBUUID(string: "AA00")]) }
+            if peripheral.state == .connected, !mokoAuthenticated, mokoStatus != "authenticating" { mokoStatus = "restoring" }
         }
         if central.state == .poweredOn {
+            reconcileMokoConnection()
             startScanIfNeeded(forceRestart: true, reason: "state-restoration")
         }
     }
@@ -1502,6 +1518,9 @@ private var scanRearmWorkItem: DispatchWorkItem?
 }
 
 private enum WallaaMokoGATT {
+    static func shouldStartHandshake(connected:Bool,authenticated:Bool,phase:String)->Bool {
+        connected && !authenticated && !["authenticating","synchronizing"].contains(phase)
+    }
     static func controlChannelsReady(_ active: Set<String>) -> Bool {
         Set(["AA01","AA02","AA07"]).isSubset(of:Set(active.map{$0.uppercased()}))
     }
