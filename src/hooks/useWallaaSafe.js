@@ -2,7 +2,7 @@ import { setNetworkParticipation, getOwnedNetworkDevices, reportNetworkObservati
 import { prepareMokoButton } from '../services/mokoSetup';
 import { MOKO_FACTORY_PASSWORD, MOKO_PROFILE_VERSION } from '../services/mokoSetupProtocol';
 import { BleClient } from '@capacitor-community/bluetooth-le';
-import { configureMokoConnection, getMokoConnectionStatus, supportsMokoConnection, beginMokoSetup, endMokoSetup, isMokoDiagnosticRun } from '../services/mokoConnection';
+import { configureMokoConnection, getMokoConnectionStatus, supportsMokoConnection, beginMokoSetup, endMokoSetup, isMokoDiagnosticRun, getSafetyPermissions, requestSafetyLocation, openSafetySettings } from '../services/mokoConnection';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { storage } from '../services/storage';
@@ -11,7 +11,7 @@ import { getCurrentLocation, requestLocationPermission, watchLiveLocation } from
 import { sendWallaaAlert } from '../services/alert';
 import { closeLiveAlert, deleteWallaaAccount, sendDeviceHeartbeat, updateLiveLocation, sendLiveProtectionLocation, sendAuthorizedLocationSnapshot, sendUniversalSentinelHeartbeat } from '../services/liveAlert';
 import {
-  createQrDataUrl, claimWallaaDevice, checkWallaaDeviceClaim, getWallaaNetwork, getWallaaContacts, getWallaaAccount, getWallaaLegalStatus, acceptWallaaLegalDocuments, getWallaaAlerts, getNetworkAlert, loginWallaaAccount, logoutWallaaAccount, registerWallaaAccount, registerWallaaIdentity, removeWallaaLink, rotateWallaaQr, scanQrWithCamera, scanWallaaCode, syncWallaaContacts, getWallaaNotificationHistory, acknowledgeActiveNetworkAlerts, clearWallaaNotificationHistory } from '../services/network';
+  createQrDataUrl, claimWallaaDevice, checkWallaaDeviceClaim, getWallaaNetwork, getWallaaContacts, getWallaaAccount, getWallaaLegalStatus, acceptWallaaLegalDocuments, getWallaaAlerts, getNetworkAlert, loginWallaaAccount, logoutWallaaAccount, registerWallaaAccount, registerWallaaIdentity, removeWallaaLink, rotateWallaaQr, scanQrWithCamera, scanWallaaCode, syncWallaaContacts, getWallaaNotificationHistory, getActiveGuardianAlerts, acknowledgeActiveNetworkAlerts, clearWallaaNotificationHistory } from '../services/network';
 import { clearDeliveredWallaaNotifications, initWallaaPush, playWallaaAlarm, stopPushListeners, stopWallaaAlarm } from '../services/push';
 import { detectDeviceLanguage, translate } from '../i18n';
 import { ensureLocalNotificationPermission, feedbackWarning, showLocalSafetyNotification } from '../services/nativeFeedback';
@@ -57,7 +57,7 @@ function pruneActivities(items = []) {
 
 const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const [loaded, setLoaded] = useState(false);
-  const [profile, setProfile] = useState({ customerId: '', name: '', firstName: '', lastName: '', email: '', phone: '', countryCode: '+39', birthCountry: '', birthPlace: '', safetyWord: '', language: defaultLanguage, plan: 'basic', sosLocationEnabled: true, liveProtectionEnabled: false, onboardingComplete: false });
+  const [profile, setProfile] = useState({ customerId: '', name: '', firstName: '', lastName: '', email: '', phone: '', countryCode: '+39', birthCountry: '', birthPlace: '', safetyWord: '', language: defaultLanguage, plan: 'basic', networkObserverEnabled:true, sosLocationEnabled: true, liveProtectionEnabled: false, onboardingComplete: false });
   const [contacts, setContacts] = useState([]);
   const [device, setDevice] = useState(null);
   const [armed, setArmedState] = useState(true);
@@ -87,11 +87,15 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const [networkState, setNetworkState] = useState({ status: 'loading', guardians: [], following: [], pushPermission: 'unknown' });
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [incomingAlert, setIncomingAlert] = useState(null);
+  const [incomingAlertMinimized,setIncomingAlertMinimized] = useState(false);
+  const [guardianAlerts,setGuardianAlerts] = useState([]);
   const [sentinelOffer, setSentinelOffer] = useState(null);
   const clearSentinelOffer = useCallback(() => setSentinelOffer(null), []);
   const [messagePush, setMessagePush] = useState(null);
   const [centralMessagePush, setCentralMessagePush] = useState(null);
   const [connectionGuard, setConnectionGuardState] = useState({ enabled: true, delaySeconds: 60 });
+  const [showSafetyGuide,setShowSafetyGuide]=useState(false);
+  const [safetyPermissions,setSafetyPermissions]=useState({});
   const [appearance, setAppearanceState] = useState({ mode: 'dark' });
   const [systemHealth, setSystemHealth] = useState({ status: 'idle' });
   const [legalStatus, setLegalStatus] = useState(null);
@@ -359,19 +363,18 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
           } else {
             playWallaaAlarm();
           }
-          setIncomingAlert(alert);
-          pushActivity({ type: 'network-alert', status: 'error', titleKey: 'activity.networkSos', titleVars: { name: alert.ownerName }, location: alert.location }).catch(() => {});
+          setIncomingAlertMinimized(false);
+          setIncomingAlert({...alert,status:'active'});
+          pushActivity({ type: 'network-alert', status: 'error', titleKey: 'activity.networkSos', titleVars: { name: alert.ownerName }, alertId:alert.id, location: alert.location }).catch(() => {});
         },
         onSentinelOffer: (offer) => setSentinelOffer(offer),
         onMessage: (message) => {
           setMessagePush({
             ...message,
-      onCentralMessage: (payload) => {
-        setCentralMessagePush(payload);
-      },
             receivedAt: Date.now()
           });
         },
+        onCentralMessage:payload=>setCentralMessagePush({...payload,receivedAt:Date.now()}),
         onAlertClosed: (alertId) => {
           stopWallaaAlarm();
           setIncomingAlert((current) => (!alertId || current?.id === alertId) ? null : current);
@@ -387,6 +390,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
         },
         onError: (error) => setToast({ type: 'error', text: error?.message || tx('error.pushUnavailable') })
       });
+      if(push.permission!=='granted')pushInitializedRef.current=false;
       setNetworkState((current) => ({ ...current, pushPermission: push.permission }));
     } catch {
       pushInitializedRef.current = false;
@@ -605,6 +609,28 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     return()=>{stopped=true;clearInterval(timer);document.removeEventListener('visibilitychange',visible);};
   }, [loaded, networkIdentity?.authToken, profile?.sosLocationEnabled]);
 
+  useEffect(()=>{
+    if(!loaded||!networkIdentity?.authToken)return;
+    let stopped=false,busy=false;
+    const refresh=async()=>{if(busy||document.visibilityState==='hidden')return;busy=true;try{
+      const result=await getActiveGuardianAlerts(networkIdentityRef.current);
+      if(!stopped)setGuardianAlerts(result.alerts||[]);
+    }catch{/* Keep the last known active SOS during a temporary outage. */}finally{busy=false;}};
+    refresh();const timer=setInterval(refresh,5000);document.addEventListener('visibilitychange',refresh);
+    return()=>{stopped=true;clearInterval(timer);document.removeEventListener('visibilitychange',refresh);};
+  },[loaded,networkIdentity?.authToken]);
+  const acknowledgeIncomingAlert=useCallback(()=>{stopWallaaAlarm();clearDeliveredWallaaNotifications().catch(()=>{});setIncomingAlertMinimized(true);},[]);
+  const openGuardianAlert=useCallback(async id=>{const result=await getNetworkAlert(networkIdentityRef.current,id);if(result?.alert){setIncomingAlert({...result.alert,remote:result.alert.status==='active',opened:true});setIncomingAlertMinimized(false);}},[]);
+  const activeGuardianAlerts=[...guardianAlerts];
+  if(incomingAlert?.status!=='closed'&&incomingAlert?.remote&& !activeGuardianAlerts.some(item=>item.id===incomingAlert.id))activeGuardianAlerts.unshift(incomingAlert);
+
+  useEffect(()=>{
+    if(!loaded||!networkIdentity?.authToken)return;
+    let stopped=false;
+    getWallaaNotificationHistory(networkIdentityRef.current).then(result=>{if(stopped)return;const rows=(result.notifications||[]).map(item=>({id:`remote-${item.id}`,at:item.createdAt,type:item.type==='sos'?'network-alert':'network-event',status:item.type==='sos'?'error':'success',title:item.title,detail:item.body,alertId:item.alertId,location:item.location}));setActivities(current=>{const ids=new Set(current.map(item=>item.id));const next=pruneActivities([...rows.filter(item=>!ids.has(item.id)),...current]);storage.setActivities(next).catch(()=>{});return next;});}).catch(()=>{});
+    return()=>{stopped=true;};
+  },[loaded,networkIdentity?.authToken]);
+
   // Keep a Guardian's incoming SOS position live while the app is open.
   // The initial push can arrive before the protected person's first GPS fix, so
   // this authenticated poll refreshes the same alert every 3 seconds.
@@ -616,6 +642,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
         const result = await getNetworkAlert(networkIdentityRef.current, incomingAlert.id);
         if (stopped || !result?.alert) return;
         const remote = result.alert;
+        if(remote.status!=='active'){setGuardianAlerts(items=>items.filter(item=>item.id!==remote.id));setIncomingAlert(null);stopWallaaAlarm();return;}
         setIncomingAlert((current) => {
           if (!current || current.id !== incomingAlert.id) return current;
           return {
@@ -625,6 +652,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
             locationShared: remote.locationShared !== false,
             liveUrl: remote.liveUrl || current.liveUrl || '',
             location: remote.location?.latitude != null && remote.location?.longitude != null ? {
+              ...remote.location,
               latitude: Number(remote.location.latitude),
               longitude: Number(remote.location.longitude),
               accuracy: remote.location.accuracy == null ? null : Number(remote.location.accuracy),
@@ -651,7 +679,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     if (profileSyncTimerRef.current) { clearTimeout(profileSyncTimerRef.current); profileSyncTimerRef.current = null; }
     await storage.clearAll();
 
-    const emptyProfile = { customerId:'',name:'',firstName:'',lastName:'',email:'',phone:'',countryCode:'+39',birthCountry:'',birthPlace:'',safetyWord:'',language:currentLanguage(),plan:'basic',sosLocationEnabled:true,liveProtectionEnabled:false,privacyAccepted:false,termsAccepted:false,onboardingComplete:false };
+    const emptyProfile = { customerId:'',name:'',firstName:'',lastName:'',email:'',phone:'',countryCode:'+39',birthCountry:'',birthPlace:'',safetyWord:'',language:currentLanguage(),plan:'basic',networkObserverEnabled:true,sosLocationEnabled:true,liveProtectionEnabled:false,privacyAccepted:false,termsAccepted:false,onboardingComplete:false };
     const identity = { installationId: currentIdentity?.installationId || makeId(), userId:'', authToken:'', qrToken:'', qrPayload:'' };
     await storage.setProfile(emptyProfile);
     await storage.setNetworkIdentity(identity);
@@ -664,7 +692,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     setActiveAlert(null); activeAlertRef.current = null;
     setResolvedAlert(null);
     setLastAlert(null);
-    setIncomingAlert(null);
+    setIncomingAlert(null);setGuardianAlerts([]);setIncomingAlertMinimized(false);
     setTelemetry({ battery:null, rssi:null, seenAt:null });
     setPairingState('idle');
     setQrDataUrl('');
@@ -811,7 +839,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       const identity = savedIdentity || newNetworkIdentity();
       const legacyHasName = Boolean(savedProfile?.name?.trim());
       const normalizedProfile = {
-        name: '', firstName: '', lastName: '', email: '', phone: '', countryCode: '+39', birthCountry: '', birthPlace: '', safetyWord: '', plan: 'basic', sosLocationEnabled: true, liveProtectionEnabled: false, privacyAccepted: false, termsAccepted: false,
+        name: '', firstName: '', lastName: '', email: '', phone: '', countryCode: '+39', birthCountry: '', birthPlace: '', safetyWord: '', plan: 'basic', networkObserverEnabled:true, sosLocationEnabled: true, liveProtectionEnabled: false, privacyAccepted: false, termsAccepted: false,
         ...savedProfile,
         language: savedProfile?.language || defaultLanguage,
         onboardingComplete: savedProfile?.onboardingComplete ?? legacyHasName
@@ -1019,7 +1047,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   useEffect(()=>{
     if(!loaded || !networkIdentity?.authToken || !appVisible)return undefined;
     let stopped=false;
-    const refresh=async()=>{try{const value=await getOwnedNetworkDevices(networkIdentityRef.current);if(!stopped)setNetworkOwnedDevices(value.devices||[]);}catch{if(!stopped)setNetworkOwnedDevices([]);}};
+    const refresh=async()=>{try{const value=await getOwnedNetworkDevices(networkIdentityRef.current);if(stopped)return;const owned=value.devices||[];setNetworkOwnedDevices(owned);const current=deviceRef.current;if(!pairingInProgressRef.current&&current?.mokoSetupVerified===true&&current?.hardwareId?.startsWith('MOKO:')&&!owned.some(item=>item.hardwareId===current.hardwareId)){deviceRef.current=null;setDevice(null);await storage.setDevice(null);await configureMokoConnection({hardwareId:current.hardwareId,enabled:false,useExistingPassword:true});setToast({type:'warning',text:'L’associazione del WB-001 è stata revocata. Per usarlo occorre una nuova associazione autorizzata.'});}}catch{if(!stopped)setNetworkOwnedDevices([]);}};
     refresh();const timer=setInterval(refresh,20000);return()=>{stopped=true;clearInterval(timer);};
   },[loaded,networkIdentity?.authToken,appVisible]);
 
@@ -1210,7 +1238,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     if (!next.privacyAccepted || !next.termsAccepted || !next.safetyNoticeAccepted) throw new Error(tx('v405.auth.acceptLegal'));
     if (!password || password.length < 8) throw new Error(tx('v405.auth.passwordLength'));
     const baseIdentity = networkIdentityRef.current || newNetworkIdentity();
-    const draftProfile = { ...profileRef.current, ...next, privacyPolicyVersion: CONFIG.privacyPolicyVersion, termsVersion: CONFIG.termsVersion, safetyNoticeVersion: CONFIG.safetyNoticeVersion, name: `${next.firstName} ${next.lastName}`.trim(), plan: 'basic', sosLocationEnabled: true, liveProtectionEnabled: false, onboardingComplete: true };
+    const draftProfile = { ...profileRef.current, ...next, privacyPolicyVersion: CONFIG.privacyPolicyVersion, termsVersion: CONFIG.termsVersion, safetyNoticeVersion: CONFIG.safetyNoticeVersion, name: `${next.firstName} ${next.lastName}`.trim(), plan: 'basic', networkObserverEnabled:true, sosLocationEnabled: true, liveProtectionEnabled: false, onboardingComplete: true };
     const registered = await registerWallaaAccount({ installationId: baseIdentity.installationId, profile: draftProfile, password, platform: Capacitor.getPlatform() });
     if (registered?.pendingVerification) return registered;
     const identity = { ...baseIdentity, userId: registered.userId, authToken: registered.authToken, qrToken: registered.qrToken || '', qrPayload: registered.qrPayload || '' };
@@ -1469,6 +1497,22 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     }).catch(error=>setToast({type:'error',text:error.message||'Apri Il mio pulsante per completare l’aggiornamento.'}));
   },[loaded,appVisible,pairingActive,activeAlert?.active,device?.hardwareId,device?.mokoSetupVerified,device?.mokoProfileVersion,networkIdentity?.userId,pairDevice]);
 
+  useEffect(()=>{
+    if(!loaded||!networkIdentity?.authToken||!profile?.onboardingComplete)return;
+    let active=true;
+    storage.getSafetyGuideSeen().then(async seen=>{const status=await getSafetyPermissions();if(active){setSafetyPermissions(status);if(!seen)setShowSafetyGuide(true);}}).catch(()=>{});
+    return()=>{active=false;};
+  },[loaded,networkIdentity?.authToken,profile?.onboardingComplete]);
+  const refreshSafetyPermissions=useCallback(async()=>{const status=await getSafetyPermissions();setSafetyPermissions(status);return status;},[]);
+  const activateSafetyPermissions=useCallback(async()=>{await requestLocationPermission();await ensureLocalNotificationPermission();await requestSafetyLocation();await refreshSafetyPermissions();await initializeAccountServices();},[refreshSafetyPermissions,initializeAccountServices]);
+  useEffect(()=>{if(!showSafetyGuide)return;const timer=setInterval(()=>refreshSafetyPermissions().catch(()=>{}),2000);return()=>clearInterval(timer);},[showSafetyGuide,refreshSafetyPermissions]);
+  const finishSafetyGuide=useCallback(async()=>{setShowSafetyGuide(false);await storage.setSafetyGuideSeen(true);},[]);
+  useEffect(()=>{
+    if(!loaded||!appVisible||!device?.hardwareId?.startsWith('MOKO:')||!networkIdentity?.authToken)return;
+    const send=()=>{if(pairingInProgressRef.current||deviceRef.current?.mokoSetupVerified===false)return;const current=deviceRef.current;sendDeviceHeartbeat(networkIdentityRef.current,{deviceId:current.id,hardwareId:current.hardwareId,claimToken:current.claimToken,status:mokoConnection.connected?'connected':'disconnected',battery:telemetryRef.current.battery,rssi:telemetryRef.current.rssi,lastSeenAt:telemetryRef.current.seenAt,notifyGuardians:false,health:{model:'WB-001',firmware:current.firmwareVersion,profileVersion:current.mokoProfileVersion,verified:current.mokoSetupVerified,ready:mokoConnection.ready,voltage:telemetryRef.current.batteryVoltageMv}}).catch(()=>{});};
+    const timer=setInterval(send,60000);return()=>clearInterval(timer);
+  },[loaded,appVisible,device?.hardwareId,networkIdentity?.authToken,mokoConnection.connected,mokoConnection.ready]);
+
   const disconnectDevice = useCallback(async () => {
     await stopBleScan(); setDevice(null); deviceRef.current = null; disconnectNotifiedRef.current = false; lastHeartbeatStatusRef.current = '';
     setTelemetry({ battery: null, rssi: null, seenAt: null }); await storage.setDevice(null);
@@ -1591,10 +1635,10 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
 
   return {
     loaded, profile, contacts, device, armed, trigger, activities, telemetry, pairingState, pairingError, busy, dispatchingAlert, dispatchStage, ready, toast, lastAlert,
-    networkIdentity, networkState, qrDataUrl, incomingAlert, sentinelOffer, connectionGuard, appearance, connectionStatus, lastSignalAgeSeconds,
+    networkIdentity, networkState, qrDataUrl, incomingAlert, incomingAlertMinimized, activeGuardianAlerts, acknowledgeIncomingAlert, openGuardianAlert, sentinelOffer, connectionGuard, appearance, connectionStatus, lastSignalAgeSeconds,
     messagePush,
     centralMessagePush,
-    refreshButtonStatus,pendingMokoDevice,resumeMokoSetup,pairingCandidates,selectPairingCandidate,cancelPairing,setupMokoDevice,networkOwnedDevices, networkDevice, setNetworkObserver, setDeviceNetworkTracking, mokoConnection, setMokoConnectionOptions, signalQuality, safetyLevel, activeAlert, resolvedAlert, systemHealth, currentLocation, locationStatus, authenticated: Boolean(networkIdentity?.authToken && profile?.onboardingComplete),
+    showSafetyGuide,safetyPermissions,activateSafetyPermissions,refreshSafetyPermissions,finishSafetyGuide,openSafetySettings,refreshButtonStatus,pendingMokoDevice,resumeMokoSetup,pairingCandidates,selectPairingCandidate,cancelPairing,setupMokoDevice,networkOwnedDevices, networkDevice, setNetworkObserver, setDeviceNetworkTracking, mokoConnection, setMokoConnectionOptions, signalQuality, safetyLevel, activeAlert, resolvedAlert, systemHealth, currentLocation, locationStatus, authenticated: Boolean(networkIdentity?.authToken && profile?.onboardingComplete),
     legalStatus, legalChecked, legalRequired, legalGatePending, legalError,
     setToast, setArmed, setTrigger, saveProfile, setGuardianMode, dismissResolvedAlert, completeOnboarding, loginAccount, signOut, acceptLegalUpdate, refreshLegalStatus, addOrUpdateContact, removeContact, pairDevice, disconnectDevice,
     fireAlert, closeActiveAlert, clearActivities, clearData, deleteAccount, refreshNetwork, scanNetworkQr, rotateQr, removeNetworkLink,

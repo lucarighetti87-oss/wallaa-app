@@ -292,3 +292,5 @@ export async function deleteWallaaConversation(identity, conversationId) {
 }
 
 export async function checkWallaaDeviceClaim(identity,device){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);try{return await api('/api/devices/check-claim',{method:'POST',identity,signal:controller.signal,body:{hardwareId:device.hardwareId,claimToken:device.claimToken||''}});}catch(error){if(error.name==='AbortError')throw new Error('Il servizio Wallaa non risponde. Riprova il collegamento.');throw error;}finally{clearTimeout(timer);}}
+
+export function getActiveGuardianAlerts(identity){return api('/api/network/alerts/active',{identity});}

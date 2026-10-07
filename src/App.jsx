@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import SafetyPermissionGuide from './components/SafetyPermissionGuide';
 import Toast from './components/Toast';
 import Modal from './components/Modal';
 import AlertResult from './components/AlertResult';
@@ -295,6 +296,7 @@ export default function App() {
     <div className={`app-shell-v4 screen-${screen}`}>
       {showTopBar && <V4TopBar onMenu={() => setDrawer(true)} onNotifications={() => navigateTo('notifications')} onHome={() => navigateTo('home')} t={t} />}
       <main ref={mainRef} className="app-main-v4"><div className="screen-transition" key={screen}>
+        {screen === 'home' && safe.activeGuardianAlerts?.length>0 && <section className="guardian-live-stack" aria-label="SOS dei tuoi contatti">{safe.activeGuardianAlerts.map(alert=><button key={alert.id} type="button" className="guardian-live-card" onClick={()=>safe.openGuardianAlert(alert.id).catch(e=>safe.setToast({type:'error',text:e.message}))}><span className="guardian-live-orbit">SOS</span><span><small>ALLARME ANCORA ATTIVO</small><strong>{alert.ownerName||'Un tuo contatto'}</strong><em>Apri allarme e posizione →</em></span></button>)}</section>}
         {screen === 'home' && <HomeV4Screen {...common} onSOSStart={() => setSosActivation(true)} onSOSCancel={() => { if (!safe.busy) setSosActivation(false); }} onSafetyCheck={() => setScreen('security-check')} />}
         {screen === 'security-check' && <SecurityCheckScreen {...common} onBack={() => setScreen('home')} onRefreshSystemHealth={safe.refreshSystemHealth} />}
         {screen === 'contacts' && <ContactsScreen contacts={safe.contacts} plan={safe.profile?.plan || 'basic'} t={t} onBack={() => setScreen('home')} onAdd={() => { setContactDraft(emptyContact); setContactModal(true); }} onEdit={(contact) => { setContactDraft(contact); setContactModal(true); }} />}
@@ -323,7 +325,7 @@ export default function App() {
             onDeleted={() => setSelectedConversation(null)}
           />
         )}
-        {screen === 'notifications' && <NotificationsScreen activities={safe.activities} onBack={()=>setScreen('home')} onClear={() => clearActivityFeed('notifications')} t={t} language={language} />}
+        {screen === 'notifications' && <NotificationsScreen activities={safe.activities} onOpenAlert={safe.openGuardianAlert} onBack={()=>setScreen('home')} onClear={() => clearActivityFeed('notifications')} t={t} language={language} />}
         {screen === 'network' && <NetworkScreen profile={safe.profile} networkState={safe.networkState} qrDataUrl={safe.qrDataUrl} onScan={async () => { try { await safe.scanNetworkQr(); setScreen('home'); } catch (error) { safe.setToast({ type:'error', text:error.message }); } }} onRotate={() => safe.rotateQr().catch((error) => safe.setToast({ type:'error', text:error.message }))} onRemoveLink={(id) => safe.removeNetworkLink(id).catch((error) => safe.setToast({ type:'error', text:error.message }))} onRefresh={() => safe.refreshNetwork().catch(() => {})} t={t} />}
         {screen === 'resolved-alert' && <ResolvedAlertScreen alert={safe.resolvedAlert} onHome={()=>{safe.dismissResolvedAlert();setScreen('home')}} />}
         {screen === 'active-alert' && <ActiveAlertScreen
@@ -365,9 +367,10 @@ export default function App() {
         </form>
       </Modal>
 
+      {safe.showSafetyGuide&&(!safe.incomingAlert||safe.incomingAlertMinimized)&&<SafetyPermissionGuide status={safe.safetyPermissions} onActivate={safe.activateSafetyPermissions} onRefresh={safe.refreshSafetyPermissions} onFinish={safe.finishSafetyGuide} onSettings={safe.openSafetySettings}/> }
       <Toast toast={safe.toast} onClose={() => safe.setToast(null)} t={t} />
       <AlertResult alert={result} onClose={() => setResult(null)} t={t} language={language} />
-      <IncomingAlert alert={safe.incomingAlert} onClose={() => safe.setIncomingAlert(null)} t={t} language={language} />
+      <IncomingAlert alert={safe.incomingAlertMinimized?null:safe.incomingAlert} onClose={safe.acknowledgeIncomingAlert} t={t} language={language} />
     </div>
   );
 }

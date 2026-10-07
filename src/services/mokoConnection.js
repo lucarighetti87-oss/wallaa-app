@@ -14,3 +14,7 @@ export async function getMokoConnectionStatus(options={}) {
 
 export async function beginMokoSetup(){if(supportsMokoConnection())await native.beginSetup();}
 export async function endMokoSetup(options={}){if(supportsMokoConnection())await native.endSetup(options);}
+
+export async function getSafetyPermissions(){return supportsMokoConnection()?native.permissions():{location:'not-determined',bluetooth:false,notifications:false,backgroundRefresh:false};}
+export async function requestSafetyLocation(){if(supportsMokoConnection())return native.requestLocation();}
+export async function openSafetySettings(){if(supportsMokoConnection())return native.openSettings();}

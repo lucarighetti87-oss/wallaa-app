@@ -15,10 +15,13 @@ export default function CentralSosChat({
   const [sending,setSending] = useState(false);
   const [error,setError] = useState('');
   const threadRef = useRef(null);
+  const requestRef = useRef(0);
+  const [serverActive,setServerActive] = useState(null);
+  const [syncError,setSyncError] = useState('');
   const stickRef = useRef(true);
 
   const alertId = alert?.id;
-  const active = Boolean(alert?.active);
+  const active = Boolean(alert?.active) && serverActive !== false;
 
   function nearBottom() {
     const el = threadRef.current;
@@ -34,12 +37,17 @@ export default function CentralSosChat({
   async function refresh(silent=false) {
     if (!alertId || !networkIdentity) return;
 
+    const request=++requestRef.current;
     try {
       const result = await getWallaaCentralMessages(
         networkIdentity,
         alertId
       );
 
+      if(request!==requestRef.current)return;
+      setSyncError('');
+      if(result?.alert)setServerActive(result.alert.status==='active');
+      else if(result?.conversation?.closed)setServerActive(false);
       const next = result?.messages || [];
       const shouldScroll =
         stickRef.current || nearBottom() || messages.length === 0;
@@ -52,14 +60,16 @@ export default function CentralSosChat({
         requestAnimationFrame(bottom);
       }
     } catch (e) {
+      if(request!==requestRef.current)return;
+      setSyncError('Aggiornamento non disponibile. Riproviamo automaticamente.');
       if (!silent) setError(e?.message || 'Chat Centrale non disponibile.');
     } finally {
-      if (!silent) setLoading(false);
+      if (request===requestRef.current) setLoading(false);
     }
   }
 
   useEffect(() => {
-    let alive = true;
+    let alive = true;setMessages([]);setText('');setServerActive(null);setLoading(true);
 
     (async () => {
       if (alive) await refresh(false);
@@ -69,10 +79,10 @@ export default function CentralSosChat({
       if (alive && document.visibilityState === 'visible') {
         refresh(true);
       }
-    }, 1200);
+    }, 3000);
 
     return () => {
-      alive = false;
+      alive = false;requestRef.current++;
       window.clearInterval(timer);
     };
   }, [
@@ -102,12 +112,14 @@ export default function CentralSosChat({
     stickRef.current = true;
 
     try {
-      await sendWallaaCentralMessage(
+      const result=await sendWallaaCentralMessage(
         networkIdentity,
         alertId,
         body
       );
 
+      requestRef.current++;
+      if(result?.message)setMessages(items=>items.some(m=>m.id===result.message.id)?items:[...items,result.message]);
       setText('');
       await refresh(true);
       requestAnimationFrame(bottom);
@@ -125,10 +137,10 @@ export default function CentralSosChat({
           <span className="wallaa-central-sos-kicker">
             CENTRALE WALLAA
           </span>
-          <strong>Assistenza durante il tuo SOS</strong>
+          <strong>Chat con la Centrale</strong>
           <p>
             {active
-              ? 'Comunica direttamente con la Centrale Wallaa.'
+              ? 'Questo canale collega te e la Centrale durante il SOS.'
               : 'Conversazione conclusa.'}
           </p>
         </div>
@@ -173,7 +185,7 @@ export default function CentralSosChat({
                           'it-IT',
                           { hour:'2-digit', minute:'2-digit' }
                         )
-                      : ''}
+                      : ''}{!central?' · Inviato':''}
                   </time>
                 </div>
               </div>
@@ -191,12 +203,14 @@ export default function CentralSosChat({
         )}
       </div>
 
+      {syncError && <div className="wallaa-chat-sync" role="status">{syncError}</div>}
       {error && (
-        <div className="wallaa-central-error">
+        <div className="wallaa-central-error" role="alert">
           {error}
         </div>
       )}
 
+      {!active && <p className="wallaa-chat-sync">SOS concluso · puoi leggere i messaggi, ma non inviarne altri.</p>}
       {active && (
         <form
           className="wallaa-central-composer"
@@ -207,6 +221,7 @@ export default function CentralSosChat({
             onChange={(e) => setText(e.target.value)}
             placeholder="Scrivi alla Centrale Wallaa…"
             maxLength={4000}
+            aria-label="Messaggio alla Centrale"
             rows={2}
             disabled={sending}
             onFocus={() => {
@@ -222,6 +237,7 @@ export default function CentralSosChat({
           </button>
         </form>
       )}
+      {active && <small className="wallaa-chat-delivery-note">Inviato indica un messaggio salvato; non conferma che sia già stato letto.</small>}
     </section>
   );
 }
