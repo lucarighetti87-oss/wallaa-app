@@ -5,7 +5,7 @@ export async function prepareMokoButton({device,ble,password=MOKO_FACTORY_PASSWO
  const controller=new AbortController();
  const cancel=()=>controller.abort(signal?.reason||new Error('Associazione annullata.'));
  signal?.addEventListener('abort',cancel,{once:true});if(signal?.aborted)cancel();
- let pending=null,pressPending=null,ending=false,lastCounter=null,proofActive=false;
+ let pending=null,pressPending=null,ending=false,lastCounter=null,proofActive=false,stage='collegamento';
  const overall=setTimeout(()=>controller.abort(new Error('Configurazione interrotta: riprova con il pulsante vicino.')),150000);
  function abort(){const error=controller.signal.reason||new Error('Associazione interrotta.');pending?.reject(error);pressPending?.reject(error);}
  controller.signal.addEventListener('abort',abort);
@@ -39,10 +39,12 @@ export async function prepareMokoButton({device,ble,password=MOKO_FACTORY_PASSWO
   ensure();onProgress('checking');const eligibility=await bounded(checkOwnership(device),15000);if(eligibility?.allowed!==true)throw new Error('Non ho confermato la disponibilità del pulsante per il tuo account.');ensure();onProgress('connecting');
   await bounded(ble.connect(device.id,()=>{if(!ending)controller.abort(new Error('Pulsante scollegato durante la configurazione.'));},{timeout:commandTimeout}));
   ensure();
+  if(ble.discoverServices)await bounded(ble.discoverServices(device.id));
   const services=await bounded(ble.getServices(device.id));
   const match=(value,expected)=>{const v=String(value||'').toLowerCase();return v===expected||(/^[0-9a-f]{4}$/.test(v)&&mokoUuid(v)===expected);};
   const service=services.find(s=>match(s.uuid,MOKO_GATT.service));
   for(const uuid of [MOKO_GATT.custom,MOKO_GATT.password,MOKO_GATT.events])if(!service?.characteristics?.some(c=>match(c.uuid,uuid)))throw new Error('Questo pulsante non supporta la configurazione Wallaa.');
+  stage='autenticazione';
   await bounded(ble.startNotifications(device.id,MOKO_GATT.service,MOKO_GATT.password,onReply));
   await bounded(ble.startNotifications(device.id,MOKO_GATT.service,MOKO_GATT.custom,onReply));
   onProgress('authenticating');
@@ -52,8 +54,14 @@ export async function prepareMokoButton({device,ble,password=MOKO_FACTORY_PASSWO
   const actual='MOKO:'+Array.from(mac).map(n=>n.toString(16).padStart(2,'0').toUpperCase()).join('');
   if(actual!==device.hardwareId)throw new Error('Il pulsante collegato non corrisponde a quello selezionato.');
   const text=async uuid=>new TextDecoder().decode(mokoBytes(await bounded(ble.read(device.id,MOKO_GATT.info,mokoUuid(uuid),{timeout:commandTimeout})))).replace(/\0+$/g,'').trim();
-  const [software,firmware]=await Promise.all([text('2a28'),text('2a26')]);
+  stage='informazioni del pulsante';
+  if(ble.discoverServices)await bounded(ble.discoverServices(device.id));
+  const refreshed=await bounded(ble.getServices(device.id));
+  const infoService=refreshed.find(s=>match(s.uuid,MOKO_GATT.info));
+  for(const uuid of ['2a28','2a26'])if(!infoService?.characteristics?.some(c=>match(c.uuid,mokoUuid(uuid))))throw new Error('Le informazioni del pulsante non sono disponibili. Chiudi l’app MOKO e riprova.');
+  const software=await text('2a28'),firmware=await text('2a26');
   if(software!=='BXP-B-D'||!/^V?2\./i.test(firmware))throw new Error('Questa versione del pulsante richiede una verifica di compatibilità Wallaa.');
+  stage='pressione di conferma';
   await bounded(ble.startNotifications(device.id,MOKO_GATT.service,MOKO_GATT.events,value=>{
    const counter=mokoConnectionCounter(value);if(counter===null)return;
    const previous=lastCounter;lastCounter=counter;onCounter(counter);
@@ -75,7 +83,7 @@ export async function prepareMokoButton({device,ble,password=MOKO_FACTORY_PASSWO
   if(ownership?.hardwareId!==device.hardwareId||typeof ownership?.claimToken!=='string'||!ownership.claimToken)throw new Error('L’associazione del pulsante non è stata confermata dal servizio Wallaa.');
   const claimed={...device,hardwareId:ownership.hardwareId||device.hardwareId,claimToken:ownership.claimToken,mokoSetupVerified:false,mokoContinuousEnabled:true,pairingButtonEvent:'press',name:'Wallaa Button',monitorMode:'event-only',permanentOwnership:true};
   await bounded(onClaim(claimed));ensure();
-  onProgress('configuring');
+  stage='impostazioni';onProgress('configuring');
   for(const step of MOKO_SINGLE_CLICK_PROFILE){
    const current=await read(step.command,step.read);
    if(equalMokoBytes(current,step.expected))continue;
@@ -86,6 +94,9 @@ export async function prepareMokoButton({device,ble,password=MOKO_FACTORY_PASSWO
   }
   onProgress('verifying');ensure();
   return {...claimed,mokoProfileVersion:MOKO_PROFILE_VERSION,mokoSetupVerifiedAt:new Date().toISOString(),mokoConnectionBaseline:lastCounter,softwareVersion:software,firmwareVersion:firmware};
+ }catch(error){
+  if(/Characteristic not found/i.test(error.message||''))throw new Error(`Collegamento Bluetooth incompleto (${stage}). Chiudi l’app MOKO e riprova con il pulsante vicino.`);
+  throw error;
  }finally{
   ending=true;clearTimeout(overall);signal?.removeEventListener('abort',cancel);controller.signal.removeEventListener('abort',abort);
   pending?.reject(new Error('Associazione conclusa.'));pressPending?.reject(new Error('Associazione conclusa.'));

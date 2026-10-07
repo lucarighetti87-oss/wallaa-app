@@ -11,7 +11,8 @@ function fixture(options={}){
  const emit=count=>callbacks.get(MOKO_GATT.events)?.(view([0xeb,2,6,1,count]));
  const ble={
   async connect(){connections++;},async disconnect(){},async stopNotifications(){},
-  async getServices(){return [{uuid:'AA00',characteristics:['AA01','AA07','AA08'].map(uuid=>({uuid,properties:{read:uuid==='AA08'&&!options.noRead}}))}];},
+  async discoverServices(){},
+  async getServices(){return [{uuid:'AA00',characteristics:['AA01','AA07','AA08'].map(uuid=>({uuid,properties:{read:uuid==='AA08'&&!options.noRead}}))},{uuid:'180A',characteristics:(options.missingInfo?[]:['2A28','2A26']).map(uuid=>({uuid}))}];},
   async startNotifications(id,service,char,callback){callbacks.set(char,callback);},
   async read(id,service,char){
    if(char===MOKO_GATT.events)return view([0xeb,2,6,1,0]);
@@ -71,3 +72,5 @@ test('successful write acknowledgements alone do not bypass readback verificatio
 });
 
 test('a successful HTTP response without positive eligibility cannot start Bluetooth setup',async()=>{const f=fixture({unconfirmedOwner:true});await assert.rejects(prepareMokoButton(f.args),/disponibilità/);assert.equal(f.connections,0);});
+
+test('missing Device Information is explained before claim and settings writes',async()=>{const f=fixture({missingInfo:true});await assert.rejects(prepareMokoButton(f.args),/informazioni del pulsante/);assert.equal(f.claims,0);assert.ok(!f.stages.includes('configuring'));});
