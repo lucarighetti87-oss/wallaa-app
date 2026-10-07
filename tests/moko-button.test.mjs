@@ -38,3 +38,5 @@ test('restart restores counters, unknown streams baseline, standby and wrap beha
  let r=consumeMokoFrame(parseMokoAlarm(alarm(65535,1)),{});assert.equal(r.emit,false);
  assert.equal(consumeMokoFrame(parseMokoAlarm(alarm(0)),JSON.parse(JSON.stringify(r.counters))).emit,true);
 });
+
+test('a standby frame preceding the alarm does not swallow the first physical click',()=>{const standby=consumeMokoFrame(parseMokoAlarm(alarm(2,1)),{'32':1});assert.equal(standby.emit,false);const triggered=consumeMokoFrame(parseMokoAlarm(alarm(2)),standby.counters);assert.equal(triggered.emit,true);assert.equal(consumeMokoFrame(parseMokoAlarm(alarm(2)),triggered.counters).emit,false);});

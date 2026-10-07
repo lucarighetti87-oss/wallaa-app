@@ -32,9 +32,10 @@ window.fetch=async(input)=>{
 
 function Harness(){
  const [push,setPush]=useState(offer);
+ const [selected,setSelected]=useState(null);
  const clear=useCallback(()=>setPush(null),[]);
  const identity={installationId:'ui-test',authToken:'test-only'};
- if(parameters.get('screen')==='device')return <DeviceScreen device={parameters.has('empty')?null:{id:'test',protocol:parameters.has('legacy')?'bthome':'moko-button',hardwareId:parameters.has('legacyHash')?'LEGACY-TESTOLD':parameters.has('unidentified')?'':parameters.has('legacy')?'BTHOME:123':'MOKO:785005009F8B',mokoSetupVerified:!parameters.has('incomplete')}} telemetry={{}} pairingState={parameters.get('state')||'idle'} connectionStatus={parameters.has('incomplete')?'setup-required':'connected'} trigger='press' mokoConnection={{state:'ready'}} onCancelPair={()=>{}}/>;
+ if(parameters.get('screen')==='device')return <DeviceScreen device={parameters.has('empty')?null:{id:'test',protocol:parameters.has('legacy')?'bthome':'moko-button',hardwareId:parameters.has('legacyHash')?'LEGACY-TESTOLD':parameters.has('unidentified')?'':parameters.has('legacy')?'BTHOME:123':'MOKO:785005009F8B',mokoSetupVerified:!parameters.has('incomplete')}} telemetry={{}} pairingError={parameters.has('setupError')?'Collegamento non riuscito. Ripeti la procedura.':''} pairingState={selected?'connecting':parameters.get('state')||'idle'} pairingCandidates={[{id:'near-one',hardwareId:'MOKO:785005009F8B',rssi:-67},{id:'near-two',hardwareId:'MOKO:785005009F76',rssi:-100}]} onSelectCandidate={setSelected} connectionStatus={parameters.has('incomplete')?'setup-required':'connected'} trigger='press' mokoConnection={{state:'ready'}} onCancelPair={()=>{}}/>;
  if(parameters.get('screen')==='sentinel')return <div className="app-shell-v4"><SentinelScreen networkIdentity={identity} sentinelOffer={push} clearSentinelOffer={clear} currentLocation={{latitude:45,longitude:9}} setToast={()=>{}} profile={{plan:'pro'}}/></div>;
  return <div className="app-shell-v4 screen-messages"><div className="app-main-v4"><div className="screen-transition"><MessagesScreen networkIdentity={identity} onOpenChat={()=>{}}/></div></div><nav className="v4-bottom-nav">Navigation</nav></div>;
 }

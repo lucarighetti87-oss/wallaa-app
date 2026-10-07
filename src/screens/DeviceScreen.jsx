@@ -4,9 +4,9 @@ import WallaaButton3D from '../components/WallaaButton3D';
 
 import WallaaBrandShield from '../components/WallaaBrandShield';
 function signalLabel(value){return value||'—';}
-function connectionLabel(status){if(status==='setup-required')return'Da configurare';if(status==='connected')return'Connesso';if(status==='standby')return'Pronto';if(status==='weak')return'Segnale debole';return'Disconnesso';}
+function connectionLabel(status){if(status==='setup-required')return'Da configurare';if(status==='connected')return'Connesso';if(status==='searching')return'Collegamento in corso';if(status==='protection-off')return'Protezione disattivata';if(status==='standby')return'Pronto';if(status==='weak')return'Segnale debole';return'Disconnesso';}
 
-export default function DeviceScreen({ pendingMokoDevice, onResumeSetup, pairingCandidates = [], onSelectCandidate, onCancelPair, onMokoSetup, networkOwnedDevices = [], networkDevice, onNetworkTracking, mokoConnection, onMokoConfigure, device, telemetry, pairingState, onPair, connectionStatus, signalQuality, trigger, onTrigger, onBack, onHome }) {
+export default function DeviceScreen({ pairingError='', pendingMokoDevice, onResumeSetup, pairingCandidates = [], onSelectCandidate, onCancelPair, onMokoSetup, networkOwnedDevices = [], networkDevice, onNetworkTracking, mokoConnection, onMokoConfigure, device, telemetry, pairingState, onPair, connectionStatus, signalQuality, trigger, onTrigger, onBack, onHome }) {
   const [mokoPassword, setMokoPassword] = useState('');
   const isMoko=Boolean(device && (device.protocol==='moko-button'||device.hardwareId?.startsWith('MOKO:')||/^MK Button$/i.test(device.advertisedName||'')||!device.hardwareId||/^LEGACY-/i.test(device.hardwareId)));
   const needsSetup=isMoko && (!device.hardwareId?.startsWith('MOKO:')||device.mokoSetupVerified!==true);
@@ -14,6 +14,7 @@ export default function DeviceScreen({ pendingMokoDevice, onResumeSetup, pairing
   const setupBusy=['scanning','found','selecting','checking','connecting','authenticating','awaiting_press','confirm_press','claiming','configuring','verifying','checking_signal','restoring'].includes(pairingState);
   useEffect(()=>()=>onCancelPair?.(),[onCancelPair]);
   const setupProgress=<>
+    {pairingError && <p className="mk1-setup-status" role="alert">{pairingError}</p>}
     {setupLabels[pairingState] && <p className="mk1-setup-status" role="status">{setupLabels[pairingState]}</p>}
     {pairingState==='selecting' && <div className="mk1-candidates">{pairingCandidates.map(candidate=><button type="button" key={candidate.id} onClick={()=>onSelectCandidate?.(candidate)}><Bluetooth/><span>Pulsante vicino · {candidate.hardwareId?.slice(-4)}</span><small>Segnale {candidate.rssi??'—'} dBm</small></button>)}</div>}
     {pairingState==='password_error' && <label>Password del pulsante<input className="input" type="password" autoComplete="off" value={mokoPassword} onChange={event=>setMokoPassword(event.target.value)} placeholder="Solo se è stata modificata"/></label>}
