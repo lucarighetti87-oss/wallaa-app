@@ -1,3 +1,5 @@
+import {setUiLanguage} from './uiText.js';
+import {uiText,uiLocale} from './uiText.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import SafetyPermissionGuide from './components/SafetyPermissionGuide';
 import Toast from './components/Toast';
@@ -150,6 +152,7 @@ export default function App() {
   const [splashMinDone, setSplashMinDone] = useState(false);
   const mainRef = useRef(null);
   const language = safe.profile?.language || detectDeviceLanguage();
+  setUiLanguage(language);
   const t = useCallback((key, vars) => translate(language, key, vars), [language]);
 
   useEffect(() => {
@@ -356,7 +359,7 @@ export default function App() {
       <Modal open={contactModal} title={contactDraft.id ? t('v4.guardian.edit') : t('v4.guardian.new')} onClose={() => setContactModal(false)} className="guardian-editor-sheet">
         <form className="modal-form guardian-modal-form" onSubmit={submitContact}>
           <label>{t('v4.guardian.name')}<input className="input" value={contactDraft.name} onChange={(e) => setContactDraft({ ...contactDraft, name:e.target.value })} placeholder={t('v4.guardian.namePlaceholder')} autoFocus /></label>
-          <label>Email<input className="input" type="email" value={contactDraft.email} onChange={(e) => setContactDraft({ ...contactDraft, email:e.target.value })} placeholder="guardian@email.com" /></label>
+          <label>{"" + uiText("Email") + ""}<input className="input" type="email" value={contactDraft.email} onChange={(e) => setContactDraft({ ...contactDraft, email:e.target.value })} placeholder="guardian@email.com" /></label>
           <label>{t('v4.guardian.phone')}<input className="input" type="tel" value={contactDraft.phone} onChange={(e) => setContactDraft({ ...contactDraft, phone:e.target.value })} placeholder="+39…" /></label>
           <label>{t('v4.guardian.role')}<select className="input" value={contactDraft.role||'guardian'} onChange={(e)=>setContactDraft({...contactDraft,role:e.target.value})}><option value="guardian">{t('v4.guardian.guardian')}</option><option value="primary">{t('v4.guardian.primary')}</option></select></label>
           <div className="guardian-permission-editor">

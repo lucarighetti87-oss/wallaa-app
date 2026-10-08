@@ -1,7 +1,6 @@
 import { CONFIG } from '../config';
-import { getCurrentLocation } from './location';
+import { getCurrentLocation,getCachedLocation } from './location';
 
-const uiBeat = (ms = 180) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function sendWallaaAlert({ profile, contacts, trigger, device, networkIdentity, eventPacketId = null, locationEnabled = true, onProgress = null }) {
   const validContacts = contacts.filter((c) => c.email?.trim() && c.permissions?.sosAlerts !== false);
@@ -9,10 +8,9 @@ export async function sendWallaaAlert({ profile, contacts, trigger, device, netw
     throw new Error('Aggiungi almeno un contatto email abilitato agli SOS o collega una persona nella Rete Wallaa.');
   }
 
-  let location = null;
-  if (locationEnabled) {
+  let location = locationEnabled?getCachedLocation():null;
+  if (locationEnabled && !location) {
     onProgress?.('location');
-    await uiBeat(220);
     let timer;
     try { location = await Promise.race([getCurrentLocation(), new Promise(resolve => { timer = setTimeout(() => resolve(null), 1500); })]); }
     catch { location = null; }
@@ -21,7 +19,6 @@ export async function sendWallaaAlert({ profile, contacts, trigger, device, netw
   const fullName = [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim();
 
   onProgress?.('guardians');
-  await uiBeat(260);
   const response = await fetch(CONFIG.apiUrl, {
     method: 'POST',
     headers: {

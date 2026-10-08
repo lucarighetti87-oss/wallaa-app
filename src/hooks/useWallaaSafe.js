@@ -469,7 +469,6 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       }
       if (event !== 'manual_test') {
         setDispatchStage('complete');
-        await new Promise((resolve) => setTimeout(resolve, 700));
       }
       return alertResult;
     } catch (error) {

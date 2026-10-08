@@ -1,3 +1,4 @@
+import {uiText,uiLocale} from '../uiText.js';
 import { Building2, LockKeyhole, Mail, MoreHorizontal, Phone, Plus, ShieldCheck, Star, UserRound, UsersRound } from 'lucide-react';
 
 function permissionCount(contact) {
@@ -34,7 +35,7 @@ export default function ContactsScreen({ contacts, onAdd, onEdit, t, plan = 'bas
           <a href="mailto:safety@wallaasafety.com"><Mail size={13}/>safety@wallaasafety.com</a>
           <small>{t('v410.center.disclaimer')}</small>
         </div>
-      </section> : <section className="v410-operating-center v412-basic-center"><div className="v410-center-icon"><LockKeyhole size={21}/></div><div className="v410-center-copy"><div className="v410-center-title"><strong>Wallaa Operating Center</strong><span>PRO</span></div><p>{t('v412.center.basicBody')}</p></div></section>}
+      </section> : <section className="v410-operating-center v412-basic-center"><div className="v410-center-icon"><LockKeyhole size={21}/></div><div className="v410-center-copy"><div className="v410-center-title"><strong>{"" + uiText("Wallaa Operating Center") + ""}</strong><span>PRO</span></div><p>{t('v412.center.basicBody')}</p></div></section>}
 
       <div className="contacts-v4-list">
         {contacts.map((contact) => (

@@ -1,3 +1,4 @@
+import {uiText,uiLocale} from '../uiText.js';
 import { useEffect, useMemo, useState } from 'react';
 import {
   BellRing,
@@ -108,8 +109,8 @@ function SosSentinelMap({ userLocation, sentinel }){
     return (
       <div className="aa-sentinel-map aa-sentinel-map-empty">
         <Navigation/>
-        <strong>Localizzazione Sentinel…</strong>
-        <small>La posizione comparirà appena disponibile.</small>
+        <strong>{"" + uiText("Localizzazione Sentinel…") + ""}</strong>
+        <small>{"" + uiText("La posizione comparirà appena disponibile.") + ""}</small>
       </div>
     );
   }
@@ -197,7 +198,7 @@ function SosSentinelMap({ userLocation, sentinel }){
         }}
       >
         <i/>
-        <span>TU</span>
+        <span>{"" + uiText("TU") + ""}</span>
       </div>
 
       <div
@@ -326,7 +327,7 @@ export default function ActiveAlertScreen({
 
   return (
     <div className="aa-focus aa-sos-active-screen">
-      {alert?.location?.approximate && <p className="v402-privacy-note">Zona indicativa rilevata dalla rete Wallaa. La posizione proviene da un telefono che ha visto il pulsante nelle vicinanze.</p>}
+      {alert?.location?.approximate && <p className="v402-privacy-note">{"" + uiText("Zona indicativa rilevata dalla rete Wallaa. La posizione proviene da un telefono che ha visto il pulsante nelle vicinanze.") + ""}</p>}
       <div
         className="aa-sos-network-bg"
         aria-hidden="true"
@@ -337,7 +338,7 @@ export default function ActiveAlertScreen({
           type="button"
           className="aa-wordmark compact aa-wordmark-home"
           onClick={onHome}
-          aria-label="Torna alla Home"
+          aria-label={uiText("Torna alla Home")}
         >
           <WallaaBrandShield alt="Wallaa" />
           <span>
@@ -346,8 +347,8 @@ export default function ActiveAlertScreen({
           </span>
         </button>
 
-        <h1>SOS ATTIVO</h1>
-        <p>La nostra squadra è con te.</p>
+        <h1>{"" + uiText("SOS ATTIVO") + ""}</h1>
+        <p>{"" + uiText("La nostra squadra è con te.") + ""}</p>
       </header>
 
       <section className="aa-live-sos">
@@ -367,14 +368,12 @@ export default function ActiveAlertScreen({
 
             <div>
               <small>WALLAA SENTINEL</small>
-              <h2>Sentinel in arrivo</h2>
+              <h2>{"" + uiText("Sentinel in arrivo") + ""}</h2>
               <p>
                 {sentinel.name || 'Wallaa Sentinel'}
                 {sentinel.verified ? (
                   <span className="aa-sentinel-verified">
-                    <CheckCircle2/>
-                    Verificata
-                  </span>
+                    <CheckCircle2/>{"" + uiText("Verificata") + " "}</span>
                 ) : null}
               </p>
             </div>
@@ -387,21 +386,21 @@ export default function ActiveAlertScreen({
 
           <div className="aa-sentinel-stats">
             <div>
-              <small>DISTANZA</small>
+              <small>{"" + uiText("DISTANZA") + ""}</small>
               <strong>{formatDistance(shownDistance)}</strong>
             </div>
 
             <div>
-              <small>ARRIVO STIMATO</small>
+              <small>{"" + uiText("ARRIVO STIMATO") + ""}</small>
               <strong>{formatEta(sentinel.etaSeconds)}</strong>
             </div>
 
             <div>
-              <small>STATO</small>
+              <small>{"" + uiText("STATO") + ""}</small>
               <strong>
                 {sentinel.status === 'arrived'
-                  ? 'Arrivata'
-                  : 'In arrivo'}
+                  ? uiText("Arrivata")
+                  : uiText("In arrivo")}
               </strong>
             </div>
           </div>
@@ -409,11 +408,11 @@ export default function ActiveAlertScreen({
           <div className="aa-sentinel-live-status">
             <i/>
             <span>
-              <strong>Posizione Sentinel live</strong>
+              <strong>{"" + uiText("Posizione Sentinel live") + ""}</strong>
               <small>
                 {sentinel.presenceAgeSec != null
-                  ? `Aggiornata ${sentinel.presenceAgeSec}s fa`
-                  : 'Aggiornamento in corso'}
+                  ? uiText("Aggiornata {value0}s fa",{value0:(sentinel.presenceAgeSec)})
+                  : uiText("Aggiornamento in corso")}
               </small>
             </span>
           </div>
@@ -430,9 +429,7 @@ export default function ActiveAlertScreen({
                 closed: false
               })}
             >
-              <MessageCircle size={18}/>
-              Chat con la Sentinel
-            </button>
+              <MessageCircle size={18}/>{"" + uiText("Chat con la Sentinel") + " "}</button>
           )}
         </section>
       )}
@@ -442,8 +439,8 @@ export default function ActiveAlertScreen({
           <i className="red"><BellRing/></i>
           <time>{time}</time>
           <span>
-            <strong>SOS attivato</strong>
-            <small>Segnale inviato alla centrale</small>
+            <strong>{"" + uiText("SOS attivato") + ""}</strong>
+            <small>{"" + uiText("Segnale inviato alla centrale") + ""}</small>
           </span>
         </div>
 
@@ -451,8 +448,8 @@ export default function ActiveAlertScreen({
           <i><Radio/></i>
           <time>+01</time>
           <span>
-            <strong>Centrale operativa notificata</strong>
-            <small>La richiesta è stata presa in carico</small>
+            <strong>{"" + uiText("Centrale operativa notificata") + ""}</strong>
+            <small>{"" + uiText("La richiesta è stata presa in carico") + ""}</small>
           </span>
         </div>
 
@@ -462,11 +459,11 @@ export default function ActiveAlertScreen({
           </i>
           <time>+02</time>
           <span>
-            <strong>Contatti di emergenza avvisati</strong>
+            <strong>{"" + uiText("Contatti di emergenza avvisati") + ""}</strong>
             <small>
               {delivered
-                ? `${delivered} notifiche inviate`
-                : 'Invio in corso'}
+                ? uiText("{value0} notifiche inviate",{value0:(delivered)})
+                : uiText("Invio in corso")}
             </small>
           </span>
         </div>
@@ -475,10 +472,8 @@ export default function ActiveAlertScreen({
           <i className="green"><MapPin/></i>
           <time>LIVE</time>
           <span>
-            <strong>Posizione condivisa</strong>
-            <small>
-              In tempo reale con centrale e contatti
-            </small>
+            <strong>{"" + uiText("Posizione condivisa") + ""}</strong>
+            <small>{"" + uiText("In tempo reale con centrale e contatti") + " "}</small>
           </span>
         </div>
 
@@ -487,10 +482,9 @@ export default function ActiveAlertScreen({
             <i className="green"><ShieldCheck/></i>
             <time>LIVE</time>
             <span>
-              <strong>Sentinel assegnata</strong>
+              <strong>{"" + uiText("Sentinel assegnata") + ""}</strong>
               <small>
-                {sentinel.name || 'Wallaa Sentinel'} è in arrivo
-              </small>
+                {sentinel.name || 'Wallaa Sentinel'}{"" + uiText("è in arrivo") + " "}</small>
             </span>
           </div>
         )}
@@ -506,15 +500,12 @@ export default function ActiveAlertScreen({
         <X/>
         <strong>
           {busy
-            ? 'Chiusura in corso…'
-            : 'Sono al sicuro / chiudi SOS'}
+            ? uiText("Chiusura in corso…")
+            : uiText("Sono al sicuro / chiudi SOS")}
         </strong>
       </HoldToConfirmButton>
 
-      <p className="aa-focus-note">
-        La centrale è già stata allertata. Usa questo comando solo
-        quando la situazione è realmente risolta.
-      </p>
+      <p className="aa-focus-note">{"" + uiText("La centrale è già stata allertata. Usa questo comando solo quando la situazione è realmente risolta.") + " "}</p>
 
       <CentralSosChat
         alert={alert}

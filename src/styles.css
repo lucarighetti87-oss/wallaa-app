@@ -8249,7 +8249,7 @@ html.ios-keyboard-open .wallaa-new-chat-backdrop .wallaa-new-chat-results {
 .app-shell-v4 .sentinel-page h1,
 .app-shell-v4 .sentinel-page h2 {color:#edf7ff!important;}
 
-.mk1-setup-status{padding:14px;border:1px solid #23506a;border-radius:14px;color:#eaf8ff!important;background:#061b29;line-height:1.5}.mk1-candidates{display:grid;gap:10px;margin:12px 0}.mk1-candidates button{display:grid;grid-template-columns:24px 1fr;gap:8px;text-align:left;padding:14px;border:1px solid #23506a;border-radius:14px;background:#061b29;color:#edf7ff}.mk1-candidates small{grid-column:2;color:#a5bece}.mk1-setup-card h2{color:#edf7ff!important}
+.wb001-setup-status{padding:14px;border:1px solid #23506a;border-radius:14px;color:#eaf8ff!important;background:#061b29;line-height:1.5}.wb001-candidates{display:grid;gap:10px;margin:12px 0}.wb001-candidates button{display:grid;grid-template-columns:24px 1fr;gap:8px;text-align:left;padding:14px;border:1px solid #23506a;border-radius:14px;background:#061b29;color:#edf7ff}.wb001-candidates small{grid-column:2;color:#a5bece}.wb001-setup-card h2{color:#edf7ff!important}
 
 /* WB-001: one typography and spacing scale, isolated from legacy settings cards. */
 .app-shell-v4 .wb-device-screen,.app-shell-v4 .wb-device-details{font-family:inherit!important;display:flex!important;flex-direction:column!important;gap:16px!important}

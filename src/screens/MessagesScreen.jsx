@@ -1,3 +1,4 @@
+import {uiText,uiLocale} from '../uiText.js';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -90,7 +91,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
       const result = await getWallaaConversations(networkIdentity);
       setConversations(Array.isArray(result?.conversations) ? result.conversations : []);
     } catch (e) {
-      setError(e?.message || 'Impossibile caricare le conversazioni.');
+      setError(e?.message || uiText("Impossibile caricare le conversazioni."));
     } finally {
       setLoading(false);
     }
@@ -112,7 +113,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
       try{
         const result=await getWallaaMessageUsers(networkIdentity,value);
         if(active)setUsers(Array.isArray(result?.users)?result.users:[]);
-      }catch(e){if(active)setError(e?.message||'Ricerca utenti non disponibile.');}
+      }catch(e){if(active)setError(e?.message||uiText("Ricerca utenti non disponibile."));}
       finally{if(active)setSearching(false);}
     },300);
     return()=>{active=false;clearTimeout(timer);};
@@ -124,7 +125,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
     if (!conversation?.id) return;
 
     const confirmed = window.confirm(
-      `Eliminare definitivamente la conversazione con ${conversation.name || 'questo utente'}?`
+      uiText("Eliminare definitivamente la conversazione con {value0}?",{value0:(conversation.name || 'questo utente')})
     );
 
     if (!confirmed) return;
@@ -136,7 +137,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
         items.filter((item) => item.id !== conversation.id)
       );
     } catch (e) {
-      setError(e?.message || 'Impossibile eliminare la conversazione.');
+      setError(e?.message || uiText("Impossibile eliminare la conversazione."));
     }
   };
 
@@ -151,7 +152,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
       const conversation = result?.conversation;
 
       if (!conversation?.id) {
-        throw new Error('Conversazione non disponibile.');
+        throw new Error(uiText("Conversazione non disponibile."));
       }
 
       setNewChatOpen(false);
@@ -161,7 +162,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
       await loadConversations();
       onOpenChat(conversation);
     } catch (e) {
-      setError(e?.message || 'Impossibile creare la conversazione.');
+      setError(e?.message || uiText("Impossibile creare la conversazione."));
     } finally {
       setCreating(false);
     }
@@ -172,15 +173,15 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
       <header className="wallaa-messages-heading">
         <div className="v4-screen-heading">
           <span>WALLAA CONNECT</span>
-          <h1>Messaggi</h1>
-          <p>Messaggi e conversazioni associate al tuo account Wallaa.</p>
+          <h1>{"" + uiText("Messaggi") + ""}</h1>
+          <p>{"" + uiText("Messaggi e conversazioni associate al tuo account Wallaa.") + ""}</p>
         </div>
 
         <button
           type="button"
           className="wallaa-new-chat-button"
           onClick={() => setNewChatOpen(true)}
-          aria-label="Nuova conversazione"
+          aria-label={uiText("Nuova conversazione")}
         >
           <Plus size={22} />
         </button>
@@ -198,7 +199,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
         onClick={() => setNewChatOpen(true)}
       >
         <Search size={17} />
-        <span>Cerca un utente Wallaa</span>
+        <span>{"" + uiText("Cerca un utente Wallaa") + ""}</span>
       </button>
 
       <section className="wallaa-message-security">
@@ -207,31 +208,27 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
         </div>
         <div>
           <strong>Wallaa Connect</strong>
-          <span>
-            Qui trovi soltanto conversazioni reali associate al tuo account.
-          </span>
+          <span>{"" + uiText("Qui trovi soltanto conversazioni reali associate al tuo account.") + " "}</span>
         </div>
       </section>
 
       <div className="wallaa-message-section-title">
-        <span>CONVERSAZIONI</span>
+        <span>{"" + uiText("CONVERSAZIONI") + ""}</span>
       </div>
 
       {loading ? (
         <section className="wallaa-messages-empty">
           <div><MessageCircle size={29} /></div>
-          <strong>Aggiornamento…</strong>
-          <p>Recupero delle tue conversazioni.</p>
+          <strong>{"" + uiText("Aggiornamento…") + ""}</strong>
+          <p>{"" + uiText("Recupero delle tue conversazioni.") + ""}</p>
         </section>
       ) : conversations.length === 0 ? (
         <section className="wallaa-messages-empty">
           <div><MessageCircle size={29} /></div>
-          <strong>Nessuna conversazione</strong>
-          <p>Avvia una nuova conversazione con un utente Wallaa.</p>
+          <strong>{"" + uiText("Nessuna conversazione") + ""}</strong>
+          <p>{"" + uiText("Avvia una nuova conversazione con un utente Wallaa.") + ""}</p>
           <button type="button" onClick={() => setNewChatOpen(true)}>
-            <Plus size={17} />
-            Nuova conversazione
-          </button>
+            <Plus size={17} />{"" + uiText("Nuova conversazione") + " "}</button>
         </section>
       ) : (
         <section className="wallaa-conversation-list">
@@ -261,7 +258,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
               <div className="wallaa-conversation-copy">
                 <div>
                   <strong>
-                    {conversation.name || conversation.title || 'Utente Wallaa'}
+                    {conversation.name || conversation.title || uiText("Utente Wallaa")}
                   </strong>
                   {conversation.updatedAt && (
                     <time>
@@ -272,21 +269,19 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
 
                 <small>
                   {conversation.conversationType === 'sentinel'
-                    ? `Intervento Sentinel · ${
-                        conversation.closed ? 'concluso' : 'attivo'
-                      }`
-                    : 'Conversazione Wallaa'}
+                    ? uiText("Intervento Sentinel · {value0}",{value0:(conversation.closed ? 'concluso' : 'attivo')})
+                    : uiText("Conversazione Wallaa")}
                 </small>
 
                 <div className="wallaa-conversation-preview">
                   <p>
-                    {conversation.lastMessage || 'Nessun messaggio'}
+                    {conversation.lastMessage || uiText("Nessun messaggio")}
                   </p>
 
                   {Number(conversation.unreadCount || 0) > 0 && (
                     <span
                       className="wallaa-message-unread"
-                      aria-label={`${conversation.unreadCount} messaggi non letti`}
+                      aria-label={uiText("{value0} messaggi non letti",{value0:(conversation.unreadCount)})}
                     >
                       {conversation.unreadCount > 99
                         ? '99+'
@@ -301,7 +296,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
                   type="button"
                   className="wallaa-conversation-delete"
                   onClick={(event) => handleDeleteConversation(event, conversation)}
-                  aria-label={`Elimina conversazione con ${conversation.name || 'utente Wallaa'}`}
+                  aria-label={uiText("Elimina conversazione con {value0}",{value0:(conversation.name || uiText("utente Wallaa"))})}
                 >
                   <Trash2 size={17} />
                 </button>
@@ -321,7 +316,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
             className="wallaa-new-chat-sheet"
             role="dialog"
             aria-modal="true"
-            aria-label="Nuova conversazione"
+            aria-label={uiText("Nuova conversazione")}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="wallaa-new-chat-handle" />
@@ -329,13 +324,13 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
             <header>
               <div>
                 <span>WALLAA CONNECT</span>
-                <h2>Nuova conversazione</h2>
+                <h2>{"" + uiText("Nuova conversazione") + ""}</h2>
               </div>
 
               <button
                 type="button"
                 onClick={() => setNewChatOpen(false)}
-                aria-label="Chiudi"
+                aria-label={uiText("Chiudi")}
               >
                 <X size={20} />
               </button>
@@ -346,7 +341,7 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Nome, email o numero"
+                placeholder={uiText("Nome, email o numero")}
                 autoComplete="off"
                 autoFocus
               />
@@ -357,23 +352,19 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
               {query.trim().length < 2 ? (
                 <div className="wallaa-new-chat-placeholder">
                   <LockKeyhole size={22} />
-                  <strong>Cerca un utente Wallaa</strong>
-                  <p>
-                    Inserisci almeno 2 caratteri per cercare un account reale.
-                  </p>
+                  <strong>{"" + uiText("Cerca un utente Wallaa") + ""}</strong>
+                  <p>{"" + uiText("Inserisci almeno 2 caratteri per cercare un account reale.") + " "}</p>
                 </div>
               ) : searching ? (
                 <div className="wallaa-new-chat-placeholder">
                   <Search size={22} />
-                  <strong>Ricerca...</strong>
+                  <strong>{"" + uiText("Ricerca...") + ""}</strong>
                 </div>
               ) : users.length === 0 ? (
                 <div className="wallaa-new-chat-placeholder">
                   <UserRound size={22} />
-                  <strong>Nessun utente trovato</strong>
-                  <p>
-                    La ricerca mostra soltanto account Wallaa disponibili.
-                  </p>
+                  <strong>{"" + uiText("Nessun utente trovato") + ""}</strong>
+                  <p>{"" + uiText("La ricerca mostra soltanto account Wallaa disponibili.") + " "}</p>
                 </div>
               ) : (
                 users.map((user) => (
@@ -390,10 +381,10 @@ export default function MessagesScreen({ networkIdentity, onOpenChat }) {
 
                     <div>
                       <strong>
-                        {user.displayName || user.name || 'Utente Wallaa'}
+                        {user.displayName || user.name || uiText("Utente Wallaa")}
                       </strong>
                       <span>
-                        {user.email || user.phone || 'Account Wallaa'}
+                        {user.email || user.phone || uiText("Account Wallaa")}
                       </span>
                     </div>
                   </button>

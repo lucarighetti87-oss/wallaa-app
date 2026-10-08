@@ -1,3 +1,4 @@
+import {uiText,uiLocale} from '../uiText.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import SentinelApplicationScreen from './SentinelApplicationScreen';
 import { ArrowLeft, CheckCircle2, ChevronRight, MapPin, MessageCircle, ShieldCheck } from 'lucide-react';
@@ -122,7 +123,7 @@ function SentinelInterventionMap({ incident, currentLocation }) {
     return (
       <div className="sentinel-live-map sentinel-live-map-empty">
         <MapPin size={28}/>
-        <strong>Posizione in acquisizione</strong>
+        <strong>{"" + uiText("Posizione in acquisizione") + ""}</strong>
       </div>
     );
   }
@@ -185,7 +186,7 @@ function SentinelInterventionMap({ incident, currentLocation }) {
             top: `calc(50% + ${map.sentinel.y}px)`
           }}
         >
-          <span>TU</span>
+          <span>{"" + uiText("TU") + ""}</span>
         </div>
       )}
 
@@ -202,9 +203,9 @@ function SentinelInterventionMap({ incident, currentLocation }) {
 
       <div className="sentinel-live-map-copy">
         <div>
-          <small>UTENTE DA RAGGIUNGERE</small>
+          <small>{"" + uiText("UTENTE DA RAGGIUNGERE") + ""}</small>
           <strong>{distanceLabel(incident?.distanceM)}</strong>
-          <span>Posizione live dell'utente</span>
+          <span>{"" + uiText("Posizione live dell'utente") + ""}</span>
         </div>
       </div>
 
@@ -365,34 +366,32 @@ export default function SentinelScreen({ networkIdentity, profile, currentLocati
   }
 
   // WALLAA_V4_0_60_SENTINEL_ROLE_FIX: Basic/Standard users may serve as Sentinel.
-  if(!enabled) return <section className="sentinel-page"><div className="sentinel-top"><button onClick={onBack}><ArrowLeft/></button><WallaaBrandShield onClick={onHome} alt="Wallaa"/><span/></div><div className="sentinel-empty"><ShieldCheck size={48}/><h1>Wallaa Sentinel</h1><p>Il servizio Sentinel non è ancora attivo su questo ambiente.</p><button className="sentinel-primary" onClick={onBack}>Torna indietro</button></div></section>;
+  if(!enabled) return <section className="sentinel-page"><div className="sentinel-top"><button onClick={onBack}><ArrowLeft/></button><WallaaBrandShield onClick={onHome} alt="Wallaa"/><span/></div><div className="sentinel-empty"><ShieldCheck size={48}/><h1>Wallaa Sentinel</h1><p>{"" + uiText("Il servizio Sentinel non è ancora attivo su questo ambiente.") + ""}</p><button className="sentinel-primary" onClick={onBack}>{"" + uiText("Torna indietro") + ""}</button></div></section>;
 
   if (incident) {
     const maps = `https://maps.apple.com/?daddr=${incident.latitude},${incident.longitude}`;
     return <section className="sentinel-page sentinel-intervention">
       <div className="sentinel-top"><button onClick={onBack}><ArrowLeft/></button><button className="sentinel-brand" onClick={onHome}><WallaaBrandShield alt="Wallaa"/><b>Wallaa</b></button><span/></div>
-      <div className="sentinel-incident-head"><span className="sentinel-red-dot"/><div><small>INTERVENTO IN CORSO</small><h1>Raggiungi l'utente in sicurezza</h1></div></div>
+      <div className="sentinel-incident-head"><span className="sentinel-red-dot"/><div><small>{"" + uiText("INTERVENTO IN CORSO") + ""}</small><h1>{"" + uiText("Raggiungi l'utente in sicurezza") + ""}</h1></div></div>
       <SentinelInterventionMap incident={incident} currentLocation={currentLocation}/>
-      <div className="sentinel-guidance"><div><MapPin/><span><b>Indicazioni</b><small>Apri Apple Maps</small></span></div><a href={maps}>Apri <ChevronRight/></a></div>
-      <div className="sentinel-warning"><ShieldCheck/><p>Non affrontare situazioni pericolose. Se necessario contatta subito i servizi di emergenza.</p></div>
+      <div className="sentinel-guidance"><div><MapPin/><span><b>{"" + uiText("Indicazioni") + ""}</b><small>{"" + uiText("Apri Apple Maps") + ""}</small></span></div><a href={maps}>{"" + uiText("Apri") + " "}<ChevronRight/></a></div>
+      <div className="sentinel-warning"><ShieldCheck/><p>{"" + uiText("Non affrontare situazioni pericolose. Se necessario contatta subito i servizi di emergenza.") + ""}</p></div>
       {incident?.conversationId && (
         <button
           type="button"
           className="sentinel-chat-button"
           onClick={() => onOpenChat?.({
             id: incident.conversationId,
-            name: incident.userName || 'Utente Wallaa',
+            name: incident.userName || uiText("Utente Wallaa"),
             conversationType: 'sentinel',
             sentinelIncidentId: incident.id,
             closed: false
           })}
         >
-          <MessageCircle size={18}/>
-          Chat emergenza
-        </button>
+          <MessageCircle size={18}/>{"" + uiText("Chat emergenza") + " "}</button>
       )}
 
-      <button className="sentinel-danger" disabled={busy} onClick={() => run(async () => { await completeSentinelIncident(networkIdentity, incident.id); setIncident(null); })}>Termina intervento</button>
+      <button className="sentinel-danger" disabled={busy} onClick={() => run(async () => { await completeSentinelIncident(networkIdentity, incident.id); setIncident(null); })}>{"" + uiText("Termina intervento") + ""}</button>
     </section>;
   }
 
@@ -400,12 +399,12 @@ export default function SentinelScreen({ networkIdentity, profile, currentLocati
 
   return <section className="sentinel-page">
     <div className="sentinel-top"><button onClick={onBack}><ArrowLeft/></button><button className="sentinel-brand" onClick={onHome}><WallaaBrandShield alt="Wallaa"/><b>Wallaa</b></button><span/></div>
-    {offer && <div className="sentinel-offer"><div className="sentinel-offer-title"><span>RICHIESTA DI AIUTO</span><h2>INTERVENTO DISPONIBILE</h2></div><div className="sentinel-offer-radar"><i/><MapPin/><strong>{distanceLabel(offer.routeDistanceM || offer.distanceM)}</strong><small>{Number.isFinite(Number(offer.etaSeconds)) && Number(offer.etaSeconds) > 0 ? `tempo stimato ~${Math.max(1,Math.round(Number(offer.etaSeconds)/60))} min` : 'tempo stimato non disponibile'}</small></div><p>Prima di accettare vedi distanza stradale stimata e tempo indicativo di arrivo. La posizione precisa viene mostrata solo dopo l'accettazione.</p><p className="sentinel-offer-status" role="status">{offerState.message}</p><div className="sentinel-offer-actions">{offerState.available || offerState.checking ? <><button disabled={busy || !offerState.available} onClick={declineOffer}>Non posso</button><button disabled={busy || !offerState.available} onClick={acceptOffer}>Accetta</button></> : <button type="button" onClick={()=>{rememberOffer(null);clearSentinelOffer?.();}}>Chiudi richiesta</button>}</div></div>}
-    <div className="sentinel-hero"><img src="/sentinel-shield.png" alt="Wallaa Sentinel"/><div><small>WALLAA SENTINEL</small><h1>La rete che rende Wallaa più forte</h1><p>Persone verificate e disponibili nelle vicinanze possono aiutare quando serve.</p></div></div>
+    {offer && <div className="sentinel-offer"><div className="sentinel-offer-title"><span>{"" + uiText("RICHIESTA DI AIUTO") + ""}</span><h2>{"" + uiText("INTERVENTO DISPONIBILE") + ""}</h2></div><div className="sentinel-offer-radar"><i/><MapPin/><strong>{distanceLabel(offer.routeDistanceM || offer.distanceM)}</strong><small>{Number.isFinite(Number(offer.etaSeconds)) && Number(offer.etaSeconds) > 0 ? uiText("tempo stimato ~{value0} min",{value0:(Math.max(1,Math.round(Number(offer.etaSeconds)/60)))}) : 'tempo stimato non disponibile'}</small></div><p>{"" + uiText("Prima di accettare vedi distanza stradale stimata e tempo indicativo di arrivo. La posizione precisa viene mostrata solo dopo l'accettazione.") + ""}</p><p className="sentinel-offer-status" role="status">{offerState.message}</p><div className="sentinel-offer-actions">{offerState.available || offerState.checking ? <><button disabled={busy || !offerState.available} onClick={declineOffer}>{"" + uiText("Non posso") + ""}</button><button disabled={busy || !offerState.available} onClick={acceptOffer}>{"" + uiText("Accetta") + ""}</button></> : <button type="button" onClick={()=>{rememberOffer(null);clearSentinelOffer?.();}}>{"" + uiText("Chiudi richiesta") + ""}</button>}</div></div>}
+    <div className="sentinel-hero"><img src="/sentinel-shield.png" alt="Wallaa Sentinel"/><div><small>WALLAA SENTINEL</small><h1>{"" + uiText("La rete che rende Wallaa più forte") + ""}</h1><p>{"" + uiText("Persone verificate e disponibili nelle vicinanze possono aiutare quando serve.") + ""}</p></div></div>
 
-    {!state?.profile ? <div className="sentinel-join"><h2>Diventa Sentinel</h2><p>Metti la tua disponibilità al servizio della community Wallaa.</p><button className="sentinel-primary" disabled={busy} onClick={() => setShowApplication(true)}>Inizia candidatura</button></div> :
-      <div className="sentinel-status-card"><div><small>STATO SENTINEL</small><h2>{verified ? 'Profilo verificato' : applicationStatus === 'rejected' ? 'Candidatura non approvata' : applicationStatus === 'needs_resubmission' ? 'Nuovi documenti richiesti' : 'Candidatura ricevuta'}</h2><p>{verified ? 'Puoi scegliere quando essere disponibile.' : applicationStatus === 'rejected' ? (state?.application?.reviewNote || 'La candidatura non è stata approvata.') : applicationStatus === 'needs_resubmission' ? (state?.application?.reviewNote || 'Wallaa richiede un nuovo caricamento.') : 'La verifica viene gestita manualmente da Wallaa.'}</p></div><span className={verified ? 'verified' : 'pending'}>{verified ? <CheckCircle2/> : 'IN VERIFICA'}</span></div>}
-    {verified && <button className={`sentinel-availability ${available ? 'on' : ''}`} disabled={busy} onClick={toggleAvailability}><span><b>{available ? 'Disponibile' : 'Non disponibile'}</b><small>{available ? 'Puoi ricevere richieste Sentinel' : 'Non riceverai richieste'}</small></span><i/></button>}
-    <div className="sentinel-nearby"><div className="sentinel-section-title"><div><small>RETE VICINA</small><h2>Sentinel nella tua area</h2></div></div></div>
+    {!state?.profile ? <div className="sentinel-join"><h2>{"" + uiText("Diventa Sentinel") + ""}</h2><p>{"" + uiText("Metti la tua disponibilità al servizio della community Wallaa.") + ""}</p><button className="sentinel-primary" disabled={busy} onClick={() => setShowApplication(true)}>{"" + uiText("Inizia candidatura") + ""}</button></div> :
+      <div className="sentinel-status-card"><div><small>{"" + uiText("STATO SENTINEL") + ""}</small><h2>{verified ? uiText("Profilo verificato") : applicationStatus === 'rejected' ? uiText("Candidatura non approvata") : applicationStatus === 'needs_resubmission' ? uiText("Nuovi documenti richiesti") : uiText("Candidatura ricevuta")}</h2><p>{verified ? uiText("Puoi scegliere quando essere disponibile.") : applicationStatus === 'rejected' ? (state?.application?.reviewNote || uiText("La candidatura non è stata approvata.")) : applicationStatus === 'needs_resubmission' ? (state?.application?.reviewNote || uiText("Wallaa richiede un nuovo caricamento.")) : uiText("La verifica viene gestita manualmente da Wallaa.")}</p></div><span className={verified ? 'verified' : 'pending'}>{verified ? <CheckCircle2/> : 'IN VERIFICA'}</span></div>}
+    {verified && <button className={`sentinel-availability ${available ? 'on' : ''}`} disabled={busy} onClick={toggleAvailability}><span><b>{available ? uiText("Disponibile") : uiText("Non disponibile")}</b><small>{available ? uiText("Puoi ricevere richieste Sentinel") : uiText("Non riceverai richieste")}</small></span><i/></button>}
+    <div className="sentinel-nearby"><div className="sentinel-section-title"><div><small>{"" + uiText("RETE VICINA") + ""}</small><h2>{"" + uiText("Sentinel nella tua area") + ""}</h2></div></div></div>
   </section>;
 }

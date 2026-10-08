@@ -1,3 +1,4 @@
+import {uiText,uiLocale} from '../uiText.js';
 import { useEffect, useRef, useState } from 'react';
 import {
   getWallaaCentralMessages,
@@ -61,8 +62,8 @@ export default function CentralSosChat({
       }
     } catch (e) {
       if(request!==requestRef.current)return;
-      setSyncError('Aggiornamento non disponibile. Riproviamo automaticamente.');
-      if (!silent) setError(e?.message || 'Chat Centrale non disponibile.');
+      setSyncError(uiText("Aggiornamento non disponibile. Riproviamo automaticamente."));
+      if (!silent) setError(e?.message || uiText("Chat Centrale non disponibile."));
     } finally {
       if (request===requestRef.current) setLoading(false);
     }
@@ -124,7 +125,7 @@ export default function CentralSosChat({
       await refresh(true);
       requestAnimationFrame(bottom);
     } catch (e) {
-      setError(e?.message || 'Invio non riuscito.');
+      setError(e?.message || uiText("Invio non riuscito."));
     } finally {
       setSending(false);
     }
@@ -134,14 +135,12 @@ export default function CentralSosChat({
     <section className="wallaa-central-sos">
       <div className="wallaa-central-sos-head">
         <div>
-          <span className="wallaa-central-sos-kicker">
-            CENTRALE WALLAA
-          </span>
-          <strong>Chat con la Centrale</strong>
+          <span className="wallaa-central-sos-kicker">{"" + uiText("CENTRALE WALLAA") + " "}</span>
+          <strong>{"" + uiText("Chat con la Centrale") + ""}</strong>
           <p>
             {active
-              ? 'Questo canale collega te e la Centrale durante il SOS.'
-              : 'Conversazione conclusa.'}
+              ? uiText("Questo canale collega te e la Centrale durante il SOS.")
+              : uiText("Conversazione conclusa.")}
           </p>
         </div>
 
@@ -158,9 +157,7 @@ export default function CentralSosChat({
         }}
       >
         {loading ? (
-          <div className="wallaa-central-empty">
-            Caricamento messaggi…
-          </div>
+          <div className="wallaa-central-empty">{"" + uiText("Caricamento messaggi…") + " "}</div>
         ) : messages.length ? (
           messages.map((message) => {
             const central = message?.senderAdmin === true;
@@ -173,8 +170,8 @@ export default function CentralSosChat({
                 <div className="wallaa-central-bubble">
                   <b>
                     {central
-                      ? 'Centrale Wallaa'
-                      : 'Tu'}
+                      ? uiText("Centrale Wallaa")
+                      : uiText("Tu")}
                   </b>
 
                   <span>{message.body}</span>
@@ -185,7 +182,7 @@ export default function CentralSosChat({
                           'it-IT',
                           { hour:'2-digit', minute:'2-digit' }
                         )
-                      : ''}{!central?' · Inviato':''}
+                      : ''}{!central?uiText(" · Inviato"):''}
                   </time>
                 </div>
               </div>
@@ -193,11 +190,11 @@ export default function CentralSosChat({
           })
         ) : (
           <div className="wallaa-central-empty">
-            <strong>Centrale Wallaa</strong>
+            <strong>{"" + uiText("Centrale Wallaa") + ""}</strong>
             <span>
               {active
-                ? 'Puoi scrivere qui durante la richiesta di soccorso.'
-                : 'Nessun messaggio per questo SOS.'}
+                ? uiText("Puoi scrivere qui durante la richiesta di soccorso.")
+                : uiText("Nessun messaggio per questo SOS.")}
             </span>
           </div>
         )}
@@ -210,7 +207,7 @@ export default function CentralSosChat({
         </div>
       )}
 
-      {!active && <p className="wallaa-chat-sync">SOS concluso · puoi leggere i messaggi, ma non inviarne altri.</p>}
+      {!active && <p className="wallaa-chat-sync">{"" + uiText("SOS concluso · puoi leggere i messaggi, ma non inviarne altri.") + ""}</p>}
       {active && (
         <form
           className="wallaa-central-composer"
@@ -219,9 +216,9 @@ export default function CentralSosChat({
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Scrivi alla Centrale Wallaa…"
+            placeholder={uiText("Scrivi alla Centrale Wallaa…")}
             maxLength={4000}
-            aria-label="Messaggio alla Centrale"
+            aria-label={uiText("Messaggio alla Centrale")}
             rows={2}
             disabled={sending}
             onFocus={() => {
@@ -233,11 +230,11 @@ export default function CentralSosChat({
             type="submit"
             disabled={sending || !text.trim()}
           >
-            {sending ? 'Invio…' : 'Invia'}
+            {sending ? uiText("Invio…") : uiText("Invia")}
           </button>
         </form>
       )}
-      {active && <small className="wallaa-chat-delivery-note">Inviato indica un messaggio salvato; non conferma che sia già stato letto.</small>}
+      {active && <small className="wallaa-chat-delivery-note">{"" + uiText("Inviato indica un messaggio salvato; non conferma che sia già stato letto.") + ""}</small>}
     </section>
   );
 }

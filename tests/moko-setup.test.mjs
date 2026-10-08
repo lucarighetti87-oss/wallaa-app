@@ -41,7 +41,7 @@ function fixture(options={}){
 }
 test('factory setup confirms physical possession, configures and rereads every setting, and preserves identity/history',async()=>{
  const f=fixture();const result=await prepareMokoButton(f.args);
- assert.equal(f.claims,1);assert.equal(f.claimed[0].mokoSetupVerified,false);assert.equal(result.mokoConnectionBaseline,1);assert.equal(result.mokoProfileVersion,2);
+ assert.equal(f.claims,1);assert.equal(f.claimed[0].mokoSetupVerified,false);assert.equal(result.mokoConnectionBaseline,1);assert.equal(result.mokoProfileVersion,3);
  assert.ok(f.stages.indexOf('awaiting_press')<f.stages.indexOf('claiming'));
  const configuration=f.writes.filter(w=>w.char===MOKO_GATT.custom&&w.bytes[1]===1);
  assert.ok(configuration.length>=1);assert.ok(configuration.length<=MOKO_SINGLE_CLICK_PROFILE.length);
@@ -78,5 +78,7 @@ test('a successful HTTP response without positive eligibility cannot start Bluet
 test('new firmware without Device Information uses the official custom commands',async()=>{const f=fixture({missingInfo:true});const result=await prepareMokoButton(f.args);assert.equal(result.softwareVersion,'BXP-B-D');assert.equal(result.firmwareVersion,'V2.0.3');for(const command of [0x2b,0x2c])assert.ok(f.writes.some(w=>w.bytes[1]===0&&w.bytes[2]===command));});
 test('custom firmware information still rejects unsupported families before claim',async()=>{const f=fixture({missingInfo:true,software:'BXP-CR'});await assert.rejects(prepareMokoButton(f.args),/compatibilità/);assert.equal(f.claims,0);});
 
-test('verified profile upgrade needs a valid existing ownership token and disables deep sleep',async()=>{const f=fixture({noPress:true});f.args.device={...device,mokoSetupVerified:true};f.args.allowVerifiedUpgrade=true;f.args.checkOwnership=async()=>({allowed:true,claimTokenValid:true});const result=await prepareMokoButton(f.args);assert.equal(result.mokoProfileVersion,2);assert.ok(!f.stages.includes('awaiting_press'));assert.ok(f.writes.some(w=>w.bytes.join(',')==='234,1,57,1,0'));});
+test('verified profile upgrade needs a valid existing ownership token and disables deep sleep',async()=>{const f=fixture({noPress:true});f.args.device={...device,mokoSetupVerified:true};f.args.allowVerifiedUpgrade=true;f.args.checkOwnership=async()=>({allowed:true,claimTokenValid:true});const result=await prepareMokoButton(f.args);assert.equal(result.mokoProfileVersion,3);assert.ok(!f.stages.includes('awaiting_press'));assert.ok(f.writes.some(w=>w.bytes.join(',')==='234,1,57,1,0'));});
 test('a claimed-looking device without a valid token cannot bypass physical proof',async()=>{const f=fixture({noPress:true});f.args.device={...device,mokoSetupVerified:true};f.args.allowVerifiedUpgrade=true;await assert.rejects(prepareMokoButton(f.args),/pressione/);assert.equal(f.claims,0);});
+
+test('alarm uses a faster high-power burst while standby remains at its normal interval',()=>{const alarm=MOKO_SINGLE_CLICK_PROFILE.find(s=>s.command===0x35&&s.read[0]===0),normal=MOKO_SINGLE_CLICK_PROFILE.find(s=>s.command===0x34&&s.read[0]===0);assert.equal((alarm.data[3]<<8)|alarm.data[4],200);assert.equal(alarm.data[5],4);assert.equal((alarm.data[6]<<8)|alarm.data[7],30);assert.equal((normal.data[3]<<8)|normal.data[4],1000);assert.equal(normal.data[5],0);assert.deepEqual(alarm.data,alarm.expected);});

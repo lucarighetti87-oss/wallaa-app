@@ -32,3 +32,14 @@ assert(WallaaMokoGATT.telemetryReply(Data([0xeb,0,0x4a,2,0x0b,0xee]),command:0x4
 assert(WallaaMokoGATT.telemetryReply(Data([0xeb,0,0x62,1,255]),command:0x62)?.isEmpty == true)
 assert(WallaaMokoGATT.telemetryReply(Data([0xeb,1,0x62,1,100]),command:0x62) == nil)
 print("4 verifiche telemetria superate")
+
+assert(WallaaMokoGATT.telemetryReply(Data([0xeb,0,0x4f,1,1]),command:0x4f)?["threeAxisAvailable"] as? Bool == true)
+assert(WallaaMokoGATT.telemetryReply(Data([0xeb,0,0x4f,2,0,0]),command:0x4f)?["threeAxisAvailable"] as? Bool == false)
+assert(WallaaMokoGATT.acceleration(Data([0xeb,2,1,6,0,24,0xff,0x18,3,0xe0]))?["x"] == 24)
+assert(WallaaMokoGATT.acceleration(Data([0xeb,2,1,6,0,24,0xff,0x18,3,0xe0]))?["y"] == -232)
+assert(WallaaMokoGATT.acceleration(Data([0xeb,2,1,6,0,24,0xff,0x18,3,0xe0]))?["z"] == 992)
+assert(WallaaMokoGATT.acceleration(Data([0xeb,2,1,5,0,24,0xff,0x18,3,0xe0])) == nil)
+print("6 verifiche capacità H1 e accelerometro superate")
+
+assert(WallaaMokoGATT.accelerationDelta(["x":0,"y":0,"z":1000],["x":160,"y":10,"z":980])==160)
+assert(WallaaMokoGATT.accelerationDelta(["x":0,"y":0,"z":1000],["x":10,"y":10,"z":990])==10)

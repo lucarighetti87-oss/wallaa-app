@@ -1,5 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
+let latestLocation=null;
+export function getCachedLocation(maxAge=15000){const age=latestLocation?Date.now()-Date.parse(latestLocation.capturedAt):Infinity;return age>=0&&age<=maxAge?latestLocation:null;}
 
 export async function requestLocationPermission() {
   if (Capacitor.isNativePlatform()) {
@@ -59,7 +61,9 @@ export async function watchLiveLocation({ onLocation, onError } = {}) {
 
 function normalizePosition(position) {
   const { latitude, longitude, accuracy, altitude, speed, heading } = position.coords;
-  return makeLocation(latitude, longitude, accuracy, { altitude, speed, heading });
+  const capturedAt=Number.isFinite(position.timestamp)?new Date(position.timestamp).toISOString():new Date().toISOString();
+  latestLocation=makeLocation(latitude, longitude, accuracy, { altitude, speed, heading,capturedAt });
+  return latestLocation;
 }
 
 function makeLocation(latitude, longitude, accuracy, extra = {}) {
@@ -71,6 +75,6 @@ function makeLocation(latitude, longitude, accuracy, extra = {}) {
     speed: Number.isFinite(extra.speed) ? extra.speed : null,
     heading: Number.isFinite(extra.heading) ? extra.heading : null,
     mapsUrl: `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}`,
-    capturedAt: new Date().toISOString()
+    capturedAt: extra.capturedAt || new Date().toISOString()
   };
 }

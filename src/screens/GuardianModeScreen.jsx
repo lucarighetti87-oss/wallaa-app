@@ -1,3 +1,4 @@
+import {uiText,uiLocale} from '../uiText.js';
 import { useEffect, useMemo } from 'react';
 import { ArrowLeft, LocateFixed, Settings, ShieldCheck, UsersRound } from 'lucide-react';
 
@@ -28,8 +29,8 @@ function GuardianMap({ lat, lng, active, onRefreshLocation }) {
   if (!map) {
     return <div className="aa-guardian-empty">
       <LocateFixed size={34}/>
-      <span>Acquisizione posizione…</span>
-      <button type="button" onClick={()=>onRefreshLocation?.()}>Riprova</button>
+      <span>{"" + uiText("Acquisizione posizione…") + ""}</span>
+      <button type="button" onClick={()=>onRefreshLocation?.()}>{"" + uiText("Riprova") + ""}</button>
     </div>;
   }
 
@@ -43,9 +44,9 @@ function GuardianMap({ lat, lng, active, onRefreshLocation }) {
     <div className="aa-map-grade"/>
     <div className={`aa-live-pin ${active?'active':''}`}>
       <i/>
-      <span>Tu<small>La tua posizione</small></span>
+      <span>{"" + uiText("Tu") + ""}<small>{"" + uiText("La tua posizione") + ""}</small></span>
     </div>
-    <button className="aa-map-control aa-real-locate" type="button" aria-label="Aggiorna posizione" onClick={()=>onRefreshLocation?.()}>
+    <button className="aa-map-control aa-real-locate" type="button" aria-label={uiText("Aggiorna posizione")} onClick={()=>onRefreshLocation?.()}>
       <LocateFixed/>
     </button>
   </div>;
@@ -108,9 +109,9 @@ export default function GuardianModeScreen({
       <button type="button" onClick={onBack}><ArrowLeft/></button>
       <div>
         <h1>Guardian Mode</h1>
-        <p>I Guardian autorizzati riceveranno la tua posizione quando attivi un SOS.</p>
+        <p>{"" + uiText("I Guardian autorizzati riceveranno la tua posizione quando attivi un SOS.") + ""}</p>
       </div>
-      <button type="button" className="decorative" aria-label="Impostazioni Guardian"><Settings/></button>
+      <button type="button" className="decorative" aria-label={uiText("Impostazioni Guardian")}><Settings/></button>
     </header>
 
     <section className="aa-guardian-stage">
@@ -118,8 +119,8 @@ export default function GuardianModeScreen({
         <div className="aa-real-guardian-title">
           <span className="aa-real-guardian-icon"><UsersRound/></span>
           <div>
-            <strong>Guardian autorizzati</strong>
-            <small>{guardians.length ? 'Riceveranno la tua posizione durante un SOS attivo.' : 'Nessun Guardian configurato per ricevere la posizione durante un SOS.'}</small>
+            <strong>{"" + uiText("Guardian autorizzati") + ""}</strong>
+            <small>{guardians.length ? uiText("Riceveranno la tua posizione durante un SOS attivo.") : uiText("Nessun Guardian configurato per ricevere la posizione durante un SOS.")}</small>
           </div>
         </div>
         {guardians.length > 0 && <div className="aa-avatar-stack aa-real-avatar-stack">
@@ -130,18 +131,18 @@ export default function GuardianModeScreen({
 
       <div className="aa-map-frame">
         <div className="aa-map-hud" aria-hidden="true">
-          <span>{active?'POSIZIONE':'POSIZIONE'}</span><i/><i/><i/>
+          <span>{active?uiText("POSIZIONE"):uiText("POSIZIONE")}</span><i/><i/><i/>
         </div>
         <GuardianMap lat={lat} lng={lng} active={active} onRefreshLocation={onRefreshLocation}/>
       </div>
 
       <div className="aa-guardian-live aa-real-live-card">
-        <span><i className={active?'':'off'}/>Protezione Guardian pronta</span>
-        <strong>PRONTA</strong>
-        <p><ShieldCheck/>La posizione verrà condivisa con i Guardian solo durante un SOS attivo.</p>
+        <span><i className={active?'':'off'}/>{"" + uiText("Protezione Guardian pronta") + ""}</span>
+        <strong>{"" + uiText("PRONTA") + ""}</strong>
+        <p><ShieldCheck/>{"" + uiText("La posizione verrà condivisa con i Guardian solo durante un SOS attivo.") + ""}</p>
         <div className="aa-real-live-meta">
-          <small>Ultimo aggiornamento</small><b>{lastUpdate}</b>
-          <small>Precisione</small><b>{Number.isFinite(accuracy)?`± ${Math.round(accuracy)} m`:'—'}</b>
+          <small>{"" + uiText("Ultimo aggiornamento") + ""}</small><b>{lastUpdate}</b>
+          <small>{"" + uiText("Precisione") + ""}</small><b>{Number.isFinite(accuracy)?`± ${Math.round(accuracy)} m`:'—'}</b>
         </div>
       </div>
 
@@ -151,10 +152,10 @@ export default function GuardianModeScreen({
         onClick={()=>onToggle?.(!active)}
         disabled={profile?.plan!=='pro'}
       >
-        {profile?.plan!=='pro'?'Guardian Mode richiede Wallaa Pro':active?'Termina Guardian Mode':'Attiva Guardian Mode'}
+        {profile?.plan!=='pro'?uiText("Guardian Mode richiede Wallaa Pro"):active?uiText("Termina Guardian Mode"):uiText("Attiva Guardian Mode")}
       </button>
     </section>
 
-    <p className="aa-focus-note">La posizione dei Guardian non viene condivisa in questa schermata. Durante un SOS attivo i Guardian autorizzati possono seguire gli aggiornamenti della tua posizione.</p>
+    <p className="aa-focus-note">{"" + uiText("La posizione dei Guardian non viene condivisa in questa schermata. Durante un SOS attivo i Guardian autorizzati possono seguire gli aggiornamenti della tua posizione.") + ""}</p>
   </div>;
 }

@@ -1,3 +1,4 @@
+import {uiText,uiLocale} from '../uiText.js';
 import { Check, Eye, EyeOff, Lock, Mail, Phone, ShieldCheck, UserRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CONFIG } from '../config';
@@ -123,7 +124,7 @@ export default function OnboardingScreen({ profile, onComplete, onLogin, t, init
           <label><UserRound size={17}/><input value={form.firstName} onChange={(e)=>set('firstName',e.target.value)} placeholder={t('v4.onboarding.firstName')} autoComplete="given-name"/></label>
           <label><UserRound size={17}/><input value={form.lastName} onChange={(e)=>set('lastName',e.target.value)} placeholder={t('v4.onboarding.lastName')} autoComplete="family-name"/></label>
         </div>}
-        <label><Mail size={17}/><input value={form.email} onChange={(e)=>set('email',e.target.value)} placeholder={isLogin ? t('v415.auth.identifierPlaceholder') : 'Email'} type={isLogin ? 'text' : 'email'} inputMode={isLogin ? 'text' : 'email'} autoCapitalize="none" autoComplete={isLogin ? 'username' : 'email'}/></label>
+        <label><Mail size={17}/><input value={form.email} onChange={(e)=>set('email',e.target.value)} placeholder={isLogin ? t('v415.auth.identifierPlaceholder') : uiText("Email")} type={isLogin ? 'text' : 'email'} inputMode={isLogin ? 'text' : 'email'} autoCapitalize="none" autoComplete={isLogin ? 'username' : 'email'}/></label>
         {!isLogin && <>
           <label className="phone-row">
             <Phone size={17}/>
@@ -131,7 +132,7 @@ export default function OnboardingScreen({ profile, onComplete, onLogin, t, init
               className="country-code-select"
               value={form.countryCode}
               onChange={(e)=>set('countryCode', e.target.value)}
-              aria-label="Prefisso internazionale"
+              aria-label={uiText("Prefisso internazionale")}
             >
               {PHONE_COUNTRIES.map((country) => (
                 <option
@@ -153,7 +154,7 @@ export default function OnboardingScreen({ profile, onComplete, onLogin, t, init
           </label>
 
           <label className="v420-dob-row">
-            <span>Data di nascita</span>
+            <span>{"" + uiText("Data di nascita") + ""}</span>
             <input
               value={form.dateOfBirth}
               onChange={(e)=>set('dateOfBirth',e.target.value)}
@@ -172,8 +173,8 @@ export default function OnboardingScreen({ profile, onComplete, onLogin, t, init
               autoComplete="bday"
             />
           </label>
-          <label className="v420-dob-row"><span>Paese di nascita</span><select value={form.birthCountry} onChange={(e)=>set('birthCountry',e.target.value)}><option value="">Seleziona Paese</option>{PHONE_COUNTRIES.map((country)=><option key={country.iso} value={country.name}>{country.flag} {country.name}</option>)}</select></label>
-          <label className="v420-dob-row"><span>Luogo / città di nascita</span><input value={form.birthPlace} onChange={(e)=>set('birthPlace',e.target.value)} placeholder="Luogo di nascita"/></label>
+          <label className="v420-dob-row"><span>{"" + uiText("Paese di nascita") + ""}</span><select value={form.birthCountry} onChange={(e)=>set('birthCountry',e.target.value)}><option value="">{"" + uiText("Seleziona Paese") + ""}</option>{PHONE_COUNTRIES.map((country)=><option key={country.iso} value={country.name}>{country.flag} {country.name}</option>)}</select></label>
+          <label className="v420-dob-row"><span>{"" + uiText("Luogo / città di nascita") + ""}</span><input value={form.birthPlace} onChange={(e)=>set('birthPlace',e.target.value)} placeholder={uiText("Luogo di nascita")}/></label>
         </>}
         <label className="v405-password-row"><Lock size={17}/><input value={form.password} onChange={(e)=>set('password',e.target.value)} placeholder={isLogin ? t('v405.auth.password') : t('v4.onboarding.password')} type={showPassword ? 'text' : 'password'} autoComplete={isLogin ? 'current-password' : 'new-password'}/><button type="button" onClick={()=>setShowPassword((value)=>!value)} aria-label={showPassword ? t('v404.safetyWord.hide') : t('v404.safetyWord.show')}>{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button></label>
         {!isLogin && <>
