@@ -1,3 +1,4 @@
+import {useSentinelMode} from '../hooks/useSentinelMode';
 import {uiText,uiLocale} from '../uiText.js';
 import { useRef, useState } from 'react';
 import {
@@ -24,6 +25,7 @@ export default function HomeV4Screen({
   busy,
   t
 }) {
+  const sentinelActive=useSentinelMode();
   const sosPointerRef = useRef(null);
   const [isHolding, setIsHolding] = useState(false);
 
@@ -70,8 +72,8 @@ export default function HomeV4Screen({
   };
 
   return (
-    <section className={`w37-home ${networkState?.sentinelProtectionActive ? 'sentinel-mode-active' : ''}`} aria-label="Wallaa Home">
-      {networkState?.sentinelProtectionActive&&<div className="sentinel-mode-sweep" aria-hidden="true"/>}
+    <section className={`w37-home ${sentinelActive ? 'sentinel-mode-active' : ''}`} aria-label="Wallaa Home">
+      {sentinelActive&&<div className="sentinel-mode-sweep" aria-hidden="true"/>}
       <div className="w37-bg-perspective-grid" aria-hidden="true" />
       <div className="w37-bg-globe-hologram" aria-hidden="true" />
 
@@ -161,7 +163,7 @@ export default function HomeV4Screen({
 
         <button type="button" className="w37-holo-card w37-sentinel-card-home" onClick={() => onNavigate?.('sentinel')}>
           <img src="/sentinel-shield.png" alt="" className="w454-sentinel-menu-icon"/>
-          <span className="w37-card-copy"><strong>Sentinel {networkState?.sentinelProtectionActive&&<span className="sentinel-mode-label">{uiText('Attiva')}</span>} {profile?.plan === 'pro' ? <em className="w454-pro-chip">PRO</em> : null}</strong><small>{profile?.plan === 'pro' ? uiText("Rete Sentinel + protezione SOS Pro") : uiText("Vedi la rete e candidati come Sentinel")}</small></span>
+          <span className="w37-card-copy"><strong>Sentinel {sentinelActive&&<span className="sentinel-mode-label">{uiText('Attiva')}</span>} {profile?.plan === 'pro' ? <em className="w454-pro-chip">PRO</em> : null}</strong><small>{profile?.plan === 'pro' ? uiText("Rete Sentinel + protezione SOS Pro") : uiText("Vedi la rete e candidati come Sentinel")}</small></span>
           <ChevronRight className="w37-chevron-arrow" size={20}/>
         </button>
 

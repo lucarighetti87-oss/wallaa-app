@@ -1,3 +1,5 @@
+import {storage} from '../../src/services/storage';
+import V4TopBar from '../../src/components/V4TopBar.jsx';
 import NetworkScreen from '../../src/screens/NetworkScreen.jsx';
 import HomeV4Screen from '../../src/screens/HomeV4Screen.jsx';
 import {translate} from '../../src/i18n.js';
@@ -22,6 +24,7 @@ const parameters=new URLSearchParams(location.search);
 document.documentElement.dataset.theme=parameters.get('theme')||'dark';
 installIOSViewportFix();
 setUiLanguage(parameters.get('language')||'it');
+await storage.setNativeSentinel({active:parameters.has('sentinel'),available:parameters.has('sentinel'),status:parameters.has('sentinel')?'available':'offline'});
 const mode=parameters.get('mode')||'active';
 const expiresAt=new Date(Date.now()+(mode==='expired'?-1000:mode==='expires'?2000:60000)).toISOString();
 const offer={offerId:'ui-offer',incidentId:'ui-incident',routeDistanceM:1200,etaSeconds:240,expiresAt,opened:true};
@@ -57,7 +60,7 @@ function Harness(){
  const clear=useCallback(()=>setPush(null),[]);
  const identity={installationId:'ui-test',authToken:'test-only',userId:'ui-owner'};
  if(parameters.get('screen')==='network')return <div className="app-shell-v4 screen-network"><main className="app-main-v4"><NetworkScreen contacts={parameters.has('empty')?[]:[{id:'marta',name:'Marta Rossi',networkUserId:'marta-wallaa',permissions:{sosAlerts:true,liveLocation:true},role:'guardian_pro'},{id:'external',name:'Paolo Bianchi',email:'paolo@example.invalid'}]} profile={{plan:'pro'}} networkState={{status:'ready',customerId:'WSB-TEST',guardians:parameters.has('empty')?[]:[{userId:'marta-wallaa',linkId:'out',displayName:'Marta Rossi'}],following:parameters.has('empty')?[]:[{userId:'marta-wallaa',linkId:'in',displayName:'Marta Rossi'},{userId:'incoming',linkId:'incoming',displayName:'Elena Verdi'}]}} qrDataUrl='data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="120" height="120"%3E%3Cpath fill="white" d="M0 0h120v120H0z"/%3E%3C/svg%3E' onEdit={person=>setSelected(person.name)} onAdd={()=>setSelected('add')} onScan={()=>setSelected('scan')} onGuardianSettings={()=>setSelected('settings')} onRemoveLink={()=>{}} onRefresh={()=>{}}/>{selected&&<div role="status">{selected}</div>}</main></div>;
- if(parameters.get('screen')==='home')return <div className="app-shell-v4"><HomeV4Screen profile={{firstName:'Luca',plan:'pro'}} telemetry={{battery:100}} connectionStatus='connected' networkState={{status:'ready',sentinelProtectionActive:parameters.has('sentinel')}} onNavigate={setSelected} t={t}/></div>;
+ if(parameters.get('screen')==='home')return <div className="app-shell-v4"><V4TopBar/><HomeV4Screen profile={{firstName:'Luca',plan:parameters.has('basic')?'basic':'pro'}} telemetry={{battery:100}} connectionStatus='connected' networkState={{status:'ready'}} onNavigate={setSelected} t={t}/></div>;
  if(parameters.get('screen')==='map')return <div className="app-shell-v4"><MapScreen currentLocation={{latitude:45,longitude:9}} networkIdentity={identity} t={t} language='it'/></div>;
  if(parameters.get('screen')==='guide')return <SafetyPermissionGuide status={{location:mode==='ready'?'always':'when-in-use',notifications:true,bluetooth:true}} onActivate={()=>{}} onFinish={()=>setSelected('finished')}/>;
  if(parameters.get('screen')==='chat')return <div className="app-shell-v4 screen-chat"><ChatScreen networkIdentity={identity} conversation={{id:'ui-chat',name:'Marta Test',conversationType:'sentinel'}} onBack={()=>{}}/></div>;

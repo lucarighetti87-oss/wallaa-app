@@ -16,9 +16,9 @@ test('English and incoming-only details are readable; no private permission edit
  await page.getByRole('button',{name:/Elena Verdi/}).click();await expect(page.getByRole('region',{name:'Elena Verdi'})).toBeVisible();
  await expect(page.getByRole('button',{name:'Stop receiving their SOS alerts'})).toBeVisible();
 });
-test('Sentinel sweep only appears with server-confirmed protection, and reduced motion is honored',async({page})=>{
+test('Sentinel sweep matches the active Sentinel user logo, including Basic, and respects reduced motion',async({page})=>{
  await page.goto('/tests/ui/index.html?screen=home');await expect(page.locator('.sentinel-mode-sweep')).toHaveCount(0);
- await page.goto('/tests/ui/index.html?screen=home&sentinel');await expect(page.locator('.sentinel-mode-sweep')).toHaveCount(1);
+ await page.goto('/tests/ui/index.html?screen=home&sentinel&basic');await expect(page.locator('.sentinel-mode-sweep')).toHaveCount(1);await expect(page.locator('[data-wallaa-brand=sentinel]')).toHaveCount(1);
  await page.emulateMedia({reducedMotion:'reduce'});expect(await page.locator('.sentinel-mode-sweep').evaluate(el=>getComputedStyle(el,'::before').animationName)).toBe('none');
  await page.screenshot({path:'artifacts/sentinel-home-mobile.png',fullPage:true});
 });
