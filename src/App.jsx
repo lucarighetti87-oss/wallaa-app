@@ -1,3 +1,4 @@
+import SentinelHomeAura from './components/SentinelHomeAura';
 import {setUiLanguage} from './uiText.js';
 import {uiText,uiLocale} from './uiText.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -300,6 +301,7 @@ export default function App() {
 
   return (
     <div className={`app-shell-v4 screen-${screen}`}>
+      {screen==='home'&&<SentinelHomeAura/>}
       {showTopBar && <V4TopBar onMenu={() => setDrawer(true)} onNotifications={() => navigateTo('notifications')} onHome={() => navigateTo('home')} t={t} />}
       <main ref={mainRef} className="app-main-v4"><div className="screen-transition" key={screen}>
         {screen === 'home' && safe.activeGuardianAlerts?.length>0 && <section className="guardian-live-stack" aria-label="SOS dei tuoi contatti">{safe.activeGuardianAlerts.map(alert=><button key={alert.id} type="button" className="guardian-live-card" onClick={()=>safe.openGuardianAlert(alert.id).catch(e=>safe.setToast({type:'error',text:e.message}))}><span className="guardian-live-orbit">SOS</span><span><small>ALLARME ANCORA ATTIVO</small><strong>{alert.ownerName||'Un tuo contatto'}</strong><em>Apri allarme e posizione →</em></span></button>)}</section>}
