@@ -73,7 +73,6 @@ export default function HomeV4Screen({
 
   return (
     <section className={`w37-home ${sentinelActive ? 'sentinel-mode-active' : ''}`} aria-label="Wallaa Home">
-      {sentinelActive&&<div className="sentinel-mode-sweep" aria-hidden="true"/>}
       <div className="w37-bg-perspective-grid" aria-hidden="true" />
       <div className="w37-bg-globe-hologram" aria-hidden="true" />
 

@@ -22,3 +22,15 @@ test('Sentinel sweep matches the active Sentinel user logo, including Basic, and
  await page.emulateMedia({reducedMotion:'reduce'});expect(await page.locator('.sentinel-mode-sweep').evaluate(el=>getComputedStyle(el,'::before').animationName)).toBe('none');
  await page.screenshot({path:'artifacts/sentinel-home-mobile.png',fullPage:true});
 });
+
+test('Sentinel glow covers the visible phone screen at the top and after scrolling',async({page})=>{
+ await page.goto('/tests/ui/index.html?screen=home&sentinel&basic');
+ const aura=page.locator('.sentinel-mode-sweep');await expect(aura).toHaveCount(1);
+ const original=await aura.boundingBox();expect(original.height).toBe(844);expect(original.y).toBe(0);
+ const before=await aura.evaluate(el=>getComputedStyle(el,'::before').transform);
+ await page.waitForTimeout(1300);
+ const after=await aura.evaluate(el=>getComputedStyle(el,'::before').transform);expect(after).not.toBe(before);
+ await page.screenshot({path:'artifacts/sentinel-aura-top-build105.png'});
+ await page.evaluate(()=>window.scrollTo(0,700));const scrolled=await aura.boundingBox();expect(scrolled.y).toBe(0);expect(scrolled.height).toBe(844);
+ await page.screenshot({path:'artifacts/sentinel-aura-scrolled-build105.png'});
+});
