@@ -1,3 +1,4 @@
+import {sentinelMapOffset,clusterSentinelMarkers,sentinelDirection} from '../services/sentinelMap';
 // WALLAA_V4_0_63_SENTINEL_MAP_ALL_USERS — nearby markers are visible to every authenticated plan; dispatch remains backend Pro-only.
 // WALLAA_V4_0_61_SENTINEL_VISIBILITY_FIX
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -8,6 +9,7 @@ function appleMapsUrl(lat, lng) { return `https://maps.apple.com/?ll=${encodeURI
 function tilePosition(lat, lng, zoom = 16) { const n=2**zoom; const x=((lng+180)/360)*n; const r=(lat*Math.PI)/180; const y=(1-Math.asinh(Math.tan(r))/Math.PI)/2*n; return {x,y,zoom}; }
 function LiveMap({ lat, lng, emergency, sentinels = [], showUserPin = true, sentinelMode = false }) {
   const mapRef = useRef(null);
+  const [selectedCluster,setSelectedCluster]=useState(null);
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
@@ -37,58 +39,8 @@ function LiveMap({ lat, lng, emergency, sentinels = [], showUserPin = true, sent
   const top=`calc(50% - ${256+map.fracY*256}px)`;
   const markerRadius = sentinelMode ? 25 : 22;
   const edgePadding = markerRadius + 8;
-  const edgeX = Math.max(0, mapSize.width / 2 - edgePadding);
-  const edgeY = Math.max(0, mapSize.height / 2 - edgePadding);
-  const cp = tilePosition(lat, lng, 16);
-
-  const clampToMapEdge = (rawDx, rawDy) => {
-    if (!Number.isFinite(rawDx) || !Number.isFinite(rawDy)) return null;
-    const absX = Math.abs(rawDx), absY = Math.abs(rawDy);
-    if (absX <= edgeX && absY <= edgeY) return { dx: rawDx, dy: rawDy, outOfView: false };
-    const scaleX = absX > 0 ? edgeX / absX : Infinity;
-    const scaleY = absY > 0 ? edgeY / absY : Infinity;
-    const scale = Math.min(scaleX, scaleY);
-    if (!Number.isFinite(scale)) return null;
-    return { dx: rawDx * scale, dy: rawDy * scale, outOfView: true };
-  };
-
-  const rawMarkers = sentinels.slice(0,20).map((sentinel, index) => {
-    const bearing = Number(sentinel.bearingDeg);
-    const hasCoordinates = Number.isFinite(Number(sentinel.latitude)) && Number.isFinite(Number(sentinel.longitude));
-    const forcedEdge = !hasCoordinates && Number.isFinite(bearing);
-    let position = null;
-    if (forcedEdge) {
-      const rad = bearing * Math.PI / 180;
-      const vectorX = Math.sin(rad), vectorY = -Math.cos(rad);
-      const scaleX = Math.abs(vectorX) > 0 ? edgeX / Math.abs(vectorX) : Infinity;
-      const scaleY = Math.abs(vectorY) > 0 ? edgeY / Math.abs(vectorY) : Infinity;
-      const scale = Math.min(scaleX, scaleY);
-      if (Number.isFinite(scale)) position = { dx: vectorX * scale, dy: vectorY * scale, outOfView: true };
-    } else if (hasCoordinates) {
-      const sp = tilePosition(Number(sentinel.latitude), Number(sentinel.longitude), 16);
-      position = clampToMapEdge((sp.x - cp.x) * 256, (sp.y - cp.y) * 256);
-    }
-    if (!position) return null;
-    return { ...position, sentinel, index };
-  }).filter(Boolean);
-
-  // WALLAA 4.0.74 — markers that visually overlap become one shield with a numeric badge.
-  const clusterDistancePx = 36;
-  const clusters = [];
-  for (const marker of rawMarkers) {
-    const existing = clusters.find(cluster =>
-      cluster.outOfView === marker.outOfView &&
-      Math.hypot(cluster.dx - marker.dx, cluster.dy - marker.dy) < clusterDistancePx
-    );
-    if (existing) {
-      existing.items.push(marker);
-      const n = existing.items.length;
-      existing.dx = ((existing.dx * (n - 1)) + marker.dx) / n;
-      existing.dy = ((existing.dy * (n - 1)) + marker.dy) / n;
-    } else {
-      clusters.push({ dx: marker.dx, dy: marker.dy, outOfView: marker.outOfView, items: [marker] });
-    }
-  }
+  const rawMarkers=sentinels.slice(0,20).map((sentinel,index)=>{const position=sentinelMapOffset(sentinel,lat,lng,mapSize.width,mapSize.height,edgePadding);return position?{...position,sentinel,index}:null;}).filter(Boolean);
+  const clusters=clusterSentinelMarkers(rawMarkers);
 
   return <div ref={mapRef} className={`v412-real-map ${emergency?'emergency':''}`}>
     <div className="v412-tile-canvas" style={{left,top}}>{map.tiles.map(tile=><img key={`${tile.x}-${tile.y}`} src={`https://tile.openstreetmap.org/${tile.z}/${tile.x}/${tile.y}.png`} alt="" draggable="false" style={{left:`${(tile.dx+1)*256}px`,top:`${(tile.dy+1)*256}px`}}/>)}</div>
@@ -97,18 +49,20 @@ function LiveMap({ lat, lng, emergency, sentinels = [], showUserPin = true, sent
     {clusters.map((cluster, index) => {
       const first = cluster.items[0]?.sentinel || {};
       const count = cluster.items.length;
-      const detail = 'Sentinel disponibile';
-      return <button key={`sentinel-cluster-${index}`} type="button" className={`v454-sentinel-marker ${sentinelMode?'sentinel-radar-marker':''} ${cluster.outOfView?'edge-marker':''}`} style={{left:`calc(50% + ${cluster.dx}px)`,top:`calc(50% + ${cluster.dy}px)`}} title={detail} aria-label={detail}>
+      const detail = `${count} Sentinel ${count===1?'disponibile':'disponibili'} · ${sentinelDirection(cluster.items[0].bearingDeg)}`;
+      return <button key={`sentinel-cluster-${index}`} type="button" onClick={()=>setSelectedCluster(cluster)} className={`v454-sentinel-marker ${sentinelMode?'sentinel-radar-marker':''} ${cluster.outOfView?'edge-marker':''}`} style={{left:`calc(50% + ${cluster.dx}px)`,top:`calc(50% + ${cluster.dy}px)`}} title={detail} aria-label={detail}>
         <img src="/sentinel-shield.png" alt="Sentinel"/>
         <i className={`state-${first.status||'available'}`}/>
         {count>1&&<b className="sentinel-count-badge">{count}</b>}
       </button>;
     })}
+    <span className="sentinel-map-north" aria-label="Nord in alto">↑ N</span>
+    {selectedCluster&&<div className="sentinel-map-detail" role="dialog" aria-label="Dettagli Sentinel"><strong>{selectedCluster.items.length} Sentinel disponibili</strong><p>Direzione: {sentinelDirection(selectedCluster.items[0].bearingDeg)}{selectedCluster.outOfView?' · oltre il bordo della mappa':''}</p><small>Il gruppo riunisce soltanto indicatori vicini nella stessa direzione. Fuori da un SOS non mostra coordinate precise.</small><button type="button" onClick={()=>setSelectedCluster(null)}>Chiudi</button></div>}
     <div className="v412-map-attribution">© OpenStreetMap contributors</div>
   </div>;
 }
 export default function MapScreen({ activeAlert, currentLocation, locationStatus, onRefreshLocation, t, language, plan='basic', networkIdentity }) {
-  const location=activeAlert?.location||currentLocation,lat=Number(location?.latitude),lng=Number(location?.longitude),valid=Number.isFinite(lat)&&Number.isFinite(lng),isEmergency=Boolean(activeAlert?.active),isPro=plan==='pro',accuracy=Number(location?.accuracy),capturedAt=location?.capturedAt;
+  const location=activeAlert?.location||currentLocation,lat=Number(location?.latitude),lng=Number(location?.longitude),valid=location?.latitude!=null&&location?.longitude!=null&&Number.isFinite(lat)&&Number.isFinite(lng),isEmergency=Boolean(activeAlert?.active),isPro=plan==='pro',accuracy=Number(location?.accuracy),capturedAt=location?.capturedAt;
   const [sentinels,setSentinels]=useState([]);
   useEffect(()=>{ if(!isEmergency&&!valid&&locationStatus!=='checking') onRefreshLocation?.().catch(()=>{}); },[isEmergency,valid,locationStatus,onRefreshLocation]);
   useEffect(()=>{
@@ -128,6 +82,6 @@ export default function MapScreen({ activeAlert, currentLocation, locationStatus
   return <div className="screen v4-generic-screen v402-map-screen"><header className="v402-screen-intro v402-map-intro"><div><span>{t('v4.map.eyebrow')}</span><h1>{t('v4.map.title')}</h1><p>{isEmergency?(isPro?t('v412.map.livePro'):t('v412.map.basicAlert')):t('v402.map.privateBody')}</p></div><button className="v402-add-button" onClick={()=>onRefreshLocation?.().catch(()=>{})} disabled={locationStatus==='checking'} aria-label={t('v402.map.refresh')}><RefreshCw size={20} className={locationStatus==='checking'?'spin':''}/></button></header>
     {location?.approximate && <p className="v402-privacy-note">Zona indicativa rilevata da un telefono della rete Wallaa.</p>}
     <section className={`v402-location-status ${isEmergency?'emergency':'ready'}`}><div className="v402-location-status-icon">{isEmergency?<ShieldCheck size={20}/>:<LocateFixed size={20}/>}</div><div><strong>{isEmergency?(isPro?t('v402.map.liveTracking'):t('v412.map.positionSent')):valid?t('v402.map.currentPosition'):t('v402.map.acquiring')}</strong><span>{isEmergency?(isPro?t('v402.map.sharedDuringAlert'):t('v412.map.basicNoTracking')):t('v402.map.notSharedNow')}</span></div><i/></section>
-    <section className="v402-map-card v412-map-card"><LiveMap lat={lat} lng={lng} emergency={isEmergency} sentinels={sentinels}/>{<div className="v454-sentinel-overlay"><div className="v454-sentinel-legend"><img src="/sentinel-shield.png" alt=""/><span><b>Rete Sentinel</b><small>Rete Sentinel attiva</small></span></div></div>}
+    <section className="v402-map-card v412-map-card"><LiveMap lat={valid?lat:NaN} lng={valid?lng:NaN} emergency={isEmergency} sentinels={sentinels}/>{<div className="v454-sentinel-overlay"><div className="v454-sentinel-legend"><img src="/sentinel-shield.png" alt=""/><span><b>Rete Sentinel</b><small>{sentinels.length?`${sentinels.length} disponibili · indicatori per direzione`:'Nessuna Sentinel disponibile rilevata'}</small></span></div></div>}
         <div className="v402-location-details"><div className="v402-coordinate-row"><div><small>{t('v402.map.latitude')}</small><strong>{valid?lat.toFixed(6):'—'}</strong></div><div><small>{t('v402.map.longitude')}</small><strong>{valid?lng.toFixed(6):'—'}</strong></div></div><div className="v402-location-meta"><span><Navigation size={14}/>{Number.isFinite(accuracy)?`± ${Math.round(accuracy)} m`:t('v402.map.accuracyUnknown')}</span><span>{capturedAt?new Date(capturedAt).toLocaleTimeString(language||undefined,{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—'}</span></div>{valid&&<a className="v402-open-maps" href={appleMapsUrl(lat,lng)} target="_blank" rel="noreferrer"><ExternalLink size={16}/>{t('v402.map.openAppleMaps')}</a>}</div></section><section className="v402-privacy-note"><ShieldCheck size={17}/><div><strong>{t('v402.map.privacyTitle')}</strong><p>{t('v412.map.privacyText')}</p></div></section></div>;
 }

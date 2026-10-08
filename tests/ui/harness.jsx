@@ -1,6 +1,7 @@
 import React,{useCallback,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import SafetyPermissionGuide from '../../src/components/SafetyPermissionGuide.jsx';
+import MapScreen from '../../src/screens/MapScreen.jsx';
 import ChatScreen from '../../src/screens/ChatScreen.jsx';
 import CentralSosChat from '../../src/components/CentralSosChat.jsx';
 import NotificationsScreen from '../../src/screens/NotificationsScreen.jsx';
@@ -35,7 +36,7 @@ window.fetch=async(input,options={})=>{
   data={users:[{userId:'ui-user',displayName:newer?'Marta Latest':'More Test',email:'more@example.invalid'}]};
  }
  else if(url.pathname==='/api/sentinel/me')data={enabled:true,profile:{verified:true,available:true,status:'available'}};
- else if(url.pathname==='/api/sentinel/nearby')data={sentinels:[]};
+ else if(url.pathname==='/api/sentinel/nearby')data={sentinels:parameters.get('screen')==='map'?[0,90,180,270].map((bearingDeg,index)=>({id:`direction-${index}`,bearingDeg,edgeOnly:true,status:'available'})):[]};
  else if(url.pathname==='/api/sentinel/dispatch/current-incident')data={incident:null};
  else if(url.pathname==='/api/sentinel/dispatch/current-offer')data={offer:Date.parse(expiresAt)>Date.now()&&mode!=='closed'?offer:null,serverTime:new Date().toISOString()};
  else if(url.pathname==='/api/sentinel/dispatch/offers/ui-offer')data={offer:{...offer,actionable:false,reason:mode==='closed'?'sos_closed':'expired'},serverTime:new Date().toISOString()};
@@ -48,6 +49,7 @@ function Harness(){
  const [selected,setSelected]=useState(null);
  const clear=useCallback(()=>setPush(null),[]);
  const identity={installationId:'ui-test',authToken:'test-only',userId:'ui-owner'};
+ if(parameters.get('screen')==='map')return <div className="app-shell-v4"><MapScreen currentLocation={{latitude:45,longitude:9}} networkIdentity={identity} t={key=>key} language='it'/></div>;
  if(parameters.get('screen')==='guide')return <SafetyPermissionGuide status={{location:mode==='ready'?'always':'when-in-use',notifications:true,bluetooth:true}} onActivate={()=>{}} onFinish={()=>setSelected('finished')}/>;
  if(parameters.get('screen')==='chat')return <div className="app-shell-v4 screen-chat"><ChatScreen networkIdentity={identity} conversation={{id:'ui-chat',name:'Marta Test',conversationType:'sentinel'}} onBack={()=>{}}/></div>;
  if(parameters.get('screen')==='central')return <div className="app-shell-v4"><CentralSosChat networkIdentity={identity} alert={{id:'ui-alert',active:true}}/></div>;
