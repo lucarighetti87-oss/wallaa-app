@@ -4,6 +4,9 @@ test('one safety list merges the QR relationship and opens people and a discreet
  await expect(page.getByRole('heading',{name:'Rete di Sicurezza',exact:true})).toBeVisible();
  await expect(page.locator('.safety-person')).toHaveCount(3);
  await expect(page.getByText('Marta Rossi',{exact:true})).toHaveCount(1);
+ await expect(page.locator('.safety-cinematic-art')).toBeVisible();
+ await page.waitForFunction(()=>document.querySelector('.safety-cinematic-art')?.naturalWidth>0);
+ await page.screenshot({path:'artifacts/network-scene-build105.png'});
  await page.getByRole('button',{name:'Il mio QR',exact:true}).click();await expect(page.locator('.safety-qr-panel img')).toBeVisible();
  await page.getByRole('button',{name:/Marta Rossi/}).click();await expect(page.getByRole('status')).toHaveText('Marta Rossi');
  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);expect(overflow).toBe(false);
