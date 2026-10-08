@@ -1,3 +1,4 @@
+import {uiText,uiLocale} from '../uiText.js';
 import {
   Bluetooth, CheckCircle2, CircleAlert, Database, Globe2, Mail, MapPin, QrCode,
   RefreshCw, RotateCcw, Server, ShieldCheck, Smartphone, Trash2, UserRound, UsersRound, Radio, BellRing, Activity,
@@ -21,7 +22,7 @@ function formatDateOfBirth(value) {
   return `${match[3]}/${match[2]}/${match[1]}`;
 }
 
-export default function SettingsScreen({ device, networkDevice, onNetworkTracking, onNetworkObserver,
+export default function SettingsScreen({ connectionGuard={enabled:true,delaySeconds:60},onConnectionGuard,device, networkDevice, onNetworkTracking, onNetworkObserver,
   profile, onSaveProfile, armed, onArmed, onReset, appearance, onAppearance, onDeleteAccount, onSignOut,
   networkState, systemHealth, onRefreshSystemHealth, onTestEmail, onTestAlarmSound, onNavigate, connectionStatus, t
 }) {
@@ -59,17 +60,17 @@ export default function SettingsScreen({ device, networkDevice, onNetworkTrackin
             <div className="v412-profile-readonly">
               <div className="v412-profile-value"><small>{t('v4.settings.firstName')}</small><strong>{profile.firstName || '—'}</strong></div>
               <div className="v412-profile-value"><small>{t('v4.settings.lastName')}</small><strong>{profile.lastName || '—'}</strong></div>
-              <div className="v412-profile-value wide"><small>Email</small><strong>{profile.email || '—'}</strong></div>
+              <div className="v412-profile-value wide"><small>{"" + uiText("Email") + ""}</small><strong>{profile.email || '—'}</strong></div>
               <div className="v412-profile-value wide">
                 <small>{t('v4.settings.phone')}</small>
                 <strong>{profile.phone ? `${profile.countryCode || '+39'} ${profile.phone}` : '—'}</strong>
               </div>
               <div className="v412-profile-value wide">
-                <small>Data di nascita</small>
+                <small>{"" + uiText("Data di nascita") + ""}</small>
                 <strong>{formatDateOfBirth(profile.dateOfBirth)}</strong>
               </div>
-              <div className="v412-profile-value"><small>Paese di nascita</small><strong>{profile.birthCountry || '—'}</strong></div>
-              <div className="v412-profile-value"><small>Luogo di nascita</small><strong>{profile.birthPlace || '—'}</strong></div>
+              <div className="v412-profile-value"><small>{"" + uiText("Paese di nascita") + ""}</small><strong>{profile.birthCountry || '—'}</strong></div>
+              <div className="v412-profile-value"><small>{"" + uiText("Luogo di nascita") + ""}</small><strong>{profile.birthPlace || '—'}</strong></div>
             </div>
             <button className="v412-edit-profile" type="button" onClick={() => { setDraftProfile(profile); setEditingProfile(true); }}><Pencil size={16}/> {t('v412.settings.editMyData')}</button>
           </>
@@ -78,12 +79,12 @@ export default function SettingsScreen({ device, networkDevice, onNetworkTrackin
             <div className="profile-grid">
               <input value={draftProfile.firstName||''} onChange={(e)=>setDraftProfile({...draftProfile,firstName:e.target.value})} placeholder={t('v4.settings.firstName')}/>
               <input value={draftProfile.lastName||''} onChange={(e)=>setDraftProfile({...draftProfile,lastName:e.target.value})} placeholder={t('v4.settings.lastName')}/>
-              <input className="wide" value={draftProfile.email||''} onChange={(e)=>setDraftProfile({...draftProfile,email:e.target.value})} placeholder="Email" type="email"/>
+              <input className="wide" value={draftProfile.email||''} onChange={(e)=>setDraftProfile({...draftProfile,email:e.target.value})} placeholder={uiText("Email")} type="email"/>
               <div className="wide v420-profile-phone-row">
                 <select
                   value={draftProfile.countryCode || '+39'}
                   onChange={(e)=>setDraftProfile({...draftProfile,countryCode:e.target.value})}
-                  aria-label="Prefisso internazionale"
+                  aria-label={uiText("Prefisso internazionale")}
                 >
                   {PHONE_COUNTRIES.map((country) => (
                     <option
@@ -105,7 +106,7 @@ export default function SettingsScreen({ device, networkDevice, onNetworkTrackin
               </div>
 
               <label className="wide v420-profile-dob">
-                <span>Data di nascita</span>
+                <span>{"" + uiText("Data di nascita") + ""}</span>
                 <input
                   value={draftProfile.dateOfBirth || ''}
                   onChange={(e)=>setDraftProfile({...draftProfile,dateOfBirth:e.target.value})}
@@ -114,8 +115,8 @@ export default function SettingsScreen({ device, networkDevice, onNetworkTrackin
                   autoComplete="bday"
                 />
               </label>
-              <label className="wide v420-profile-dob"><span>Paese di nascita</span><select value={draftProfile.birthCountry || ''} onChange={(e)=>setDraftProfile({...draftProfile,birthCountry:e.target.value})}><option value="">Seleziona Paese</option>{PHONE_COUNTRIES.map((country)=><option key={country.iso} value={country.name}>{country.flag} {country.name}</option>)}</select></label>
-              <label className="wide v420-profile-dob"><span>Luogo / città di nascita</span><input value={draftProfile.birthPlace || ''} onChange={(e)=>setDraftProfile({...draftProfile,birthPlace:e.target.value})} placeholder="Luogo di nascita"/></label>
+              <label className="wide v420-profile-dob"><span>{"" + uiText("Paese di nascita") + ""}</span><select value={draftProfile.birthCountry || ''} onChange={(e)=>setDraftProfile({...draftProfile,birthCountry:e.target.value})}><option value="">{"" + uiText("Seleziona Paese") + ""}</option>{PHONE_COUNTRIES.map((country)=><option key={country.iso} value={country.name}>{country.flag} {country.name}</option>)}</select></label>
+              <label className="wide v420-profile-dob"><span>{"" + uiText("Luogo / città di nascita") + ""}</span><input value={draftProfile.birthPlace || ''} onChange={(e)=>setDraftProfile({...draftProfile,birthPlace:e.target.value})} placeholder={uiText("Luogo di nascita")}/></label>
             </div>
             <div className="v412-profile-actions"><button className="cancel" type="button" onClick={()=>{setDraftProfile(profile);setEditingProfile(false);}}>{t('common.close')}</button><button className="save" type="button" onClick={saveEditedProfile}>{t('common.save')}</button></div>
           </>
@@ -145,7 +146,7 @@ export default function SettingsScreen({ device, networkDevice, onNetworkTrackin
       </section>
 
       <section className="v4-settings-card settings-switch-row">
-        <div className="settings-row-title"><UsersRound size={19}/><div><strong>Partecipa alla rete Wallaa</strong><span>Aiuta a ritrovare i pulsanti degli altri partecipanti. Quando il telefono ne rileva uno, invia al servizio Wallaa la propria posizione e il segnale rilevato. Il proprietario vede una zona approssimativa, senza la tua identità. Per i rilevamenti in background serve il permesso di posizione Sempre.</span></div></div>
+        <div className="settings-row-title"><UsersRound size={19}/><div><strong>{"" + uiText("Partecipa alla rete Wallaa") + ""}</strong><span>{"" + uiText("Aiuta a ritrovare i pulsanti degli altri partecipanti. Quando il telefono ne rileva uno, invia al servizio Wallaa la propria posizione e il segnale rilevato. Il proprietario vede una zona approssimativa, senza la tua identità. Per i rilevamenti in background serve il permesso di posizione Sempre.") + ""}</span></div></div>
         <label className="v4-switch"><input type="checkbox" checked={profile.networkObserverEnabled === true} onChange={e=>onNetworkObserver?.(e.target.checked)}/><span/></label>
       </section>
       <div className="v412-settings-section-label">WALLAA PRO</div>
@@ -154,13 +155,13 @@ export default function SettingsScreen({ device, networkDevice, onNetworkTrackin
         <span className={`v412-plan-badge ${isPro ? 'pro' : ''}`}><Crown size={12}/>{isPro ? t('v412.pro.active') : t('v412.pro.basicPlan')}</span>
         <div className="v412-feature-list">
           <div className="v412-feature-row"><UsersRound size={18}/><span><strong>{t('v412.pro.contactsTitle')}</strong><small>{isPro ? t('v412.pro.contactsPro') : t('v412.pro.contactsBasic')}</small></span><i className={`v412-feature-state ${isPro?'':'locked'}`}>{isPro ? t('v412.pro.included') : 'PRO'}</i></div>
-          <div className="v412-feature-row"><Server size={18}/><span><strong>Wallaa Operating Center</strong><small>{t('v412.pro.centerBody')}</small></span><i className={`v412-feature-state ${isPro?'':'locked'}`}>{isPro ? t('v412.pro.activeShort') : 'PRO'}</i></div>
+          <div className="v412-feature-row"><Server size={18}/><span><strong>{"" + uiText("Wallaa Operating Center") + ""}</strong><small>{t('v412.pro.centerBody')}</small></span><i className={`v412-feature-state ${isPro?'':'locked'}`}>{isPro ? t('v412.pro.activeShort') : 'PRO'}</i></div>
           <div className="v412-feature-row"><Navigation size={18}/><span><strong>{t('v412.pro.liveTitle')}</strong><small>{isPro ? t('v412.pro.livePro') : t('v412.pro.liveBasic')}</small></span><i className={`v412-feature-state ${isPro?'':'locked'}`}>{isPro ? t('v412.pro.activeShort') : 'PRO'}</i></div>
         </div>
         {!isPro && <p className="v404-sound-note">{t('v412.pro.futureBilling')}</p>}
       </section>
       <section className={`v4-settings-card settings-switch-row v419-live-protection ${!isPro ? 'locked' : ''}`}>
-        <div className="settings-row-title"><Navigation size={19}/><div><strong>Guardian Mode</strong><span>{isPro ? 'Condividi la posizione con i Guardian autorizzati e la Centrale Wallaa mentre Guardian Mode è attiva. iOS può sospendere gli aggiornamenti in background.' : 'Disponibile con Wallaa Pro.'}</span></div></div>
+        <div className="settings-row-title"><Navigation size={19}/><div><strong>Guardian Mode</strong><span>{isPro ? uiText("Condividi la posizione con i Guardian autorizzati e la Centrale Wallaa mentre Guardian Mode è attiva. iOS può sospendere gli aggiornamenti in background.") : uiText("Disponibile con Wallaa Pro.")}</span></div></div>
         <label className="v4-switch"><input type="checkbox" disabled={!isPro} checked={isPro && profile.liveProtectionEnabled === true} onChange={(e)=>onSaveProfile({...profile,liveProtectionEnabled:e.target.checked})}/><span/></label>
       </section>
 
@@ -198,8 +199,9 @@ export default function SettingsScreen({ device, networkDevice, onNetworkTrackin
         <div className="v409-guard-explain"><ShieldCheck size={17}/><span>{t('v409.guard.explain')}</span></div>
       </section>
 
-      {device?.hardwareId?.startsWith('MOKO:') && <section className="v4-settings-card wb-network-settings"><div className="settings-row-title"><Radio size={19}/><div><strong>Ritrova con la rete Wallaa</strong><span>I partecipanti alla rete possono segnalare il tuo WB-001 nelle vicinanze.</span></div></div><label className="v4-switch"><input aria-label="Attiva ritrovamento WB-001" type="checkbox" checked={networkDevice?.trackingEnabled===true} onChange={e=>onNetworkTracking?.(e.target.checked)}/><span/></label>{networkDevice?.lastObservation?<><p>Ultimo rilevamento: {new Date(networkDevice.lastObservation.capturedAt).toLocaleString()}</p><p>Zona approssimativa: circa {Math.round(networkDevice.lastObservation.accuracy)} m intorno al telefono ricevente.</p><a href={networkDevice.lastObservation.mapsUrl} target="_blank" rel="noreferrer">Apri la zona sulla mappa</a></>:<p>Nessun rilevamento recente.</p>}<p>Il punto indica la posizione del telefono ricevente, non una posizione GPS autonoma del pulsante.</p></section>}
-      <section className="v4-settings-card"><div className="settings-row-title"><Globe2 size={19}/><div><strong>{t('settings.language')}</strong><span>{t('v4.settings.languageBody')}</span></div></div><select value={profile.language||'en'} onChange={(e)=>onSaveProfile({...profile,language:e.target.value})}>{LANGUAGES.map((l)=><option key={l.code} value={l.code}>{l.label}</option>)}</select></section>
+      {device?.hardwareId?.startsWith('MOKO:') && <section className="v4-settings-card wb-network-settings"><div className="settings-row-title"><Radio size={19}/><div><strong>{"" + uiText("Ritrova con la rete Wallaa") + ""}</strong><span>{"" + uiText("I partecipanti alla rete possono segnalare il tuo WB-001 nelle vicinanze.") + ""}</span></div></div><label className="v4-switch"><input aria-label={uiText("Attiva ritrovamento WB-001")} type="checkbox" checked={networkDevice?.trackingEnabled===true} onChange={e=>onNetworkTracking?.(e.target.checked)}/><span/></label>{networkDevice?.lastObservation?<><p>{"" + uiText("Ultimo rilevamento:") + " "}{new Date(networkDevice.lastObservation.capturedAt).toLocaleString(uiLocale())}</p><p>{"" + uiText("Zona approssimativa: circa") + " "}{Math.round(networkDevice.lastObservation.accuracy)}{" " + uiText("m intorno al telefono ricevente.") + ""}</p><a href={networkDevice.lastObservation.mapsUrl} target="_blank" rel="noreferrer">{"" + uiText("Apri la zona sulla mappa") + ""}</a></>:<p>{"" + uiText("Nessun rilevamento recente.") + ""}</p>}<p>{"" + uiText("Il punto indica la posizione del telefono ricevente, non una posizione GPS autonoma del pulsante.") + ""}</p></section>}
+      {device?.hardwareId?.startsWith('MOKO:')&&<section className="v4-settings-card"><div className="settings-row-title"><BellRing size={19}/><div><strong>{uiText('Avvisi disconnessione WB-001')}</strong><span>{uiText('Ricevi avvisi se il collegamento resta interrotto. I Guardian abilitati possono essere avvisati.')}</span></div></div><label className="switch"><input type="checkbox" aria-label={uiText('Avvisi disconnessione WB-001')} checked={connectionGuard.enabled} onChange={event=>onConnectionGuard?.({...connectionGuard,enabled:event.target.checked})}/><span/></label></section>}
+      <section className="v4-settings-card"><div className="settings-row-title"><Globe2 size={19}/><div><strong>{t('settings.language')}</strong><span>{t('v4.settings.languageBody')}</span></div></div><select aria-label={t('settings.language')} value={profile.language||'en'} onChange={(e)=>onSaveProfile({...profile,language:e.target.value})}>{LANGUAGES.map((l)=><option key={l.code} value={l.code}>{l.label}</option>)}</select></section>
 
       <section className="v405-legal-card"><div className="settings-row-title"><FileText size={19}/><div><strong>{t('v405.legal.title')}</strong><span>{t('v405.legal.subtitle')}</span></div></div><button className="v411-privacy-open" type="button" onClick={()=>onNavigate('privacy')}><ShieldCheck size={18}/><span>{t('v411.privacy.open')}</span><ExternalLink size={15}/></button><a href={CONFIG.privacyPolicyUrl} target="_blank" rel="noreferrer"><span>{t('v405.legal.privacy')}</span><ExternalLink size={16}/></a><a href={CONFIG.termsUrl} target="_blank" rel="noreferrer"><span>{t('v405.legal.terms')}</span><ExternalLink size={16}/></a></section>
       <section className="v4-legal-note"><strong>{t('v4.settings.important')}</strong><p>{t('v4.settings.legal')}</p></section>

@@ -1,3 +1,4 @@
+import {uiText,uiLocale} from '../uiText.js';
 import { useRef, useState } from 'react';
 import {
   BatteryMedium,
@@ -35,12 +36,12 @@ export default function HomeV4Screen({
   const eventOnly = device?.monitorMode === 'event-only';
 
   const statusTitle = protectedState
-    ? (eventOnly ? (t?.('v409.home.readyTitle') || 'Sistema pronto') : 'Sistema pronto')
-    : 'Configura il tuo Wallaa';
+    ? (eventOnly ? (t?.('v409.home.readyTitle') || uiText("Sistema pronto")) : uiText("Sistema pronto"))
+    : uiText("Configura il tuo Wallaa");
 
   const statusBody = protectedState
-    ? (eventOnly ? (t?.('v409.home.standbyBody') || 'Tutti i servizi operativi') : 'Tutti i servizi operativi')
-    : 'Collega il Wallaa Safety Button';
+    ? (eventOnly ? (t?.('v409.home.standbyBody') || uiText("Tutti i servizi operativi")) : uiText("Tutti i servizi operativi"))
+    : uiText("Collega il Wallaa Safety Button");
 
   const start = (event) => {
     event.preventDefault();
@@ -77,12 +78,10 @@ export default function HomeV4Screen({
         <section className="w37-user-hero-row">
           <div className="w37-user-copy">
             <span className="w37-eco-chip">Stay safe. Press Wallaa.</span>
-            <h1 className="w37-user-name">Buonasera, {name}</h1>
-            <p className="w37-user-sub">Un mondo più sicuro inizia da te.</p>
+            <h1 className="w37-user-name">{"" + uiText("Buonasera,") + " "}{name}</h1>
+            <p className="w37-user-sub">{"" + uiText("Un mondo più sicuro inizia da te.") + ""}</p>
           </div>
-          <div className="w37-tagline-col" aria-hidden="true">
-            PERSONE<br />PIÙ SICURE<br />CITTÀ<br />PIÙ VIVE
-            <div className="w37-tagline-bar" />
+          <div className="w37-tagline-col" aria-hidden="true">{"" + uiText("PERSONE") + ""}<br />{"" + uiText("PIÙ SICURE") + ""}<br />{"" + uiText("CITTÀ") + ""}<br />{"" + uiText("PIÙ VIVE") + " "}<div className="w37-tagline-bar" />
           </div>
         </section>
 
@@ -103,13 +102,13 @@ export default function HomeV4Screen({
             className={`w37-hardware-button-img ${protectedState ? 'connected' : 'disconnected'}`}
           />
           <div className="w37-device-copy">
-            <span className="w37-device-kicker">DISPOSITIVO</span>
-            <strong>Wallaa Button</strong>
+            <span className="w37-device-kicker">{"" + uiText("DISPOSITIVO") + ""}</span>
+            <strong>{"" + uiText("Wallaa Button") + ""}</strong>
             <div className="w37-device-meta">
               <span className={`w37-device-status ${protectedState ? 'ok' : 'off'}`}>
-                <i /> {protectedState ? (weak ? 'Segnale debole' : 'Connesso') : 'Non collegato'}
+                <i /> {protectedState ? (weak ? uiText("Segnale debole") : uiText("Connesso")) : uiText("Non collegato")}
               </span>
-              <span className="w37-battery"><BatteryMedium size={15} /> Batteria {battery}</span>
+              <span className="w37-battery"><BatteryMedium size={15} />{" " + uiText("Batteria") + " "}{battery}</span>
             </div>
           </div>
           <ChevronRight className="w37-chevron-arrow" size={20} />
@@ -127,7 +126,7 @@ export default function HomeV4Screen({
               type="button"
               className={`w37-sos-button-core ${isHolding ? 'holding' : ''}`}
               disabled={busy}
-              aria-label="Tieni premuto per inviare SOS"
+              aria-label={uiText("Tieni premuto per inviare SOS")}
               onPointerDown={start}
               onPointerUp={stop}
               onPointerCancel={stop}
@@ -140,45 +139,45 @@ export default function HomeV4Screen({
             >
               <span className="w37-sos-shine" aria-hidden="true" />
               <span className="w37-sos-txt">SOS</span>
-              <span className="w37-sos-sub">Tieni premuto</span>
+              <span className="w37-sos-sub">{"" + uiText("Tieni premuto") + ""}</span>
             </button>
           </div>
-          <p className="w37-sos-caption">Premi in caso di emergenza</p>
+          <p className="w37-sos-caption">{"" + uiText("Premi in caso di emergenza") + ""}</p>
         </section>
 
         <div className="w37-grid-actions">
           <button type="button" className="w37-holo-card w37-grid-cell" onClick={() => onNavigate?.('guardian')}>
             <div className="w37-grid-cell-head"><Navigation size={24} /><ChevronRight size={18} /></div>
-            <span><strong>Guardian Mode</strong><small>Protezione live</small></span>
+            <span><strong>Guardian Mode</strong><small>{"" + uiText("Protezione live") + ""}</small></span>
           </button>
 
           <button type="button" className="w37-holo-card w37-grid-cell" onClick={() => onNavigate?.('contacts')}>
             <div className="w37-grid-cell-head"><Users size={24} /><ChevronRight size={18} /></div>
-            <span><strong>I miei contatti</strong><small>{guardianCount} configurati</small></span>
+            <span><strong>{"" + uiText("I miei contatti") + ""}</strong><small>{guardianCount}{" " + uiText("configurati") + ""}</small></span>
           </button>
 
           <button type="button" className="w37-holo-card w37-grid-cell" onClick={() => onNavigate?.('map')}>
             <div className="w37-grid-cell-head"><MapPin size={24} /><ChevronRight size={18} /></div>
-            <span><strong>Posizione</strong><small>Apri mappa</small></span>
+            <span><strong>{"" + uiText("Posizione") + ""}</strong><small>{"" + uiText("Apri mappa") + ""}</small></span>
           </button>
 
           <button type="button" className="w37-holo-card w37-grid-cell" onClick={() => onNavigate?.('network')}>
             <div className="w37-grid-cell-head"><QrCode size={24} /><ChevronRight size={18} /></div>
-            <span><strong>Safety Network</strong><small>{networkState?.status === 'ready' ? 'Pronta' : 'Da configurare'}</small></span>
+            <span><strong>Safety Network</strong><small>{networkState?.status === 'ready' ? uiText("Pronta") : uiText("Da configurare")}</small></span>
           </button>
         </div>
 
         <button type="button" className="w37-holo-card w37-sentinel-card-home" onClick={() => onNavigate?.('sentinel')}>
           <img src="/sentinel-shield.png" alt="" className="w454-sentinel-menu-icon"/>
-          <span className="w37-card-copy"><strong>Sentinel {profile?.plan === 'pro' ? <em className="w454-pro-chip">PRO</em> : null}</strong><small>{profile?.plan === 'pro' ? 'Rete Sentinel + protezione SOS Pro' : 'Vedi la rete e candidati come Sentinel'}</small></span>
+          <span className="w37-card-copy"><strong>Sentinel {profile?.plan === 'pro' ? <em className="w454-pro-chip">PRO</em> : null}</strong><small>{profile?.plan === 'pro' ? uiText("Rete Sentinel + protezione SOS Pro") : uiText("Vedi la rete e candidati come Sentinel")}</small></span>
           <ChevronRight className="w37-chevron-arrow" size={20}/>
         </button>
 
         <button type="button" className="w37-holo-card w37-security-card" onClick={() => onSafetyCheck?.()} disabled={busy}>
           <Shield size={26} />
           <span className="w37-card-copy">
-            <strong>Controllo sicurezza</strong>
-            <small>Controlla lo stato dell’app senza inviare allarmi</small>
+            <strong>{"" + uiText("Controllo sicurezza") + ""}</strong>
+            <small>{"" + uiText("Controlla lo stato dell’app senza inviare allarmi") + ""}</small>
           </span>
           <ChevronRight className="w37-chevron-arrow" size={20} />
         </button>

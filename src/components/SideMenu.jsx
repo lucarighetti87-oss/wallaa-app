@@ -1,3 +1,4 @@
+import {uiText,uiLocale} from '../uiText.js';
 import { useEffect } from 'react';
 import { CircleUserRound, Home, Link2, MapPin, MessageCircle, Settings, Shield, UsersRound, X } from 'lucide-react';
 import WallaaButton3D from './WallaaButton3D';
@@ -8,7 +9,7 @@ const items = [
   ['network', 'v4.menu.safetyNetwork', Shield],
   ['contacts', 'v4.menu.emergencyContacts', UsersRound],
   ['map', 'v4.menu.location', MapPin],
-  ['messages', 'Messaggi', MessageCircle],
+  ['messages', 'messages.title', MessageCircle],
   ['settings', 'nav.settings', Settings]
 ];
 
@@ -45,13 +46,13 @@ export default function SideMenu({ open, onClose, onNavigate, active, profile, d
 
   return (
     <div className="side-menu-backdrop" role="presentation" onPointerDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }}>
-      <aside className="side-menu" role="dialog" aria-modal="true" aria-label="Menu Wallaa" onPointerDown={(event) => event.stopPropagation()}>
+      <aside className="side-menu" role="dialog" aria-modal="true" aria-label={uiText("Menu Wallaa")} onPointerDown={(event) => event.stopPropagation()}>
         <div className="side-menu-head">
           <strong>WALLAA</strong>
           <button type="button" onClick={onClose} aria-label={t('common.close')}><X size={21}/></button>
         </div>
         <div className="side-user-card"><CircleUserRound size={38}/><div><strong>{name}</strong><span>{profile?.email || t('v4.menu.ecosystem')}</span></div></div>
-        <nav className="side-nav" aria-label="Menu Wallaa">
+        <nav className="side-nav" aria-label={uiText("Menu Wallaa")}>
           {/* WALLAA_V4_0_66_SENTINEL_ACCESS_FIX: Sentinel role/network entry is visible to every authenticated plan. SOS dispatch remains a backend Pro entitlement. */}
           <button type="button" className={`${active === 'sentinel' ? 'active' : ''} side-sentinel-item`.trim()} onClick={() => navigate('sentinel')}><img src="/sentinel-shield.png" alt="" className="side-sentinel-icon"/><span>Sentinel</span>{profile?.plan === 'pro' ? <em>PRO</em> : null}</button>
           {items.map(([id,key,Icon]) => (
@@ -61,7 +62,7 @@ export default function SideMenu({ open, onClose, onNavigate, active, profile, d
           ))}
         </nav>
         <div className="side-device-footer">
-          <div><strong>{connectionLabel} <i className={`status-dot ${connectionStatus}`}/></strong><span>Wallaa Button</span><span>{t('v4.menu.battery')} {telemetry?.battery != null ? `${telemetry.battery}%` : '—'}</span></div>
+          <div><strong>{connectionLabel} <i className={`status-dot ${connectionStatus}`}/></strong><span>{"" + uiText("Wallaa Button") + ""}</span><span>{t('v4.menu.battery')} {telemetry?.battery != null ? `${telemetry.battery}%` : '—'}</span></div>
           <WallaaButton3D status={visualStatus} size="xs" compact />
         </div>
       </aside>

@@ -1,3 +1,4 @@
+import {uiText,uiLocale} from '../uiText.js';
 import {sentinelMapOffset,clusterSentinelMarkers,sentinelDirection} from '../services/sentinelMap';
 // WALLAA_V4_0_63_SENTINEL_MAP_ALL_USERS — nearby markers are visible to every authenticated plan; dispatch remains backend Pro-only.
 // WALLAA_V4_0_61_SENTINEL_VISIBILITY_FIX
@@ -49,15 +50,15 @@ function LiveMap({ lat, lng, emergency, sentinels = [], showUserPin = true, sent
     {clusters.map((cluster, index) => {
       const first = cluster.items[0]?.sentinel || {};
       const count = cluster.items.length;
-      const detail = `${count} Sentinel ${count===1?'disponibile':'disponibili'} · ${sentinelDirection(cluster.items[0].bearingDeg)}`;
+      const detail = uiText('{count} Sentinel {status} · {direction}',{count,status:uiText(count===1?'disponibile':'disponibili'),direction:uiText(sentinelDirection(cluster.items[0].bearingDeg))});
       return <button key={`sentinel-cluster-${index}`} type="button" onClick={()=>setSelectedCluster(cluster)} className={`v454-sentinel-marker ${sentinelMode?'sentinel-radar-marker':''} ${cluster.outOfView?'edge-marker':''}`} style={{left:`calc(50% + ${cluster.dx}px)`,top:`calc(50% + ${cluster.dy}px)`}} title={detail} aria-label={detail}>
         <img src="/sentinel-shield.png" alt="Sentinel"/>
         <i className={`state-${first.status||'available'}`}/>
         {count>1&&<b className="sentinel-count-badge">{count}</b>}
       </button>;
     })}
-    <span className="sentinel-map-north" aria-label="Nord in alto">↑ N</span>
-    {selectedCluster&&<div className="sentinel-map-detail" role="dialog" aria-label="Dettagli Sentinel"><strong>{selectedCluster.items.length} Sentinel disponibili</strong><p>Direzione: {sentinelDirection(selectedCluster.items[0].bearingDeg)}{selectedCluster.outOfView?' · oltre il bordo della mappa':''}</p><small>Il gruppo riunisce soltanto indicatori vicini nella stessa direzione. Fuori da un SOS non mostra coordinate precise.</small><button type="button" onClick={()=>setSelectedCluster(null)}>Chiudi</button></div>}
+    <span className="sentinel-map-north" aria-label={uiText("Nord in alto")}>↑ N</span>
+    {selectedCluster&&<div className="sentinel-map-detail" role="dialog" aria-label={uiText("Dettagli Sentinel")}><strong>{selectedCluster.items.length}{" " + uiText("Sentinel disponibili") + ""}</strong><p>{"" + uiText("Direzione:") + " "}{uiText(sentinelDirection(selectedCluster.items[0].bearingDeg))}{selectedCluster.outOfView?' · '+uiText('oltre il bordo della mappa'):''}</p><small>{"" + uiText("Il gruppo riunisce soltanto indicatori vicini nella stessa direzione. Fuori da un SOS non mostra coordinate precise.") + ""}</small><button type="button" onClick={()=>setSelectedCluster(null)}>{"" + uiText("Chiudi") + ""}</button></div>}
     <div className="v412-map-attribution">© OpenStreetMap contributors</div>
   </div>;
 }
@@ -80,8 +81,8 @@ export default function MapScreen({ activeAlert, currentLocation, locationStatus
     return()=>{alive=false;clearInterval(id);document.removeEventListener('visibilitychange',wake);window.removeEventListener('focus',load);window.removeEventListener('online',load)};
   }, [networkIdentity?.authToken,lat,lng,valid]);
   return <div className="screen v4-generic-screen v402-map-screen"><header className="v402-screen-intro v402-map-intro"><div><span>{t('v4.map.eyebrow')}</span><h1>{t('v4.map.title')}</h1><p>{isEmergency?(isPro?t('v412.map.livePro'):t('v412.map.basicAlert')):t('v402.map.privateBody')}</p></div><button className="v402-add-button" onClick={()=>onRefreshLocation?.().catch(()=>{})} disabled={locationStatus==='checking'} aria-label={t('v402.map.refresh')}><RefreshCw size={20} className={locationStatus==='checking'?'spin':''}/></button></header>
-    {location?.approximate && <p className="v402-privacy-note">Zona indicativa rilevata da un telefono della rete Wallaa.</p>}
+    {location?.approximate && <p className="v402-privacy-note">{"" + uiText("Zona indicativa rilevata da un telefono della rete Wallaa.") + ""}</p>}
     <section className={`v402-location-status ${isEmergency?'emergency':'ready'}`}><div className="v402-location-status-icon">{isEmergency?<ShieldCheck size={20}/>:<LocateFixed size={20}/>}</div><div><strong>{isEmergency?(isPro?t('v402.map.liveTracking'):t('v412.map.positionSent')):valid?t('v402.map.currentPosition'):t('v402.map.acquiring')}</strong><span>{isEmergency?(isPro?t('v402.map.sharedDuringAlert'):t('v412.map.basicNoTracking')):t('v402.map.notSharedNow')}</span></div><i/></section>
-    <section className="v402-map-card v412-map-card"><LiveMap lat={valid?lat:NaN} lng={valid?lng:NaN} emergency={isEmergency} sentinels={sentinels}/>{<div className="v454-sentinel-overlay"><div className="v454-sentinel-legend"><img src="/sentinel-shield.png" alt=""/><span><b>Rete Sentinel</b><small>{sentinels.length?`${sentinels.length} disponibili · indicatori per direzione`:'Nessuna Sentinel disponibile rilevata'}</small></span></div></div>}
+    <section className="v402-map-card v412-map-card"><LiveMap lat={valid?lat:NaN} lng={valid?lng:NaN} emergency={isEmergency} sentinels={sentinels}/>{<div className="v454-sentinel-overlay"><div className="v454-sentinel-legend"><img src="/sentinel-shield.png" alt=""/><span><b>{"" + uiText("Rete Sentinel") + ""}</b><small>{sentinels.length?uiText('{count} disponibili · indicatori per direzione',{count:sentinels.length}):uiText("Nessuna Sentinel disponibile rilevata")}</small></span></div></div>}
         <div className="v402-location-details"><div className="v402-coordinate-row"><div><small>{t('v402.map.latitude')}</small><strong>{valid?lat.toFixed(6):'—'}</strong></div><div><small>{t('v402.map.longitude')}</small><strong>{valid?lng.toFixed(6):'—'}</strong></div></div><div className="v402-location-meta"><span><Navigation size={14}/>{Number.isFinite(accuracy)?`± ${Math.round(accuracy)} m`:t('v402.map.accuracyUnknown')}</span><span>{capturedAt?new Date(capturedAt).toLocaleTimeString(language||undefined,{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—'}</span></div>{valid&&<a className="v402-open-maps" href={appleMapsUrl(lat,lng)} target="_blank" rel="noreferrer"><ExternalLink size={16}/>{t('v402.map.openAppleMaps')}</a>}</div></section><section className="v402-privacy-note"><ShieldCheck size={17}/><div><strong>{t('v402.map.privacyTitle')}</strong><p>{t('v412.map.privacyText')}</p></div></section></div>;
 }

@@ -1,3 +1,4 @@
+import {uiText,uiLocale} from '../uiText.js';
 import {
   Bluetooth, CheckCircle2, ChevronRight, Info, Mail, MapPin, ShieldCheck, Users
 } from 'lucide-react';
@@ -60,7 +61,7 @@ export default function HomeScreen({
           <WallaaButtonVisual size="sm" connected={Boolean(device)} />
         </div>
         <div className="wallaa-device-copy">
-          <strong>Wallaa Button</strong>
+          <strong>{"" + uiText("Wallaa Button") + ""}</strong>
           <span className={device ? 'online' : 'offline'}>
             <span className="tiny-status-dot" />
             {device ? t('home.connected') : t('home.toConnect')}

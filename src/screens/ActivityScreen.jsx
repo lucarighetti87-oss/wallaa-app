@@ -1,3 +1,4 @@
+import {uiText,uiLocale} from '../uiText.js';
 import {
   BellRing,
   CheckCircle2,
@@ -53,13 +54,13 @@ export default function ActivityScreen({
 
         <div className="aa-notifications-titleblock">
           <span>WALLAA CENTER</span>
-          <h1>Attività</h1>
-          <p>Eventi, SOS e attività di sicurezza degli ultimi 30 giorni.</p>
+          <h1>{"" + uiText("Attività") + ""}</h1>
+          <p>{"" + uiText("Eventi, SOS e attività di sicurezza degli ultimi 30 giorni.") + ""}</p>
         </div>
 
         <div
           className="aa-activity-count-v39"
-          aria-label={`${rows.length} attività`}
+          aria-label={uiText("{value0} attività",{value0:(rows.length)})}
         >
           <BellRing/>
           <b>{rows.length}</b>
@@ -70,7 +71,7 @@ export default function ActivityScreen({
         <div>
           <i><BellRing/></i>
           <span>
-            <small>ALERT TOTALI</small>
+            <small>{"" + uiText("ALERT TOTALI") + ""}</small>
             <strong>{alertCount}</strong>
           </span>
         </div>
@@ -78,7 +79,7 @@ export default function ActivityScreen({
         <div>
           <i><ShieldCheck/></i>
           <span>
-            <small>EVENTI RIUSCITI</small>
+            <small>{"" + uiText("EVENTI RIUSCITI") + ""}</small>
             <strong>{successCount}</strong>
           </span>
         </div>
@@ -88,8 +89,8 @@ export default function ActivityScreen({
         <div className="aa-notifications-tool-copy">
           <ShieldCheck/>
           <span>
-            <strong>Cronologia attività</strong>
-            <small>Conservazione automatica · 30 giorni</small>
+            <strong>{"" + uiText("Cronologia attività") + ""}</strong>
+            <small>{"" + uiText("Conservazione automatica · 30 giorni") + ""}</small>
           </span>
         </div>
 
@@ -99,7 +100,7 @@ export default function ActivityScreen({
           disabled={!rows.length}
         >
           <Trash2/>
-          <span>Cancella tutto</span>
+          <span>{"" + uiText("Cancella tutto") + ""}</span>
         </button>
       </section>
 
@@ -133,8 +134,8 @@ export default function ActivityScreen({
                     (entry.trigger
                       ? triggerLabel(entry.trigger, language)
                       : emergency
-                        ? 'Aggiornamento sicurezza Wallaa'
-                        : 'Evento Wallaa')}
+                        ? uiText("Aggiornamento sicurezza Wallaa")
+                        : uiText("Evento Wallaa"))}
                 </small>
 
                 {entry.location?.mapsUrl && (
@@ -143,9 +144,7 @@ export default function ActivityScreen({
                     target="_blank"
                     rel="noreferrer"
                   >
-                    <MapPin size={13}/>
-                    Apri posizione
-                  </a>
+                    <MapPin size={13}/>{"" + uiText("Apri posizione") + " "}</a>
                 )}
               </div>
 
@@ -157,11 +156,8 @@ export default function ActivityScreen({
         {!rows.length && (
           <div className="aa-notifications-empty">
             <BellRing/>
-            <h2>Nessuna attività</h2>
-            <p>
-              Gli eventi del Wallaa Button, gli SOS e gli aggiornamenti
-              di sicurezza compariranno qui.
-            </p>
+            <h2>{"" + uiText("Nessuna attività") + ""}</h2>
+            <p>{"" + uiText("Gli eventi del Wallaa Button, gli SOS e gli aggiornamenti di sicurezza compariranno qui.") + " "}</p>
           </div>
         )}
       </section>

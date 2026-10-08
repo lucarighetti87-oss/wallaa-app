@@ -1,3 +1,4 @@
+import {uiText,uiLocale} from '../uiText.js';
 import { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -87,9 +88,9 @@ export default function ChatScreen({
       }
     } catch (e) {
       if (request !== requestRef.current) return;
-      setSyncError('Aggiornamento non disponibile. Riproviamo automaticamente.');
+      setSyncError(uiText("Aggiornamento non disponibile. Riproviamo automaticamente."));
       if (!silent) {
-        setError(e?.message || 'Impossibile caricare i messaggi.');
+        setError(e?.message || uiText("Impossibile caricare i messaggi."));
       }
     } finally {
       if (request === requestRef.current) setLoading(false);
@@ -204,7 +205,7 @@ export default function ChatScreen({
       setBody('');
       loadMessages({silent:true});
     } catch (e) {
-      setError(e?.message || 'Invio del messaggio non riuscito.');
+      setError(e?.message || uiText("Invio del messaggio non riuscito."));
     } finally {
       setSending(false);
     }
@@ -228,7 +229,7 @@ export default function ChatScreen({
     if (!current.id || isSentinelConversation) return;
 
     const confirmed = window.confirm(
-      'Eliminare definitivamente questa conversazione?'
+      uiText("Eliminare definitivamente questa conversazione?")
     );
 
     if (!confirmed) return;
@@ -239,7 +240,7 @@ export default function ChatScreen({
       onDeleted?.();
       onBack();
     } catch (e) {
-      setError(e?.message || 'Impossibile eliminare la conversazione.');
+      setError(e?.message || uiText("Impossibile eliminare la conversazione."));
     }
   };
 
@@ -253,7 +254,7 @@ export default function ChatScreen({
   return (
     <div className={`wallaa-chat-screen ${isSentinelConversation ? 'wallaa-chat-sentinel' : ''}`}>
       <header className="wallaa-chat-header">
-        <button type="button" onClick={onBack} aria-label="Indietro">
+        <button type="button" onClick={onBack} aria-label={uiText("Indietro")}>
           <ArrowLeft size={22} />
         </button>
 
@@ -263,11 +264,11 @@ export default function ChatScreen({
 
         <div className="wallaa-chat-person">
           <strong>
-            {current.name || current.title || 'Utente Wallaa'}
+            {current.name || current.title || uiText("Utente Wallaa")}
           </strong>
           <span>
             <LockKeyhole size={10} />
-            {isSentinelConversation ? 'Chat di soccorso · Sentinel' : 'Conversazione Wallaa'}
+            {isSentinelConversation ? uiText("Chat di soccorso · Sentinel") : uiText("Conversazione Wallaa")}
           </span>
         </div>
 
@@ -276,14 +277,14 @@ export default function ChatScreen({
             type="button"
             className="wallaa-chat-delete"
             onClick={handleDelete}
-            aria-label="Elimina conversazione"
+            aria-label={uiText("Elimina conversazione")}
           >
             <Trash2 size={18} />
           </button>
         )}
       </header>
 
-      {isSentinelConversation && <div className="wallaa-chat-context"><ShieldCheck size={18}/><span><strong>{sentinelClosed?'Intervento concluso':'Intervento Sentinel'}</strong><small>Parli con {current.name || current.title || 'la persona assegnata'}. Questa chat è separata dalla Centrale.</small></span></div>}
+      {isSentinelConversation && <div className="wallaa-chat-context"><ShieldCheck size={18}/><span><strong>{sentinelClosed?uiText("Intervento concluso"):uiText("Intervento Sentinel")}</strong><small>{"" + uiText("Parli con") + " "}{current.name || current.title || 'la persona assegnata'}{"" + uiText(". Questa chat è separata dalla Centrale.") + ""}</small></span></div>}
       {syncError && <div className="wallaa-chat-sync" role="status">{syncError}</div>}
       {error && (
         <div className="wallaa-message-error wallaa-chat-error" role="alert">
@@ -300,18 +301,18 @@ export default function ChatScreen({
             <div className="wallaa-empty-chat-icon">
               <MessageCircle size={27} />
             </div>
-            <strong>Caricamento...</strong>
+            <strong>{"" + uiText("Caricamento...") + ""}</strong>
           </div>
         ) : messages.length === 0 ? (
           <div className="wallaa-chat-thread-empty">
             <div className="wallaa-empty-chat-icon">
               <MessageCircle size={27} />
             </div>
-            <strong>Nessun messaggio</strong>
+            <strong>{"" + uiText("Nessun messaggio") + ""}</strong>
             <p>
               {isSentinelConversation
-                ? 'Canale operativo dell’intervento Sentinel.'
-                : 'Inizia la conversazione.'}
+                ? uiText("Canale operativo dell’intervento Sentinel.")
+                : uiText("Inizia la conversazione.")}
             </p>
           </div>
         ) : (
@@ -325,16 +326,16 @@ export default function ChatScreen({
                 key={message.id}
                 className={`wallaa-chat-message ${mine ? 'mine' : 'theirs'}`}
               >
-                <b className="wallaa-chat-sender">{mine?'Tu':current.name || current.title || 'Utente Wallaa'}</b>
+                <b className="wallaa-chat-sender">{mine?uiText("Tu"):current.name || current.title || uiText("Utente Wallaa")}</b>
                 <p>{message.body}</p>
                 <span>
                   {message.createdAt
-                    ? new Date(message.createdAt).toLocaleTimeString([], {
+                    ? new Date(message.createdAt).toLocaleTimeString(uiLocale(), {
                         hour: '2-digit',
                         minute: '2-digit'
                       })
                     : ''}
-                  {mine && <><Check size={12} /> Inviato</>}
+                  {mine && <><Check size={12} />{" " + uiText("Inviato") + ""}</>}
                 </span>
               </div>
             );
@@ -347,10 +348,8 @@ export default function ChatScreen({
           <div className="wallaa-sentinel-chat-closed">
             <ShieldCheck size={18} />
             <span>
-              <strong>Intervento concluso</strong>
-              <small>
-                La conversazione Sentinel è disponibile in sola lettura.
-              </small>
+              <strong>{"" + uiText("Intervento concluso") + ""}</strong>
+              <small>{"" + uiText("La conversazione Sentinel è disponibile in sola lettura.") + " "}</small>
             </span>
           </div>
         </footer>
@@ -369,24 +368,24 @@ export default function ChatScreen({
                 scrollThreadToBottom();
               }, 80);
             }}
-            placeholder={isSentinelConversation?'Scrivi nella chat di soccorso…':'Scrivi un messaggio…'}
-            aria-label="Messaggio"
+            placeholder={isSentinelConversation?uiText("Scrivi nella chat di soccorso…"):uiText("Scrivi un messaggio…")}
+            aria-label={uiText("Messaggio")}
             disabled={sending}
           />
 
           <button
             type="button"
-            aria-label="Invia messaggio"
+            aria-label={uiText("Invia messaggio")}
             onClick={handleSend}
             disabled={!body.trim() || sending}
           >
-            {sending?'Invio…':<Send size={18} />}
+            {sending?uiText("Invio…"):<Send size={18} />}
           </button>
         </div>
 
         <small>
           <LockKeyhole size={9} />
-          {sending?'Invio in corso…':'Inviato = salvato nella conversazione; non indica lettura.'}
+          {sending?uiText("Invio in corso…"):uiText("Inviato = salvato nella conversazione; non indica lettura.")}
         </small>
       </footer>
       )}

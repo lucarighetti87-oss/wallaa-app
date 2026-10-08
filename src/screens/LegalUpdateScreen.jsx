@@ -1,3 +1,4 @@
+import {uiText,uiLocale} from '../uiText.js';
 import { useMemo, useState } from 'react';
 import { Check, ExternalLink, FileText, ShieldCheck } from 'lucide-react';
 import { CONFIG } from '../config';

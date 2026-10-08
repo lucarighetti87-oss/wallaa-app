@@ -815,6 +815,9 @@ export function localeForLanguage(language) {
 
 export function translate(language, key, vars = {}) {
   const lang = normalizeLanguage(language);
+  if(key==='messages.title')return ({en:'Messages',it:'Messaggi',es:'Mensajes',fr:'Messages',de:'Nachrichten',pt:'Mensagens'})[lang];
   const template = dictionaries[lang]?.[key] ?? en[key] ?? key;
   return String(template).replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? `{${name}}`);
 }
+
+export function dictionaryEntries(language){return Object.entries(dictionaries[normalizeLanguage(language)]);}
