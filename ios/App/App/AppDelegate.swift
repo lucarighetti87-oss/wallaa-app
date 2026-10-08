@@ -270,6 +270,10 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private var communityLocationTimeout: DispatchWorkItem?
     private var communityPublishing = false
     private var communityPaused = false
+    private var communityLastDetectedAt:Date?
+    private var communityLastReportAt:Date?
+    private var communityLastResponseCode:Int?
+    private var communityLastFailureAt:Date?
     private var communityNextAttempt = Date.distantPast
     private var communityRequestedAlways = false
     private var communityEnabled: Bool {
@@ -304,17 +308,19 @@ private var scanRearmWorkItem: DispatchWorkItem?
               now.timeIntervalSince(communityLastSent[hardwareId] ?? .distantPast)>=15 else {return}
         if communityMacs.count>256 {communityMacs=[peripheral.identifier:hardwareId]}
         if communityPending.count>=20 && communityPending[hardwareId]==nil {return}
+        communityLastDetectedAt=now
         communityPending[hardwareId]=(rssi:rssi.intValue,at:now)
         guard now>=communityNextAttempt else {return}
         beginCommunityTask()
         if let location=locationManager.location, location.horizontalAccuracy>=0,
            location.horizontalAccuracy<=100, abs(location.timestamp.timeIntervalSinceNow)<15 {
             publishCommunityObservations(location)
-        } else if locationManager.authorizationStatus == .authorizedAlways && !sending && !adminLocationRequestPending && !communityPublishing {
+        } else if locationManager.authorizationStatus == .authorizedAlways && !sending && !adminLocationRequestPending && !communityPublishing && communityLocationTimeout == nil {
             locationManager.requestLocation()
             communityLocationTimeout?.cancel()
             let timeout=DispatchWorkItem {[weak self] in
                 self?.communityNextAttempt=Date().addingTimeInterval(30)
+                self?.communityLastFailureAt=Date();self?.communityLastResponseCode = -1
                 self?.communityPending.removeAll();self?.endCommunityTask()
             }
             communityLocationTimeout=timeout
@@ -350,16 +356,17 @@ private var scanRearmWorkItem: DispatchWorkItem?
                 guard let self else {return}
                 self.communityPublishing=false
                 self.endCommunityTask()
-                if let response=response as? HTTPURLResponse, [401,403].contains(response.statusCode) {
-                    self.communityPaused=true;self.communityPending.removeAll()
-                    return
-                }
-                if let response=response as? HTTPURLResponse, (200..<300).contains(response.statusCode) {
+                let code=(response as? HTTPURLResponse)?.statusCode ?? 0
+                self.communityLastResponseCode=code
+                if WallaaMokoGATT.shouldPauseCommunity(statusCode:code) {self.communityPaused=true;self.communityLastFailureAt=Date();self.communityPending.removeAll();return}
+                if code==403 {self.communityLastFailureAt=Date();self.communityNextAttempt=Date().addingTimeInterval(WallaaMokoGATT.communityRetryDelay(statusCode:code));return}
+                if (200..<300).contains(code) {
+                    self.communityLastReportAt=Date();self.communityLastFailureAt=nil
                     for item in items {
                         self.communityLastSent[item.key]=now
                         if self.communityPending[item.key]?.at==item.value.at {self.communityPending.removeValue(forKey:item.key)}
                     }
-                } else {self.communityNextAttempt=Date().addingTimeInterval(30)}
+                } else {self.communityLastFailureAt=Date();self.communityNextAttempt=Date().addingTimeInterval(30)}
             }
         }.resume()
     }
@@ -462,7 +469,11 @@ private var scanRearmWorkItem: DispatchWorkItem?
         }
         refreshMokoTelemetryIfNeeded()
         requestMokoMotionSample()
-        var result: [String: Any] = ["telemetry":mokoTelemetry,"state": mokoStatus,
+        var network:[String:Any]=["paused":communityPaused,"lastStatusCode":communityLastResponseCode ?? 0,"waiting":communityPending.count]
+        if let at=communityLastDetectedAt {network["lastDetectedAt"]=ISO8601DateFormatter().string(from:at)}
+        if let at=communityLastReportAt {network["lastReportAt"]=ISO8601DateFormatter().string(from:at)}
+        if let at=communityLastFailureAt {network["lastFailureAt"]=ISO8601DateFormatter().string(from:at)}
+        var result: [String: Any] = ["network":network,"telemetry":mokoTelemetry,"state": mokoStatus,
             "connected": mokoAuthenticated && mokoPeripheral?.state == .connected && mokoEventsCharacteristic?.isNotifying == true && mokoStatus == "ready",
             "ready": mokoStatus == "ready", "rssi": NSNull(), "disconnectedAt": NSNull()]
         #if DEBUG
@@ -1607,6 +1618,8 @@ private var scanRearmWorkItem: DispatchWorkItem?
 }
 
 private enum WallaaMokoGATT {
+    static func shouldPauseCommunity(statusCode:Int)->Bool{statusCode==401}
+    static func communityRetryDelay(statusCode:Int)->TimeInterval{statusCode==403 ? 60 : 30}
     static func accelerationDelta(_ previous:[String:Int],_ current:[String:Int])->Int{["x","y","z"].map{abs((current[$0] ?? 0)-(previous[$0] ?? 0))}.max() ?? 0}
     static func acceleration(_ data:Data)->[String:Int]?{
         let b=[UInt8](data);guard b.count==10,b[0]==0xeb,b[3]==6 else{return nil}

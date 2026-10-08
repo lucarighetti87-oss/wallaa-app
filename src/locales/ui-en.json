@@ -492,5 +492,20 @@
   "Eliminare definitivamente la conversazione con {value0}?": "Permanently delete the conversation with {value0}?",
   "Pronto": "Ready",
   "Avvisi disconnessione WB-001": "WB-001 disconnection alerts",
-  "Ricevi avvisi se il collegamento resta interrotto. I Guardian abilitati possono essere avvisati.": "Receive alerts if the connection remains interrupted. Authorized Guardians may also be notified."
+  "Ricevi avvisi se il collegamento resta interrotto. I Guardian abilitati possono essere avvisati.": "Receive alerts if the connection remains interrupted. Authorized Guardians may also be notified.",
+  "Stato ricevitore Wallaa": "Wallaa receiver status",
+  "Sessione da ripristinare": "Sign-in needs restoring",
+  "Invio da riprovare": "Sending needs retrying",
+  "Dati inviati al servizio": "Data sent to the service",
+  "In attesa di un pulsante nelle vicinanze": "Waiting for a nearby button",
+  "Ultimo rilevamento Bluetooth:": "Last Bluetooth detection:",
+  "Ultimo invio al servizio:": "Last report to the service:",
+  "Non ancora rilevato": "Not detected yet",
+  "Non ancora inviato": "Not sent yet",
+  "Questo stato conferma il lavoro del telefono ricevente. Il proprietario verifica il risultato in Ultimo rilevamento del proprio WB-001.": "This status describes the receiving phone. The owner checks the result under Last detection for their WB-001.",
+  "Rilevamento ricevuto dalla rete": "Detection received from the network",
+  "Ritrovamento abilitato · nessun rilevamento ricevuto": "Finding enabled · no detection received",
+  "Verifica account e partecipazione alla rete. Il telefono riproverà.": "Check your account and network participation. The phone will retry.",
+  "Invio non riuscito. Controlla Internet e i permessi.": "Sending failed. Check Internet access and permissions.",
+  "Pulsante rilevato · invio in preparazione": "Button detected · preparing the report"
 }
