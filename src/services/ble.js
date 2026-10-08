@@ -266,7 +266,7 @@ export async function startWallaaMonitor({ deviceId, hardwareId, communityEnable
           const decoded = decodeResult(result);
           if (!decoded) return;
           if (communityEnabled && decoded.id !== deviceId && decoded.protocol === 'moko-button' && decoded.hardwareId?.startsWith('MOKO:') && Number.isFinite(decoded.rssi)) {
-            onCommunityObservation?.({hardwareId:decoded.hardwareId,rssi:decoded.rssi,observedAt:new Date().toISOString()});
+            onCommunityObservation?.({hardwareId:decoded.hardwareId,rssi:decoded.rssi,moving:decoded.frameType!=null?decoded.motion:undefined,observedAt:new Date().toISOString()});
           }
           if (decoded.id !== deviceId) return;
           if (decoded.protocol === 'moko-button') {

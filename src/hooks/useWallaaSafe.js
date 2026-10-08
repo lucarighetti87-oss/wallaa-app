@@ -1,3 +1,5 @@
+import {observationDue} from '../services/observationCadence';
+import {mergeMokoTelemetry} from '../services/radioTelemetry';
 import {combineReceiverStatus} from '../services/networkReceiver';
 import {buildButtonHeartbeat} from '../services/buttonHealth';
 import { setNetworkParticipation, getOwnedNetworkDevices, reportNetworkObservations, getDeviceNetworkLocation, setDeviceNetworkTracking as saveDeviceNetworkTracking } from '../services/deviceNetwork';
@@ -9,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { storage } from '../services/storage';
 import { pairWallaaButton, captureMokoSetupBaseline, startWallaaMonitor, stopBleScan } from '../services/ble';
-import { getCurrentLocation, requestLocationPermission, watchLiveLocation } from '../services/location';
+import { getCurrentLocation,getCachedLocation,requestLocationPermission, watchLiveLocation } from '../services/location';
 import { sendWallaaAlert } from '../services/alert';
 import { closeLiveAlert, deleteWallaaAccount, sendDeviceHeartbeat, updateLiveLocation, sendLiveProtectionLocation, sendAuthorizedLocationSnapshot, sendUniversalSentinelHeartbeat } from '../services/liveAlert';
 import {
@@ -69,6 +71,8 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const [networkOwnedDevices, setNetworkOwnedDevices] = useState([]);
   const [networkDevice, setNetworkDevice] = useState({trackingEnabled:false,lastObservation:null});
   const networkObservationBuffer = useRef(new Map());
+  const networkLastSent=useRef(new Map());
+  const networkPublish=useRef(null);
   const [receiverLocal,setReceiverLocal]=useState({});
   const [receiverNative,setReceiverNative]=useState({});
   const networkReceiverStatus=combineReceiverStatus(receiverLocal,receiverNative);
@@ -925,9 +929,9 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       deviceId: armed ? device?.id : null,
       hardwareId: device?.hardwareId,
       communityEnabled: profile?.networkObserverEnabled === true,
-      onCommunityObservation: observation => {networkObservationBuffer.current.set(observation.hardwareId,observation);setReceiverLocal(value=>({...value,lastDetectedAt:observation.observedAt}));},
+      onCommunityObservation: observation => {networkObservationBuffer.current.set(observation.hardwareId,observation);setReceiverLocal(value=>({...value,lastDetectedAt:observation.observedAt}));if(!networkLastSent.current.has(observation.hardwareId))networkPublish.current?.();},
       onTelemetry: (data) => {
-        setTelemetry((prev) => ({ ...prev, battery:data.battery, rssi:data.rssi, seenAt:data.seenAt, ...(data.protocol === 'moko-button' ? { motion:data.motion, acceleration:data.acceleration, batteryVoltageMv:data.batteryVoltageMv } : {}) }));
+        setTelemetry((prev) => ({ ...prev, battery:data.battery, rssi:data.rssi, rssiSampledAt:data.seenAt,rssiSource:'advertisement',seenAt:data.seenAt, ...(data.protocol === 'moko-button' ? { motion:data.motion, acceleration:data.acceleration, batteryVoltageMv:data.batteryVoltageMv } : {}) }));
         const current = deviceRef.current;
         const identity = networkIdentityRef.current;
         if(current && data.protocol==='moko-button' && (!current.hardwareId?.startsWith('MOKO:')||current.protocol!=='moko-button')){
@@ -995,7 +999,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
         if (stopped) return;
         if(status.ready&&status.connected){if(nativeReadySinceRef.current===null)nativeReadySinceRef.current=Date.now();}else nativeReadySinceRef.current=null;
         setMokoConnection(status);
-        if (status.connected) setTelemetry(prev => ({...prev, ...status.telemetry, rssi:status.rssi ?? prev.rssi, seenAt:new Date().toISOString()}));
+        if (status.connected) setTelemetry(prev => mergeMokoTelemetry(prev,status));
       } catch (error) { if (!stopped) setMokoConnection({state:'unavailable',connected:false,ready:false}); }
     };
     refresh();
@@ -1026,18 +1030,19 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     let stopped=false, publishing=false;
     const publish=async()=>{
       if(stopped || publishing || !networkObservationBuffer.current.size) return;
+      const due=[...networkObservationBuffer.current.values()].filter(item=>observationDue(item,networkLastSent.current.get(item.hardwareId)));if(!due.length)return;
       publishing=true;
       try{
-        const location=await getCurrentLocation();
+        const location=getCachedLocation()||await getCurrentLocation();
         if(stopped)return;
-        const items=[...networkObservationBuffer.current.values()].filter(x=>Date.now()-new Date(x.observedAt).getTime()<60000).slice(0,10);
-        if(items.length){await reportNetworkObservations(networkIdentityRef.current,location,items);if(!stopped)setReceiverLocal(value=>({...value,lastReportAt:new Date().toISOString(),error:''}));}
+        const items=[...networkObservationBuffer.current.values()].filter(item=>observationDue(item,networkLastSent.current.get(item.hardwareId))).slice(0,10);
+        if(items.length){await reportNetworkObservations(networkIdentityRef.current,location,items);if(stopped)return;for(const item of items)networkLastSent.current.set(item.hardwareId,Date.now());setReceiverLocal(value=>({...value,lastReportAt:new Date().toISOString(),error:''}));}
         for(const item of items)if(networkObservationBuffer.current.get(item.hardwareId)===item)networkObservationBuffer.current.delete(item.hardwareId);
         for(const [key,item] of networkObservationBuffer.current)if(Date.now()-new Date(item.observedAt).getTime()>60000)networkObservationBuffer.current.delete(key);
       }catch(error){if(!stopped)setReceiverLocal(value=>({...value,lastFailureAt:new Date().toISOString(),error:error.message||'Rilevamento non inviato.'}));}finally{publishing=false;}
     };
-    const timer=setInterval(publish,15000);
-    return()=>{stopped=true;clearInterval(timer);networkObservationBuffer.current.clear();};
+    networkPublish.current=publish;const timer=setInterval(publish,15000);
+    return()=>{stopped=true;networkPublish.current=null;clearInterval(timer);networkObservationBuffer.current.clear();networkLastSent.current.clear();};
   },[loaded,networkIdentity?.authToken,profile?.networkObserverEnabled,appVisible]);
 
   useEffect(()=>{
