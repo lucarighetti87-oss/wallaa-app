@@ -5,8 +5,8 @@ import {safetyPeople} from '../services/safetyNetwork';
 
 function NetworkScene(){
  return <div className="safety-scene safety-scene-cinematic" aria-hidden="true">
-  <img className="safety-cinematic-art" src="/guardian-network-cinematic-v2.png" alt=""/>
-  <div className="safety-art-shade"/><div className="safety-holo-ring ring-front"/><div className="safety-holo-ring ring-back"/>
+  <img className="safety-cinematic-art" src="/guardian-network-cinematic-v3.png" alt=""/>
+  <div className="safety-central-energy"/><div className="safety-art-shade"/><div className="safety-holo-ring ring-front"/><div className="safety-holo-ring ring-back"/>
   <div className="safety-official-core"><img src="/wallaa-app-icon.png" alt=""/><i/></div>
   <div className="safety-light-scan"/>
   <div className="safety-energy-particles">{Array.from({length:7},(_,n)=><i key={n} style={{'--particle':n}}/>)}</div>

@@ -7,7 +7,7 @@ test('one safety list merges the QR relationship and opens people and a discreet
  await expect(page.locator('.safety-cinematic-art')).toBeVisible();
  await page.waitForFunction(()=>document.querySelector('.safety-cinematic-art')?.naturalWidth>0);
  await expect(page.locator('.safety-person').last()).toHaveCSS('opacity','1');
- await page.screenshot({path:'artifacts/network-scene-build105.png'});
+ await page.screenshot({path:'artifacts/network-scene-build106.png'});
  await page.getByRole('button',{name:'Il mio QR',exact:true}).click();await expect(page.locator('.safety-qr-panel img')).toBeVisible();
  await page.getByRole('button',{name:/Marta Rossi/}).click();await expect(page.getByRole('status')).toHaveText('Marta Rossi');
  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);expect(overflow).toBe(false);
@@ -37,4 +37,18 @@ test('Sentinel glow covers the visible phone screen at the top and after scrolli
  await page.screenshot({path:'artifacts/sentinel-aura-top-build105.png'});
  await page.evaluate(()=>window.scrollTo(0,700));const scrolled=await aura.boundingBox();expect(scrolled.y).toBe(0);expect(scrolled.height).toBe(844);
  await page.screenshot({path:'artifacts/sentinel-aura-scrolled-build105.png'});
+});
+
+test('the central Guardian light has an animated red pulse and respects reduced motion',async({page})=>{
+ await page.goto('/tests/ui/index.html?screen=network');const energy=page.locator('.safety-central-energy');await expect(energy).toBeVisible();
+ expect(await energy.evaluate(el=>getComputedStyle(el).animationName)).toBe('guardianRedPulse');
+ expect(await energy.evaluate(el=>getComputedStyle(el,'::before').animationName)).toBe('guardianRedFlow');
+ await page.emulateMedia({reducedMotion:'reduce'});expect(await energy.evaluate(el=>getComputedStyle(el).animationName)).toBe('none');expect(await energy.evaluate(el=>getComputedStyle(el,'::before').animationName)).toBe('none');
+});
+
+test('capture the Guardian lighting animation for review',async({browser})=>{
+ const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,recordVideo:{dir:'artifacts/animation-capture',size:{width:390,height:844}}});
+ const page=await context.newPage();await page.goto('http://127.0.0.1:5174/tests/ui/index.html?screen=network');
+ await page.locator('.safety-scene-cinematic').scrollIntoViewIfNeeded();
+ await page.waitForTimeout(6500);const video=page.video();await context.close();await video.saveAs('artifacts/guardian-animation-build106.webm');
 });
