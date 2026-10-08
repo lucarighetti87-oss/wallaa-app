@@ -7,7 +7,6 @@ const items = [
   ['home', 'nav.home', Home],
   ['device', 'v4.menu.myButton', Link2],
   ['network', 'v4.menu.safetyNetwork', Shield],
-  ['contacts', 'v4.menu.emergencyContacts', UsersRound],
   ['map', 'v4.menu.location', MapPin],
   ['messages', 'messages.title', MessageCircle],
   ['settings', 'nav.settings', Settings]
@@ -57,7 +56,7 @@ export default function SideMenu({ open, onClose, onNavigate, active, profile, d
           <button type="button" className={`${active === 'sentinel' ? 'active' : ''} side-sentinel-item`.trim()} onClick={() => navigate('sentinel')}><img src="/sentinel-shield.png" alt="" className="side-sentinel-icon"/><span>Sentinel</span>{profile?.plan === 'pro' ? <em>PRO</em> : null}</button>
           {items.map(([id,key,Icon]) => (
             <button type="button" key={id} className={active===id?'active':''} onClick={() => navigate(id)}>
-              <Icon size={19}/><span>{t(key)}</span>
+              <Icon size={19}/><span>{id==='network'?uiText('Rete di Sicurezza'):t(key)}</span>
             </button>
           ))}
         </nav>

@@ -108,7 +108,7 @@ export default function GuardianModeScreen({
     <header className="aa-focus-head">
       <button type="button" onClick={onBack}><ArrowLeft/></button>
       <div>
-        <h1>Guardian Mode</h1>
+        <h1>{uiText('Protezione della rete')}</h1>
         <p>{"" + uiText("I Guardian autorizzati riceveranno la tua posizione quando attivi un SOS.") + ""}</p>
       </div>
       <button type="button" className="decorative" aria-label={uiText("Impostazioni Guardian")}><Settings/></button>

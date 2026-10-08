@@ -35,7 +35,7 @@ import { getWallaaConversations } from './services/network.js';
 
 import WallaaBrandShield from './components/WallaaBrandShield';
 const emptyContact = {
-  id: '', name: '', email: '', phone: '', role: 'guardian',
+  id: '', name: '', email: '', phone: '', customerId: '', role: 'guardian',
   permissions: { sosAlerts: true, liveLocation: true, disconnectAlerts: true }
 };
 
@@ -46,7 +46,7 @@ export default function App() {
   // WALLAA 4.0.72 — every normal screen opens from the top.
   // Chat is intentionally excluded because it owns its message scroll.
   const navigateTo = (targetScreen) => {
-    setScreen(targetScreen);
+    setScreen(['contacts','network'].includes(targetScreen)?'network':targetScreen);
 
     if (targetScreen === 'chat') return;
 
@@ -147,6 +147,7 @@ export default function App() {
   const [drawer, setDrawer] = useState(false);
   const [contactModal, setContactModal] = useState(false);
   const [contactDraft, setContactDraft] = useState(emptyContact);
+  const [contactSaving,setContactSaving]=useState(false);
   const [result, setResult] = useState(null);
   const [sosActivation, setSosActivation] = useState(false);
   const [splashMinDone, setSplashMinDone] = useState(false);
@@ -247,11 +248,13 @@ export default function App() {
 
   async function submitContact(e) {
     e.preventDefault();
+    if(contactSaving)return;
+    setContactSaving(true);
     try {
-      await safe.addOrUpdateContact(contactDraft);
+      const saved=await safe.addOrUpdateContact(contactDraft);
       setContactModal(false); setContactDraft(emptyContact);
-      safe.setToast({ type: 'success', text: t('toast.contactSaved') });
-    } catch (error) { safe.setToast({ type: 'error', text: error.message }); }
+      safe.setToast({ type: 'success', text: contactDraft.id||contactDraft.linkId?t('toast.contactSaved'):saved.isWallaaUser?uiText('W Guardian aggiunto. Ora vi proteggete a vicenda.'):t('toast.contactSaved') });
+    } catch (error) { safe.setToast({ type: 'error', text: uiText(error.message) }); } finally {setContactSaving(false);}
   }
 
   async function testSOS() {
@@ -303,7 +306,7 @@ export default function App() {
         {screen === 'home' && <HomeV4Screen {...common} onSOSStart={() => setSosActivation(true)} onSOSCancel={() => { if (!safe.busy) setSosActivation(false); }} onSafetyCheck={() => setScreen('security-check')} />}
         {screen === 'security-check' && <SecurityCheckScreen {...common} onBack={() => setScreen('home')} onRefreshSystemHealth={safe.refreshSystemHealth} />}
         {screen === 'contacts' && <ContactsScreen contacts={safe.contacts} plan={safe.profile?.plan || 'basic'} t={t} onBack={() => setScreen('home')} onAdd={() => { setContactDraft(emptyContact); setContactModal(true); }} onEdit={(contact) => { setContactDraft(contact); setContactModal(true); }} />}
-        {screen === 'guardian' && <GuardianModeScreen profile={safe.profile} currentLocation={safe.currentLocation} locationStatus={safe.locationStatus} networkState={safe.networkState} contacts={safe.contacts} onToggle={(v)=>safe.setGuardianMode(v).catch((e)=>safe.setToast({type:'error',text:e.message}))} onRefreshLocation={safe.refreshCurrentLocation} onBack={()=>setScreen('home')} />}
+        {screen === 'guardian' && <GuardianModeScreen profile={safe.profile} currentLocation={safe.currentLocation} locationStatus={safe.locationStatus} networkState={safe.networkState} contacts={safe.contacts} onToggle={(v)=>safe.setGuardianMode(v).catch((e)=>safe.setToast({type:'error',text:e.message}))} onRefreshLocation={safe.refreshCurrentLocation} onBack={()=>setScreen('network')} />}
         {screen === 'map' && <MapScreen activeAlert={safe.activeAlert} plan={safe.profile?.plan || 'basic'} networkIdentity={safe.networkIdentity} currentLocation={safe.currentLocation} locationStatus={safe.locationStatus} onRefreshLocation={safe.refreshCurrentLocation} t={t} language={language} />}
         {screen === 'sentinel' && <SentinelScreen networkIdentity={safe.networkIdentity} profile={safe.profile} currentLocation={safe.currentLocation} onRefreshLocation={safe.refreshCurrentLocation} onBack={() => setScreen('home')} onHome={() => setScreen('home')} onOpenChat={(conversation) => { setSelectedConversation(conversation); setScreen('chat'); }} sentinelOffer={safe.sentinelOffer} clearSentinelOffer={safe.clearSentinelOffer} setToast={safe.setToast} plan={safe.profile?.plan || 'basic'} />}
         {screen === 'device' && <DeviceScreen onRefreshDevice={()=>safe.refreshButtonStatus().catch(error=>safe.setToast({type:"error",text:error.message}))} onBack={() => setScreen('home')} onHome={() => setScreen('home')} device={safe.device} telemetry={safe.telemetry} pairingState={safe.pairingState} pairingError={safe.pairingError} onPair={options => safe.pairDevice(options).catch(()=>{})} pendingMokoDevice={safe.pendingMokoDevice} onResumeSetup={options=>safe.resumeMokoSetup(options).catch(()=>{})} pairingCandidates={safe.pairingCandidates} onSelectCandidate={safe.selectPairingCandidate} onCancelPair={safe.cancelPairing} onMokoSetup={options=>safe.setupMokoDevice(options).catch(()=>{})} networkOwnedDevices={safe.networkOwnedDevices} networkDevice={safe.networkDevice} onNetworkTracking={safe.setDeviceNetworkTracking} mokoConnection={safe.mokoConnection} onMokoConfigure={safe.setMokoConnectionOptions} connectionGuard={safe.connectionGuard} onConnectionGuard={safe.setConnectionGuard} connectionStatus={safe.connectionStatus} signalQuality={safe.signalQuality} trigger={safe.trigger} onTrigger={safe.setTrigger} t={t} />}
@@ -329,7 +332,7 @@ export default function App() {
           />
         )}
         {screen === 'notifications' && <NotificationsScreen activities={safe.activities} onOpenAlert={safe.openGuardianAlert} onBack={()=>setScreen('home')} onClear={() => clearActivityFeed('notifications')} t={t} language={language} />}
-        {screen === 'network' && <NetworkScreen profile={safe.profile} networkState={safe.networkState} qrDataUrl={safe.qrDataUrl} onScan={async () => { try { await safe.scanNetworkQr(); setScreen('home'); } catch (error) { safe.setToast({ type:'error', text:error.message }); } }} onRotate={() => safe.rotateQr().catch((error) => safe.setToast({ type:'error', text:error.message }))} onRemoveLink={(id) => safe.removeNetworkLink(id).catch((error) => safe.setToast({ type:'error', text:error.message }))} onRefresh={() => safe.refreshNetwork().catch(() => {})} t={t} />}
+        {screen === 'network' && <NetworkScreen contacts={safe.contacts} onAdd={() => { setContactDraft(emptyContact); setContactModal(true); }} onEdit={contact=>{setContactDraft(contact);setContactModal(true);}} onGuardianSettings={()=>setScreen('guardian')} profile={safe.profile} networkState={safe.networkState} qrDataUrl={safe.qrDataUrl} onScan={async () => { try { await safe.scanNetworkQr(); } catch (error) { safe.setToast({ type:'error', text:error.message }); } }} onRotate={() => safe.rotateQr().catch((error) => safe.setToast({ type:'error', text:error.message }))} onRemoveLink={(id) => safe.removeNetworkLink(id).catch((error) => safe.setToast({ type:'error', text:error.message }))} onRefresh={() => safe.refreshNetwork().catch(() => {})} t={t} />}
         {screen === 'resolved-alert' && <ResolvedAlertScreen alert={safe.resolvedAlert} onHome={()=>{safe.dismissResolvedAlert();setScreen('home')}} />}
         {screen === 'active-alert' && <ActiveAlertScreen
           alert={safe.activeAlert}
@@ -356,17 +359,19 @@ export default function App() {
       <EmergencyDispatchOverlay open={safe.dispatchingAlert} stage={safe.dispatchStage} t={t} />
       <SOSActivation open={sosActivation && !safe.dispatchingAlert} onCancel={() => setSosActivation(false)} onConfirm={activateSOS} busy={safe.busy} t={t} />
 
-      <Modal open={contactModal} title={contactDraft.id ? t('v4.guardian.edit') : t('v4.guardian.new')} onClose={() => setContactModal(false)} className="guardian-editor-sheet">
+      <Modal open={contactModal} title={contactDraft.id || contactDraft.linkId ? t('v4.guardian.edit') : t('v4.guardian.new')} onClose={() => {if(!contactSaving)setContactModal(false);}} className="guardian-editor-sheet">
         <form className="modal-form guardian-modal-form" onSubmit={submitContact}>
-          <label>{t('v4.guardian.name')}<input className="input" value={contactDraft.name} onChange={(e) => setContactDraft({ ...contactDraft, name:e.target.value })} placeholder={t('v4.guardian.namePlaceholder')} autoFocus /></label>
-          <label>{"" + uiText("Email") + ""}<input className="input" type="email" value={contactDraft.email} onChange={(e) => setContactDraft({ ...contactDraft, email:e.target.value })} placeholder="guardian@email.com" /></label>
-          <label>{t('v4.guardian.phone')}<input className="input" type="tel" value={contactDraft.phone} onChange={(e) => setContactDraft({ ...contactDraft, phone:e.target.value })} placeholder="+39…" /></label>
-          <label>{t('v4.guardian.role')}<select className="input" value={contactDraft.role||'guardian'} onChange={(e)=>setContactDraft({...contactDraft,role:e.target.value})}><option value="guardian">{t('v4.guardian.guardian')}</option><option value="primary">{t('v4.guardian.primary')}</option></select></label>
+          <label>{t('v4.guardian.name')}<input className="input" disabled={Boolean(contactDraft.linkId)} value={contactDraft.name} onChange={(e) => setContactDraft({ ...contactDraft, name:e.target.value })} placeholder={t('v4.guardian.namePlaceholder')} autoFocus /></label>
+          <label>{"" + uiText("Email") + ""}<input className="input" type="email" disabled={Boolean(contactDraft.linkId)} value={contactDraft.email||''} onChange={(e) => setContactDraft({ ...contactDraft, email:e.target.value })} placeholder="guardian@email.com" /></label>
+          <label>{t('v4.guardian.phone')}<input className="input" type="tel" disabled={Boolean(contactDraft.linkId)} value={contactDraft.phone||''} onChange={(e) => setContactDraft({ ...contactDraft, phone:e.target.value })} placeholder="+39…" /></label>
+          <label>{uiText('Codice cliente Wallaa')}<input className="input" disabled={Boolean(contactDraft.linkId)} value={contactDraft.customerId||''} onChange={e=>setContactDraft({...contactDraft,customerId:e.target.value.toUpperCase()})} placeholder="WSB-…" autoCapitalize="characters" /></label>
+          <p className="safety-editor-hint">{uiText('Basta telefono, email o codice cliente. Se la persona usa Wallaa, viene riconosciuta come W Guardian.')}</p>
+          <label>{t('v4.guardian.role')}<select className="input" value={contactDraft.role||'guardian'} onChange={(e)=>setContactDraft({...contactDraft,role:e.target.value})}><option value="guardian">{t('v4.guardian.guardian')}</option><option value="primary">{t('v4.guardian.primary')}</option><option value="guardian_pro">Guardian Pro</option></select></label>
           <div className="guardian-permission-editor">
             {[['sosAlerts',t('v4.contacts.sos')],['liveLocation',t('v4.contacts.live')],['disconnectAlerts',t('v4.contacts.disconnect')]].map(([key,label])=><label key={key} className="permission-toggle"><span>{label}</span><input type="checkbox" checked={contactDraft.permissions?.[key]!==false} onChange={(e)=>setContactDraft({...contactDraft,permissions:{...contactDraft.permissions,[key]:e.target.checked}})}/></label>)}
           </div>
-          <button className="v4-primary" type="submit">{t('v4.guardian.save')}</button>
-          {contactDraft.id && <button className="danger-outline full" type="button" onClick={async () => { await safe.removeContact(contactDraft.id); setContactModal(false); setContactDraft(emptyContact); }}>{t('v4.guardian.delete')}</button>}
+          <button className="v4-primary" type="submit" disabled={contactSaving}>{contactSaving?uiText('Verifica e salvataggio…'):t('v4.guardian.save')}</button>
+          {contactDraft.id && <button className="danger-outline full" type="button" onClick={async () => { try {await safe.removeContact(contactDraft.id); setContactModal(false); setContactDraft(emptyContact);} catch(error){safe.setToast({type:'error',text:uiText(error.message)});} }}>{t('v4.guardian.delete')}</button>}
         </form>
       </Modal>
 

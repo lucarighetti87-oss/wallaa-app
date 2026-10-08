@@ -15,7 +15,7 @@ import { getCurrentLocation,getCachedLocation,requestLocationPermission, watchLi
 import { sendWallaaAlert } from '../services/alert';
 import { closeLiveAlert, deleteWallaaAccount, sendDeviceHeartbeat, updateLiveLocation, sendLiveProtectionLocation, sendAuthorizedLocationSnapshot, sendUniversalSentinelHeartbeat } from '../services/liveAlert';
 import {
-  createQrDataUrl, claimWallaaDevice, checkWallaaDeviceClaim, getWallaaNetwork, getWallaaContacts, getWallaaAccount, getWallaaLegalStatus, acceptWallaaLegalDocuments, getWallaaAlerts, getNetworkAlert, loginWallaaAccount, logoutWallaaAccount, registerWallaaAccount, registerWallaaIdentity, removeWallaaLink, rotateWallaaQr, scanQrWithCamera, scanWallaaCode, syncWallaaContacts, getWallaaNotificationHistory, getActiveGuardianAlerts, acknowledgeActiveNetworkAlerts, clearWallaaNotificationHistory } from '../services/network';
+  createQrDataUrl, claimWallaaDevice, checkWallaaDeviceClaim, getWallaaNetwork, getWallaaContacts, getWallaaAccount, getWallaaLegalStatus, acceptWallaaLegalDocuments, getWallaaAlerts, getNetworkAlert, loginWallaaAccount, logoutWallaaAccount, registerWallaaAccount, registerWallaaIdentity, removeWallaaLink, rotateWallaaQr, scanQrWithCamera, scanWallaaCode, saveWallaaContact, deleteWallaaContact, syncWallaaContacts, getWallaaNotificationHistory, getActiveGuardianAlerts, acknowledgeActiveNetworkAlerts, clearWallaaNotificationHistory } from '../services/network';
 import { clearDeliveredWallaaNotifications, initWallaaPush, playWallaaAlarm, stopPushListeners, stopWallaaAlarm } from '../services/push';
 import { detectDeviceLanguage, translate } from '../i18n';
 import { ensureLocalNotificationPermission, feedbackWarning, showLocalSafetyNotification } from '../services/nativeFeedback';
@@ -36,7 +36,10 @@ function normalizeContact(input = {}) {
     name: String(input.name || '').trim(),
     email: String(input.email || '').trim(),
     phone: String(input.phone || '').trim(),
-    role: input.role === 'primary' ? 'primary' : 'guardian',
+    role: ['primary','guardian_pro'].includes(input.role) ? input.role : 'guardian',
+    networkUserId: input.networkUserId || null,
+    customerId: input.customerId || '',
+    source: input.source || 'manual',
     permissions: {
       sosAlerts: input.permissions?.sosAlerts !== false,
       liveLocation: input.permissions?.liveLocation !== false,
@@ -241,10 +244,14 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     return row;
   }, []);
 
+  const networkRefreshGeneration=useRef(0);
   const refreshNetwork = useCallback(async (identity = networkIdentityRef.current) => {
     if (!identity?.authToken) return null;
+    const generation=++networkRefreshGeneration.current;
     try {
       const state = await getWallaaNetwork(identity);
+      if(generation!==networkRefreshGeneration.current)return state;
+      if(Array.isArray(state.contacts)){const next=state.contacts.map(normalizeContact);if(JSON.stringify(next)!==JSON.stringify(contactsRef.current)){contactsRef.current=next;setContacts(next);await storage.setContacts(next);}}
       setNetworkState((current) => ({ ...current, ...state, status: 'ready' }));
       if (state.qrPayload) setQrDataUrl(await createQrDataUrl(state.qrPayload));
       return state;
@@ -1398,28 +1405,23 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   }, [resetLocalSession]);
 
   const addOrUpdateContact = useCallback(async (input) => {
-    const contact = normalizeContact(input);
-    if (!contact.name || !contact.email) throw new Error(tx('error.contactRequired'));
-    const isNew = !input.id;
-    const limit = profileRef.current?.plan === 'pro' ? 5 : 2;
-    if (isNew && contactsRef.current.length >= limit) {
-      const error = new Error(tx(profileRef.current?.plan === 'pro' ? 'v412.contacts.proLimit' : 'v412.contacts.basicLimit', { count: limit }));
-      error.code = 'CONTACT_LIMIT';
-      throw error;
-    }
-    const next = input.id ? contactsRef.current.map((c) => c.id === input.id ? contact : c) : [...contactsRef.current, contact];
-    if (contact.role === 'primary') next.forEach((c) => { if (c.id !== contact.id) c.role = 'guardian'; });
-    setContacts(next); contactsRef.current = next; await storage.setContacts(next);
-    if (networkIdentityRef.current?.authToken) {
-      try { await syncWallaaContacts(networkIdentityRef.current, next); } catch (error) { setToast({ type:'warning', text: tx('v416.contacts.cloudPending') }); }
-    }
-  }, [tx]);
+    if (!networkIdentityRef.current?.authToken) throw new Error('Accedi a Wallaa per aggiornare la Rete di Sicurezza.');
+    // Persist and resolve on the server first. Failed saves must never look successful locally.
+    const result=await saveWallaaContact(networkIdentityRef.current,{...input,countryCode:profileRef.current?.countryCode||'+39'});
+    const next=(result.contacts||[]).map(normalizeContact);
+    setContacts(next);contactsRef.current=next;await storage.setContacts(next);
+    await refreshNetwork().catch(()=>{});
+    return result;
+
+  }, [refreshNetwork]);
 
   const removeContact = useCallback(async (id) => {
-    const next = contactsRef.current.filter((c) => c.id !== id);
-    setContacts(next); contactsRef.current = next; await storage.setContacts(next);
-    if (networkIdentityRef.current?.authToken) { try { await syncWallaaContacts(networkIdentityRef.current, next); } catch { /* local copy retained */ } }
-  }, []);
+    await deleteWallaaContact(networkIdentityRef.current,id);
+    const next = contactsRef.current.filter(c=>c.id!==id);
+    setContacts(next);contactsRef.current=next;await storage.setContacts(next);
+    await refreshNetwork().catch(()=>{});
+
+  }, [refreshNetwork]);
 
   const cancelPairing=useCallback(()=>{pairingControllerRef.current?.abort(new Error('Associazione annullata.'));pairingChoiceRef.current?.reject(new Error('Associazione annullata.'));},[]);
   const selectPairingCandidate=useCallback(candidate=>{const choice=pairingChoiceRef.current;if(!choice){setPairingError('La selezione è terminata. Ripeti il collegamento.');setPairingCandidates([]);return;}setPairingCandidates([]);setPairingState('connecting');choice.resolve(candidate);},[]);

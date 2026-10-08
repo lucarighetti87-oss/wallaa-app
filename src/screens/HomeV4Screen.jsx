@@ -30,7 +30,7 @@ export default function HomeV4Screen({
   const connected = ['connected', 'standby'].includes(connectionStatus);
   const weak = connectionStatus === 'weak';
   const protectedState = connected || weak;
-  const guardianCount = contacts.filter((c) => c.permissions?.sosAlerts !== false).length + (networkState?.guardians?.length || 0);
+  const guardianCount = new Set([...contacts.filter(c=>c.permissions?.sosAlerts!==false).map(c=>c.networkUserId||c.id),...(networkState?.guardians||[]).filter(c=>c.permissions?.sosAlerts!==false).map(c=>c.userId)]).size;
   const battery = telemetry?.battery != null ? `${telemetry.battery}%` : '—';
   const name = profile?.firstName || profile?.name?.split?.(' ')?.[0] || 'Luca';
   const eventOnly = device?.monitorMode === 'event-only';
@@ -70,7 +70,8 @@ export default function HomeV4Screen({
   };
 
   return (
-    <section className="w37-home" aria-label="Wallaa Home">
+    <section className={`w37-home ${networkState?.sentinelProtectionActive ? 'sentinel-mode-active' : ''}`} aria-label="Wallaa Home">
+      {networkState?.sentinelProtectionActive&&<div className="sentinel-mode-sweep" aria-hidden="true"/>}
       <div className="w37-bg-perspective-grid" aria-hidden="true" />
       <div className="w37-bg-globe-hologram" aria-hidden="true" />
 
@@ -146,14 +147,9 @@ export default function HomeV4Screen({
         </section>
 
         <div className="w37-grid-actions">
-          <button type="button" className="w37-holo-card w37-grid-cell" onClick={() => onNavigate?.('guardian')}>
-            <div className="w37-grid-cell-head"><Navigation size={24} /><ChevronRight size={18} /></div>
-            <span><strong>Guardian Mode</strong><small>{"" + uiText("Protezione live") + ""}</small></span>
-          </button>
-
-          <button type="button" className="w37-holo-card w37-grid-cell" onClick={() => onNavigate?.('contacts')}>
-            <div className="w37-grid-cell-head"><Users size={24} /><ChevronRight size={18} /></div>
-            <span><strong>{"" + uiText("I miei contatti") + ""}</strong><small>{guardianCount}{" " + uiText("configurati") + ""}</small></span>
+          <button type="button" className="w37-holo-card w37-grid-cell w-safety-home-card" onClick={() => onNavigate?.('network')}>
+            <div className="w37-grid-cell-head"><Users size={24}/><ChevronRight size={18}/></div>
+            <span><strong>{uiText('Rete di Sicurezza')}</strong><small>{guardianCount} {uiText('Persone nella tua rete')}</small></span>
           </button>
 
           <button type="button" className="w37-holo-card w37-grid-cell" onClick={() => onNavigate?.('map')}>
@@ -161,15 +157,11 @@ export default function HomeV4Screen({
             <span><strong>{"" + uiText("Posizione") + ""}</strong><small>{"" + uiText("Apri mappa") + ""}</small></span>
           </button>
 
-          <button type="button" className="w37-holo-card w37-grid-cell" onClick={() => onNavigate?.('network')}>
-            <div className="w37-grid-cell-head"><QrCode size={24} /><ChevronRight size={18} /></div>
-            <span><strong>Safety Network</strong><small>{networkState?.status === 'ready' ? uiText("Pronta") : uiText("Da configurare")}</small></span>
-          </button>
         </div>
 
         <button type="button" className="w37-holo-card w37-sentinel-card-home" onClick={() => onNavigate?.('sentinel')}>
           <img src="/sentinel-shield.png" alt="" className="w454-sentinel-menu-icon"/>
-          <span className="w37-card-copy"><strong>Sentinel {profile?.plan === 'pro' ? <em className="w454-pro-chip">PRO</em> : null}</strong><small>{profile?.plan === 'pro' ? uiText("Rete Sentinel + protezione SOS Pro") : uiText("Vedi la rete e candidati come Sentinel")}</small></span>
+          <span className="w37-card-copy"><strong>Sentinel {networkState?.sentinelProtectionActive&&<span className="sentinel-mode-label">{uiText('Attiva')}</span>} {profile?.plan === 'pro' ? <em className="w454-pro-chip">PRO</em> : null}</strong><small>{profile?.plan === 'pro' ? uiText("Rete Sentinel + protezione SOS Pro") : uiText("Vedi la rete e candidati come Sentinel")}</small></span>
           <ChevronRight className="w37-chevron-arrow" size={20}/>
         </button>
 

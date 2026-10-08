@@ -1,73 +1,24 @@
-import { BellRing, CheckCircle2, CircleAlert, Link2, QrCode, RefreshCw, ScanLine, ShieldCheck, Trash2, UserCheck, Users } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ChevronRight, Plus, QrCode, RefreshCw, ScanLine, Shield, ShieldCheck, UserRound, X } from 'lucide-react';
+import {uiText as u} from '../uiText';
+import {safetyPeople} from '../services/safetyNetwork';
 
-export default function NetworkScreen({ profile, networkState, qrDataUrl, onScan, onRotate, onRemoveLink, onRefresh, t }) {
-  const guardians = networkState.guardians || [];
-  const following = networkState.following || [];
-  const ready = networkState.status === 'ready';
-  const cachedQr = Boolean(qrDataUrl);
-
-  return (
-    <div className="screen network-screen light-screen v401-network-screen">
-      <div className="screen-title pro-title network-title">
-        <div><p className="eyebrow dark">{t('network.eyebrow')}</p><h1>{t('network.title')}</h1><p>{t('network.subtitle')}</p></div>
-        <button className="round-add" onClick={onRefresh} aria-label={t('network.refresh')}><RefreshCw size={21}/></button>
-      </div>
-
-      <section className={`network-hero-card ${ready ? 'online' : 'offline'}`}>
-        <div className="network-orb network-orb-a"/><div className="network-orb network-orb-b"/>
-        <div className="network-hero-copy">
-          <span className="network-chip"><ShieldCheck size={14}/> {t('network.personalCode')}</span>
-          <h2>{profile.name?.trim() || [profile.firstName, profile.lastName].filter(Boolean).join(' ') || t('network.wallaaId')}</h2>
-          <p>{t('network.qrDesc')}</p>
-          <span className={`v401-network-state ${ready ? 'ok' : cachedQr ? 'cached' : 'bad'}`}>
-            {ready ? <CheckCircle2 size={13}/> : <CircleAlert size={13}/>} {ready ? t('v401.network.synced') : cachedQr ? t('v401.network.cached') : t('v401.network.notGenerated')}
-          </span>
-        </div>
-        <div className="qr-premium-shell">
-          <div className="qr-corners" aria-hidden="true"><i/><i/><i/><i/></div>
-          {qrDataUrl ? <img src={qrDataUrl} alt={t('network.qrAlt')}/> : <div className="qr-loading"><QrCode size={54}/><small>{t('v401.network.waiting')}</small></div>}
-          <span className="qr-center-mark">W</span>
-        </div>
-        <div className="qr-actions">
-          <button className="network-primary" onClick={onScan} disabled={!ready}><ScanLine size={20}/> {t('network.scanQr')}</button>
-          <button className="network-secondary" onClick={onRotate} disabled={!ready}><RefreshCw size={18}/> {t('network.regenerate')}</button>
-        </div>
-      </section>
-
-      <section className="network-status-strip">
-        <div><BellRing size={18}/><span><small>{t('network.notifications')}</small><strong>{networkState.pushPermission === 'granted' ? t('network.active') : t('network.toEnable')}</strong></span></div>
-        <div><UserCheck size={18}/><span><small>{t('network.protectMe')}</small><strong>{guardians.length}</strong></span></div>
-        <div><Users size={18}/><span><small>{t('network.iProtect')}</small><strong>{following.length}</strong></span></div>
-      </section>
-
-      {!ready && <section className="network-offline-card v401-offline-card">
-        <div className="network-offline-icon"><Link2 size={22}/></div>
-        <div><strong>{t('v401.network.backendRequired')}</strong><p>{networkState.error || t('network.backendFallback')}</p></div>
-        <button type="button" onClick={onRefresh}><RefreshCw size={17}/><span>{t('v401.network.retry')}</span></button>
-      </section>}
-
-      <NetworkList title={t('network.guardiansTitle')} subtitle={t('network.guardiansSubtitle')} rows={guardians} empty={t('network.guardiansEmpty')} onRemove={onRemoveLink} accent="green" t={t}/>
-      <NetworkList title={t('network.followingTitle')} subtitle={t('network.followingSubtitle')} rows={following} empty={t('network.followingEmpty')} onRemove={onRemoveLink} accent="blue" t={t}/>
-
-      <section className="network-how-card">
-        <span className="network-how-number">01</span><div><strong>{t('network.scan')}</strong><p>{t('network.scanDesc')}</p></div>
-        <span className="network-how-number">02</span><div><strong>{t('network.connect')}</strong><p>{t('network.connectDesc')}</p></div>
-        <span className="network-how-number">03</span><div><strong>{t('network.receiveSos')}</strong><p>{t('network.receiveSosDesc')}</p></div>
-      </section>
-    </div>
-  );
+function NetworkScene({count}){
+ return <div className="safety-scene" aria-hidden="true"><div className="safety-orbit orbit-one"/><div className="safety-orbit orbit-two"/><div className="safety-core"><Shield/><span>W</span></div>{[0,1,2].map((n)=><div key={n} className={`safety-figure figure-${n}`}><div className="figure-aura"/><i className="figure-head"/><i className="figure-body"/><span>{n===0?'W':n===1?'W':'G'}</span></div>)}<div className="safety-scene-caption">{count?u('La tua rete, sempre con te'):u('La sicurezza inizia dalle persone')}</div></div>;
 }
-
-function NetworkList({ title, subtitle, rows, empty, onRemove, accent, t }) {
-  return (
-    <section className="network-list-card">
-      <div className="network-list-heading"><div><h2>{title}</h2><p>{subtitle}</p></div><span>{rows.length}</span></div>
-      <div className="network-list-body">
-        {rows.map((row,index)=><div className="network-person-row" key={row.linkId} style={{'--delay':`${index*60}ms`}}><span className={`network-avatar ${accent}`}>{initials(row.displayName)}</span><div><strong>{row.displayName}</strong><small>{accent==='green'?t('network.receivesYourAlerts'):t('network.youReceiveTheirAlerts')}</small></div><button onClick={()=>onRemove(row.linkId)} aria-label={t('network.remove')}><Trash2 size={17}/></button></div>)}
-        {!rows.length && <div className="network-empty"><QrCode size={25}/><span>{empty}</span></div>}
-      </div>
-    </section>
-  );
+export default function NetworkScreen({profile={},contacts=[],networkState={},qrDataUrl,onScan,onRotate,onRemoveLink,onRefresh,onAdd,onEdit,onGuardianSettings}){
+ const[showQr,setShowQr]=useState(false);const[details,setDetails]=useState(null);const people=useMemo(()=>safetyPeople(contacts,networkState),[contacts,networkState]);
+ const ready=networkState.status==='ready';
+ return <div className="screen safety-network-screen">
+  <header className="safety-heading"><div><span>WALLAA CONNECT</span><h1>{u('Rete di Sicurezza')}</h1><p>{u('Le persone su cui puoi contare, in un unico posto.')}</p></div><button type="button" onClick={onRefresh} aria-label={u('Aggiorna rete')}><RefreshCw size={19}/></button></header>
+  <section className="safety-hero"><NetworkScene count={people.length}/><div className="safety-hero-summary"><span><strong>{people.length}</strong>{u('Persone nella tua rete')}</span><span><ShieldCheck size={16}/>{u('Posizione condivisa durante un SOS')}</span></div></section>
+  <div className="safety-add-actions"><button type="button" className="safety-primary" onClick={onAdd}><Plus size={19}/>{u('Aggiungi persona')}</button><button type="button" onClick={onScan} disabled={!ready}><ScanLine size={18}/>{u('Scansiona QR')}</button><button type="button" onClick={()=>setShowQr(!showQr)} aria-expanded={showQr} aria-label={u('Il mio QR')}><QrCode size={20}/></button></div>
+  {!ready&&<p className="safety-status" role="status">{u('Rete da aggiornare. Controlla la connessione e riprova.')}</p>}
+  {showQr&&<section className="safety-qr-panel"><div><strong>{u('Il mio QR')}</strong><p>{u('Una scansione vi collega: ora vi proteggete a vicenda.')}</p><small>{networkState.customerId||profile.customerId||''}</small><button type="button" onClick={onRotate} disabled={!ready}>{u('Rigenera QR')}</button></div>{qrDataUrl&&<img src={qrDataUrl} alt={u('Il mio QR')}/>}</section>}
+  <div className="safety-list-title"><h2>{u('Le tue persone')}</h2><span>{u('W = usa Wallaa')}</span></div>
+  <div className="safety-people">{people.map((person,index)=><article key={person.key} className="safety-person" style={{'--arrival':`${index*70}ms`}}><button type="button" className="safety-person-main" onClick={()=>person.id?onEdit(person):person.guardianLinkId?onEdit({...person,linkId:person.guardianLinkId}):setDetails(person)}><span className={`safety-avatar ${person.isWallaa?'wallaa':''}`}><UserRound size={25}/>{person.isWallaa&&<i>W</i>}</span><span className="safety-person-copy"><strong>{person.name}</strong><small>{person.isWallaa?'W Guardian': 'Guardian'}{person.role==='guardian_pro'?' Pro':person.role==='primary'?` · ${u('Principale')}`:''}</small><em>{person.receives&&person.protects?u('Vi proteggete a vicenda'):person.receives?u('Riceve i tuoi SOS'):u('Ricevi i suoi SOS')}</em></span><ChevronRight size={18}/></button>{!person.isWallaa&&!person.email&&<p className="safety-person-note">{u('Aggiungi un’email per ricevere gli avvisi senza Wallaa.')}</p>}{!person.id&&person.guardianLinkId&&<button className="safety-link-remove" type="button" onClick={()=>onRemoveLink(person.guardianLinkId)}>{u('Rimuovi collegamento')}</button>}</article>)}</div>
+  {!people.length&&<div className="safety-empty"><ShieldCheck size={30}/><h2>{u('Costruisci la tua rete')}</h2><p>{u('Aggiungi una persona tramite telefono, email, codice cliente o QR.')}</p></div>}
+  {details&&<section className="safety-qr-panel" role="region" aria-label={details.name}><div><strong>{details.name}</strong><p>{u('Ricevi i suoi SOS')}</p><p>{u('Questa persona ha scelto di avvisarti. I suoi permessi sono gestiti dal suo account.')}</p><button type="button" onClick={()=>{onRemoveLink(details.followingLinkId);setDetails(null);}}>{u('Smetti di ricevere i suoi SOS')}</button><button type="button" onClick={()=>setDetails(null)}>{u('Chiudi')}</button></div></section>}
+  <button type="button" className="safety-options" onClick={onGuardianSettings}><ShieldCheck size={20}/><span><strong>{u('Impostazioni di protezione')}</strong><small>{u('Permessi e protezione durante l’SOS')}</small></span><ChevronRight size={18}/></button>
+ </div>;
 }
-
-function initials(value='') { return value.trim().split(/\s+/).slice(0,2).map((x)=>x[0]?.toUpperCase()).join('') || 'W'; }

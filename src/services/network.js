@@ -161,6 +161,12 @@ export async function getWallaaContacts(identity) {
   return api('/api/contacts', { identity });
 }
 
+export async function deleteWallaaContact(identity,id) { return api(`/api/contacts/${encodeURIComponent(id)}`,{method:'DELETE',identity}); }
+
+export async function saveWallaaContact(identity, contact) {
+  return contact.linkId ? api(`/api/network/links/${encodeURIComponent(contact.linkId)}`,{method:'PATCH',identity,body:{contact}}) : api('/api/contacts/save', {method:'POST', identity, body:{contact}});
+}
+
 export async function syncWallaaContacts(identity, contacts = []) {
   return api('/api/contacts/sync', { method: 'POST', identity, body: { contacts } });
 }
