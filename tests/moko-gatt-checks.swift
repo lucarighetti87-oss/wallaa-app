@@ -43,3 +43,9 @@ print("6 verifiche capacità H1 e accelerometro superate")
 
 assert(WallaaMokoGATT.accelerationDelta(["x":0,"y":0,"z":1000],["x":160,"y":10,"z":980])==160)
 assert(WallaaMokoGATT.accelerationDelta(["x":0,"y":0,"z":1000],["x":10,"y":10,"z":990])==10)
+
+assert(WallaaMokoGATT.shouldPauseCommunity(statusCode:401))
+assert(!WallaaMokoGATT.shouldPauseCommunity(statusCode:403))
+assert(!WallaaMokoGATT.shouldPauseCommunity(statusCode:503))
+assert(WallaaMokoGATT.communityRetryDelay(statusCode:403)==60)
+print("4 verifiche recupero ricevitore superate")

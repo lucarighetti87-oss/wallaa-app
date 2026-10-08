@@ -1,3 +1,4 @@
+import {combineReceiverStatus} from '../services/networkReceiver';
 import {buildButtonHeartbeat} from '../services/buttonHealth';
 import { setNetworkParticipation, getOwnedNetworkDevices, reportNetworkObservations, getDeviceNetworkLocation, setDeviceNetworkTracking as saveDeviceNetworkTracking } from '../services/deviceNetwork';
 import { prepareMokoButton } from '../services/mokoSetup';
@@ -68,6 +69,9 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const [networkOwnedDevices, setNetworkOwnedDevices] = useState([]);
   const [networkDevice, setNetworkDevice] = useState({trackingEnabled:false,lastObservation:null});
   const networkObservationBuffer = useRef(new Map());
+  const [receiverLocal,setReceiverLocal]=useState({});
+  const [receiverNative,setReceiverNative]=useState({});
+  const networkReceiverStatus=combineReceiverStatus(receiverLocal,receiverNative);
   const [mokoConnection, setMokoConnection] = useState({ state: 'disabled', connected: false, ready: false });
   const [pairingState, setPairingState] = useState('idle');
   const [pairingError,setPairingError]=useState('');
@@ -921,7 +925,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       deviceId: armed ? device?.id : null,
       hardwareId: device?.hardwareId,
       communityEnabled: profile?.networkObserverEnabled === true,
-      onCommunityObservation: observation => networkObservationBuffer.current.set(observation.hardwareId,observation),
+      onCommunityObservation: observation => {networkObservationBuffer.current.set(observation.hardwareId,observation);setReceiverLocal(value=>({...value,lastDetectedAt:observation.observedAt}));},
       onTelemetry: (data) => {
         setTelemetry((prev) => ({ ...prev, battery:data.battery, rssi:data.rssi, seenAt:data.seenAt, ...(data.protocol === 'moko-button' ? { motion:data.motion, acceleration:data.acceleration, batteryVoltageMv:data.batteryVoltageMv } : {}) }));
         const current = deviceRef.current;
@@ -1027,14 +1031,20 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
         const location=await getCurrentLocation();
         if(stopped)return;
         const items=[...networkObservationBuffer.current.values()].filter(x=>Date.now()-new Date(x.observedAt).getTime()<60000).slice(0,10);
-        if(items.length)await reportNetworkObservations(networkIdentityRef.current,location,items);
+        if(items.length){await reportNetworkObservations(networkIdentityRef.current,location,items);if(!stopped)setReceiverLocal(value=>({...value,lastReportAt:new Date().toISOString(),error:''}));}
         for(const item of items)if(networkObservationBuffer.current.get(item.hardwareId)===item)networkObservationBuffer.current.delete(item.hardwareId);
         for(const [key,item] of networkObservationBuffer.current)if(Date.now()-new Date(item.observedAt).getTime()>60000)networkObservationBuffer.current.delete(key);
-      }catch{}finally{publishing=false;}
+      }catch(error){if(!stopped)setReceiverLocal(value=>({...value,lastFailureAt:new Date().toISOString(),error:error.message||'Rilevamento non inviato.'}));}finally{publishing=false;}
     };
     const timer=setInterval(publish,15000);
     return()=>{stopped=true;clearInterval(timer);networkObservationBuffer.current.clear();};
   },[loaded,networkIdentity?.authToken,profile?.networkObserverEnabled,appVisible]);
+
+  useEffect(()=>{
+    if(!loaded||!appVisible||!networkIdentity?.authToken||!profile?.networkObserverEnabled||!supportsMokoConnection())return;
+    let stopped=false;const refresh=async()=>{try{const result=await getMokoConnectionStatus();if(!stopped)setReceiverNative(result.network||{});}catch{}};
+    refresh();const timer=setInterval(refresh,10000);return()=>{stopped=true;clearInterval(timer);};
+  },[loaded,appVisible,networkIdentity?.authToken,profile?.networkObserverEnabled]);
 
   useEffect(()=>{
     if(!loaded || !networkIdentity?.authToken || !device?.hardwareId?.startsWith('MOKO:') || !appVisible)return undefined;
@@ -1640,7 +1650,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     networkIdentity, networkState, qrDataUrl, incomingAlert, incomingAlertMinimized, activeGuardianAlerts, acknowledgeIncomingAlert, openGuardianAlert, sentinelOffer, connectionGuard, appearance, connectionStatus, lastSignalAgeSeconds,
     messagePush,
     centralMessagePush,
-    showSafetyGuide,safetyPermissions,activateSafetyPermissions,refreshSafetyPermissions,finishSafetyGuide,openSafetySettings,refreshButtonStatus,pendingMokoDevice,resumeMokoSetup,pairingCandidates,selectPairingCandidate,cancelPairing,setupMokoDevice,networkOwnedDevices, networkDevice, setNetworkObserver, setDeviceNetworkTracking, mokoConnection, setMokoConnectionOptions, signalQuality, safetyLevel, activeAlert, resolvedAlert, systemHealth, currentLocation, locationStatus, authenticated: Boolean(networkIdentity?.authToken && profile?.onboardingComplete),
+    showSafetyGuide,safetyPermissions,activateSafetyPermissions,refreshSafetyPermissions,finishSafetyGuide,openSafetySettings,refreshButtonStatus,pendingMokoDevice,resumeMokoSetup,pairingCandidates,selectPairingCandidate,cancelPairing,setupMokoDevice,networkOwnedDevices, networkDevice, networkReceiverStatus, setNetworkObserver, setDeviceNetworkTracking, mokoConnection, setMokoConnectionOptions, signalQuality, safetyLevel, activeAlert, resolvedAlert, systemHealth, currentLocation, locationStatus, authenticated: Boolean(networkIdentity?.authToken && profile?.onboardingComplete),
     legalStatus, legalChecked, legalRequired, legalGatePending, legalError,
     setToast, setArmed, setTrigger, saveProfile, setGuardianMode, dismissResolvedAlert, completeOnboarding, loginAccount, signOut, acceptLegalUpdate, refreshLegalStatus, addOrUpdateContact, removeContact, pairDevice, disconnectDevice,
     fireAlert, closeActiveAlert, clearActivities, clearData, deleteAccount, refreshNetwork, scanNetworkQr, rotateQr, removeNetworkLink,

@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {combineReceiverStatus} from '../src/services/networkReceiver.js';
+test('a native failure newer than the last sent report remains visible',()=>{const result=combineReceiverStatus({lastReportAt:'2026-10-08T12:00:00Z'},{lastFailureAt:'2026-10-08T12:01:00Z',lastStatusCode:403});assert.equal(result.error,'HTTP 403');assert.equal(result.paused,false);});
+test('a later report clears an older native failure',()=>{const result=combineReceiverStatus({lastReportAt:'2026-10-08T12:02:00Z'},{lastFailureAt:'2026-10-08T12:01:00Z',lastStatusCode:403});assert.equal(result.error,'');});
+test('an empty receiver never claims a successful detection or report',()=>{const result=combineReceiverStatus();assert.equal(result.lastDetectedAt,null);assert.equal(result.lastReportAt,null);assert.equal(result.error,'');});
