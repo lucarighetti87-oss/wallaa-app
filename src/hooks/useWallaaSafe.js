@@ -1,3 +1,4 @@
+import {buildButtonHeartbeat} from '../services/buttonHealth';
 import { setNetworkParticipation, getOwnedNetworkDevices, reportNetworkObservations, getDeviceNetworkLocation, setDeviceNetworkTracking as saveDeviceNetworkTracking } from '../services/deviceNetwork';
 import { prepareMokoButton } from '../services/mokoSetup';
 import { MOKO_FACTORY_PASSWORD, MOKO_PROFILE_VERSION } from '../services/mokoSetupProtocol';
@@ -1112,7 +1113,8 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       battery: telemetryRef.current.battery,
       rssi: telemetryRef.current.rssi,
       lastSeenAt: telemetryRef.current.seenAt,
-      notifyGuardians: false
+      notifyGuardians: false,
+      ...(device.hardwareId?.startsWith('MOKO:')?{health:{model:'WB-001',firmware:device.firmwareVersion,profileVersion:device.mokoProfileVersion,verified:device.mokoSetupVerified===true,ready:mokoConnection.ready===true,voltage:telemetryRef.current.batteryVoltageMv}}:{})
     }).catch(() => {});
   }, [loaded, device?.id, connectionStatus]);
 
@@ -1509,8 +1511,9 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const finishSafetyGuide=useCallback(async()=>{setShowSafetyGuide(false);await storage.setSafetyGuideSeen(true);},[]);
   useEffect(()=>{
     if(!loaded||!appVisible||!device?.hardwareId?.startsWith('MOKO:')||!networkIdentity?.authToken)return;
-    const send=()=>{if(pairingInProgressRef.current||deviceRef.current?.mokoSetupVerified===false)return;const current=deviceRef.current;sendDeviceHeartbeat(networkIdentityRef.current,{deviceId:current.id,hardwareId:current.hardwareId,claimToken:current.claimToken,status:mokoConnection.connected?'connected':'disconnected',battery:telemetryRef.current.battery,rssi:telemetryRef.current.rssi,lastSeenAt:telemetryRef.current.seenAt,notifyGuardians:false,health:{model:'WB-001',firmware:current.firmwareVersion,profileVersion:current.mokoProfileVersion,verified:current.mokoSetupVerified,ready:mokoConnection.ready,voltage:telemetryRef.current.batteryVoltageMv}}).catch(()=>{});};
-    const timer=setInterval(send,60000);return()=>clearInterval(timer);
+    const send=()=>{if(pairingInProgressRef.current)return;const payload=buildButtonHeartbeat(deviceRef.current,telemetryRef.current,mokoConnection);if(payload)sendDeviceHeartbeat(networkIdentityRef.current,payload).catch(()=>{});};
+    const initial=setTimeout(send,5000);
+    const timer=setInterval(send,60000);return()=>{clearTimeout(initial);clearInterval(timer);};
   },[loaded,appVisible,device?.hardwareId,networkIdentity?.authToken,mokoConnection.connected,mokoConnection.ready]);
 
   const disconnectDevice = useCallback(async () => {
