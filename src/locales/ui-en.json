@@ -507,5 +507,12 @@
   "Ritrovamento abilitato · nessun rilevamento ricevuto": "Finding enabled · no detection received",
   "Verifica account e partecipazione alla rete. Il telefono riproverà.": "Check your account and network participation. The phone will retry.",
   "Invio non riuscito. Controlla Internet e i permessi.": "Sending failed. Check Internet access and permissions.",
-  "Pulsante rilevato · invio in preparazione": "Button detected · preparing the report"
+  "Pulsante rilevato · invio in preparazione": "Button detected · preparing the report",
+  "Collegamento": "Connection",
+  "Interrotto": "Interrupted",
+  "Da aggiornare": "Refresh needed",
+  "Letto alle": "Read at",
+  "Fonte lettura radio": "Radio reading source",
+  "Connessione Bluetooth": "Bluetooth connection",
+  "Signal misura l’intensità radio ricevuta: non indica una distanza in metri e non è, da solo, un test dell’SOS.": "Signal measures received radio strength: it is not a distance in metres and, by itself, does not test SOS delivery."
 }

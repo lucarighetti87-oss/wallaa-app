@@ -264,7 +264,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     }
 
     private var communityMacs: [UUID: String] = [:]
-    private var communityPending: [String: (rssi: Int, at: Date)] = [:]
+    private var communityPending: [String: (rssi: Int, at: Date, moving:Bool?)] = [:]
     private var communityLastSent: [String: Date] = [:]
     private var communityTask: UIBackgroundTaskIdentifier = .invalid
     private var communityLocationTimeout: DispatchWorkItem?
@@ -303,13 +303,15 @@ private var scanRearmWorkItem: DispatchWorkItem?
                 communityMacs[peripheral.identifier]="MOKO:\(mac)"
             }
         }
+        let serviceData=advertisement[CBAdvertisementDataServiceDataKey] as? [CBUUID:Data]
+        let moving=serviceData?[CBUUID(string:"FEE0")].flatMap{WallaaMokoGATT.movementFlag($0)}
         guard let hardwareId=communityMacs[peripheral.identifier], hardwareId != config?.hardwareId,
               (-127...20).contains(rssi.intValue),
-              now.timeIntervalSince(communityLastSent[hardwareId] ?? .distantPast)>=15 else {return}
+              now.timeIntervalSince(communityLastSent[hardwareId] ?? .distantPast)>=WallaaMokoGATT.observationInterval(moving:moving) else {return}
         if communityMacs.count>256 {communityMacs=[peripheral.identifier:hardwareId]}
         if communityPending.count>=20 && communityPending[hardwareId]==nil {return}
         communityLastDetectedAt=now
-        communityPending[hardwareId]=(rssi:rssi.intValue,at:now)
+        communityPending[hardwareId]=(rssi:rssi.intValue,at:now,moving:moving)
         guard now>=communityNextAttempt else {return}
         beginCommunityTask()
         if let location=locationManager.location, location.horizontalAccuracy>=0,
@@ -402,6 +404,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private var mokoHandshakeTimeout: DispatchWorkItem?
     private var mokoLastRssiAt = Date.distantPast
     private var mokoRssi: Int?
+    private var mokoRssiMeasuredAt:Date?
     private var mokoDisconnectedAt: Date?
     private var guardianLastLocationAt = Date.distantPast
     private var guardianPublishing = false
@@ -479,7 +482,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
         #if DEBUG
         result["diagnostic"] = true
         #endif
-        if let rssi = mokoRssi { result["rssi"] = rssi }
+        if let rssi=mokoRssi,let at=mokoRssiMeasuredAt,Date().timeIntervalSince(at)<=45 {result["rssi"]=rssi;result["rssiSampledAt"]=ISO8601DateFormatter().string(from:at)}
         if let at = mokoDisconnectedAt { result["disconnectedAt"] = ISO8601DateFormatter().string(from: at) }
         if mokoLastLoggedStatus != mokoStatus {
             mokoLastLoggedStatus = mokoStatus
@@ -491,7 +494,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
 
     private func refreshMokoTelemetryIfNeeded() {
         guard mokoStatus == "ready", mokoAuthenticated, mokoConnectionWanted, let hardwareId=config?.hardwareId else { return }
-        if mokoTelemetryHardwareId != hardwareId { mokoTelemetry=[:];mokoTelemetryAt = .distantPast;mokoTelemetryHardwareId=hardwareId }
+        if mokoTelemetryHardwareId != hardwareId { mokoTelemetry=[:];mokoTelemetryAt = .distantPast;mokoTelemetryHardwareId=hardwareId;mokoRssi=nil;mokoRssiMeasuredAt=nil;mokoLastRssiAt = .distantPast }
         guard mokoTelemetryCommand == nil, mokoTelemetryQueue.isEmpty, Date().timeIntervalSince(mokoTelemetryAt)>=60 else { return }
         mokoTelemetryAt=Date();mokoTelemetryQueue=[0x62,0x4a,0x4f,0x2d,0x2e,0x5a];readNextMokoTelemetry()
     }
@@ -708,7 +711,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     }
 
     func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
-        if peripheral == mokoPeripheral, error == nil, (-127...0).contains(RSSI.intValue) { mokoRssi = RSSI.intValue;UserDefaults.standard.set(["rssi":RSSI.intValue,"sampledAt":ISO8601DateFormatter().string(from:Date())],forKey:"wallaa.moko.radio") }
+        if peripheral == mokoPeripheral, error == nil, (-127...0).contains(RSSI.intValue) { mokoRssi = RSSI.intValue;mokoRssiMeasuredAt=Date();UserDefaults.standard.set(["rssi":RSSI.intValue,"sampledAt":ISO8601DateFormatter().string(from:Date())],forKey:"wallaa.moko.radio") }
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
@@ -718,7 +721,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         guard peripheral == mokoPeripheral else { return }
-        mokoAuthenticated = false; mokoHandshakeTimeout?.cancel()
+        mokoAuthenticated = false; mokoRssi=nil;mokoRssiMeasuredAt=nil;mokoHandshakeTimeout?.cancel()
         NSLog("[WALLAA][MOKO] disconnected: \(error?.localizedDescription ?? "no error")")
         if mokoConnectionWanted && !mokoAuthenticationBlocked {
             mokoStatus = "disconnected"; if mokoDisconnectedAt == nil { mokoDisconnectedAt = Date() }; scheduleMokoReconnect()
@@ -839,7 +842,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
 
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         if central.state != .poweredOn && mokoConnectionWanted {
-            mokoAuthenticated = false; mokoStatus = "bluetooth_disabled"
+            mokoAuthenticated = false;mokoRssi=nil;mokoRssiMeasuredAt=nil; mokoStatus = "bluetooth_disabled"
             if mokoDisconnectedAt == nil { mokoDisconnectedAt = Date() }
         }
         NSLog("[WALLAA][BLE] central state=\(central.state.rawValue)")
@@ -1618,6 +1621,9 @@ private var scanRearmWorkItem: DispatchWorkItem?
 }
 
 private enum WallaaMokoGATT {
+    static func observationInterval(moving:Bool?)->TimeInterval{moving==true ? 15 : moving==false ? 45 : 30}
+    static func movementFlag(_ data:Data)->Bool?{let b=[UInt8](data);guard (9...12).contains(b.count),[0x20,0x21,0x22].contains(b[0]),b[b.count-2]<=1,b[b.count-1]<=1 else{return nil};return b[b.count-1]==1}
+
     static func shouldPauseCommunity(statusCode:Int)->Bool{statusCode==401}
     static func communityRetryDelay(statusCode:Int)->TimeInterval{statusCode==403 ? 60 : 30}
     static func accelerationDelta(_ previous:[String:Int],_ current:[String:Int])->Int{["x","y","z"].map{abs((current[$0] ?? 0)-(previous[$0] ?? 0))}.max() ?? 0}
