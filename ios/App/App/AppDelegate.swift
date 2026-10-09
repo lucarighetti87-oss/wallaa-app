@@ -4,6 +4,21 @@ import CoreBluetooth
 import CoreLocation
 import UserNotifications
 import Security
+import AccessorySetupKit
+
+#if DEBUG
+private func wallaaDiagnosticRecord(_ kind: String, details: [String: Any] = [:]) {
+    guard let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let url = folder.appendingPathComponent("wallaa-diagnostic-events.json")
+    var events = (try? Data(contentsOf: url)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [[String: Any]] } ?? []
+    var entry = details
+    entry["kind"] = kind
+    entry["at"] = ISO8601DateFormatter().string(from: Date())
+    events.append(entry)
+    if let data = try? JSONSerialization.data(withJSONObject: Array(events.suffix(64))) { try? data.write(to: url, options: .atomic) }
+}
+#endif
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -13,6 +28,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private var wallaaStartupScheduled = false
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        #if DEBUG
+        wallaaDiagnosticRecord("launch", details: ["bluetoothRestoration": launchOptions?[.bluetoothCentrals] != nil])
+        #endif
         // Keep launch lightweight. Release/TestFlight can be less tolerant of native
         // subsystem initialization before UIApplication has completed launch.
         // Start the native BLE monitor on the next main-loop turn instead.
@@ -23,15 +41,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
+        guard WallaaAccessoryBootstrap.shared.ready else { return }
         // Cover the short active -> inactive -> background transition too, so a button
         // press while the user locks the phone or leaves the app is not lost.
         wallaaBackgroundBLE.enterBackgroundMode()
     }
     func applicationDidEnterBackground(_ application: UIApplication) {
+        guard WallaaAccessoryBootstrap.shared.ready else { return }
         wallaaBackgroundBLE.enterBackgroundMode()
     }
     func applicationWillEnterForeground(_ application: UIApplication) {}
     func applicationDidBecomeActive(_ application: UIApplication) {
+        WallaaAccessoryBootstrap.shared.presentMigrationIfNeeded()
+        guard WallaaAccessoryBootstrap.shared.ready else { return }
         wallaaBackgroundBLE.enterForegroundMode()
         application.applicationIconBadgeNumber = 0
     }
@@ -56,7 +78,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             NSLog("[WALLAA][BOOT] starting background BLE manager")
-            self.wallaaBackgroundBLE.start()
+            WallaaAccessoryBootstrap.shared.prepare {
+                self.wallaaBackgroundBLE.start()
+            }
         }
     }
 
@@ -93,6 +117,96 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         NSLog("[WALLAA][LOCATION][ADMIN] native location request received")
         wallaaBackgroundBLE.handleAdminLocationRequest(completion: completionHandler)
+    }
+}
+
+// Migration must finish before *any* CoreBluetooth central is created, including
+// the web plugins. SceneDelegate keeps the web bridge unloaded during this step.
+final class WallaaAccessoryBootstrap {
+    static let shared = WallaaAccessoryBootstrap()
+    private(set) var ready = false
+    private var started = false
+    private var callbacks: [() -> Void] = []
+    private var accessorySession: AnyObject?
+    private var peripheralID: UUID?
+    private var activated = false
+    private var pickerPresented = false
+
+    func prepare(_ completion: @escaping () -> Void) {
+        if ready { completion(); return }
+        callbacks.append(completion)
+        guard !started else { return }
+        started = true
+        guard #available(iOS 26.0, *),
+              let raw = UserDefaults.standard.string(forKey: "CapacitorStorage.wallaa.safe.background.config"),
+              let data = raw.data(using: .utf8),
+              let config = try? JSONDecoder().decode(WallaaNativeConfig.self, from: data),
+              config.armed, config.hardwareId?.hasPrefix("MOKO:") == true,
+              let identifier = UUID(uuidString: config.deviceId) else { finish(); return }
+        peripheralID = identifier
+        let session = ASAccessorySession()
+        accessorySession = session
+        session.activate(on: .main) { [weak self] event in
+            guard let self else { return }
+            NSLog("[WALLAA][ACCESSORY] event=\(event.eventType.rawValue) error=\(event.error?.localizedDescription ?? "none")")
+            #if DEBUG
+            wallaaDiagnosticRecord("accessory", details: ["event": event.eventType.rawValue, "failed": event.error != nil])
+            #endif
+            switch event.eventType {
+            case .activated:
+                self.activated = true
+                if session.accessories.contains(where: { $0.bluetoothIdentifier == identifier && $0.state == .authorized }) {
+                    NSLog("[WALLAA][ACCESSORY] WB-001 already authorized")
+                    self.finish()
+                } else { self.presentMigrationIfNeeded() }
+            case .pickerDidDismiss:
+                let authorized = session.accessories.contains { $0.bluetoothIdentifier == identifier && $0.state == .authorized }
+                NSLog("[WALLAA][ACCESSORY] picker finished authorized=\(authorized)")
+                self.finish()
+            case .migrationComplete:
+                // Migration of an already paired device can finish without a picker
+                // dismissal event. Release both the web bridge and BLE startup here.
+                self.finish()
+            case .invalidated:
+                self.finish()
+            default: break
+            }
+        }
+    }
+
+    func presentMigrationIfNeeded() {
+        let foregroundScene = UIApplication.shared.connectedScenes.contains {
+            $0.activationState == .foregroundActive || $0.activationState == .foregroundInactive
+        }
+        NSLog("[WALLAA][ACCESSORY] check picker ready=\(ready) activated=\(activated) shown=\(pickerPresented) foregroundScene=\(foregroundScene) appState=\(UIApplication.shared.applicationState.rawValue)")
+        guard #available(iOS 26.0, *), !ready, activated, !pickerPresented,
+              foregroundScene,
+              let session = accessorySession as? ASAccessorySession, let identifier = peripheralID else { return }
+        pickerPresented = true
+        let descriptor = ASDiscoveryDescriptor()
+        descriptor.bluetoothServiceUUID = CBUUID(string: "AA00")
+        descriptor.bluetoothNameSubstring = "MK Button"
+        let image = Bundle.main.url(forResource: "wallaa-button", withExtension: "png", subdirectory: "public")
+            .flatMap { UIImage(contentsOfFile: $0.path) } ?? UIImage(systemName: "button.programmable")!
+        let item = ASMigrationDisplayItem(name: "WB-001", productImage: image, descriptor: descriptor)
+        item.peripheralIdentifier = identifier
+        NSLog("[WALLAA][ACCESSORY] presenting existing WB-001 migration")
+        session.showPicker(for: [item]) { [weak self] error in
+            if let error {
+                NSLog("[WALLAA][ACCESSORY] migration error=\(error.localizedDescription)")
+                self?.finish()
+            }
+        }
+    }
+
+    func skipMigration() { finish() }
+
+    private func finish() {
+        guard !ready else { return }
+        ready = true
+        let pending = callbacks
+        callbacks.removeAll()
+        for callback in pending { callback() }
     }
 }
 
@@ -414,6 +528,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private var mokoLastEventAt = Date.distantPast
     private var mokoStreamStartedAt = Date.distantPast
     private var mokoStreamReady: DispatchWorkItem?
+    private var mokoResetInFlight = false
     private var mokoLastLoggedStatus = ""
     private var mokoMotionCharacteristic:CBCharacteristic?
     private var healthMotionAnchor:[String:Int]?
@@ -667,6 +782,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
         guard central?.state == .poweredOn, mokoConnectionWanted else { return }
         mokoConnectTimeout?.cancel()
         mokoStreamReady?.cancel()
+        mokoResetInFlight = false
         mokoPeripheral = peripheral; peripheral.delegate = self
         mokoAuthenticated = false; mokoStatus = "authenticating"
         healthMotionAnchor=nil;healthPreviousAxes=nil;healthMotionSamples=[];healthMovementPending=false
@@ -726,19 +842,18 @@ private var scanRearmWorkItem: DispatchWorkItem?
 
     private func synchronizeMokoEventStream() {
         mokoStatus = "synchronizing"
-        mokoStreamReady?.cancel()
-        let peripheral = mokoPeripheral
-        let timeout = DispatchWorkItem { [weak self] in
-            guard let self, self.mokoAuthenticated, self.mokoPeripheral == peripheral else { return }
-            self.mokoStatus = "ready"; self.mokoHandshakeTimeout?.cancel()
-            self.mokoDisconnectedAt = nil; self.updateNativeConnectionGuard()
-            self.requestMokoMotionSample()
-        }
-        mokoStreamReady = timeout
-        // This firmware replays the previous event shortly after subscription.
-        // Drain that replay before exposing a ready connection to the user.
-        let delay = max(1, 4 - Date().timeIntervalSince(mokoStreamStartedAt))
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: timeout)
+        // The vendor's dismiss command clears the latched click quantity and
+        // produces an AA08 zero. Wait for that actual baseline, not a time guess.
+        acknowledgeMokoPress()
+    }
+
+    private func acknowledgeMokoPress() {
+        guard !mokoResetInFlight, mokoAuthenticated, let peripheral = mokoPeripheral,
+              peripheral.state == .connected,
+              let custom = mokoControlCharacteristics.first(where: { $0.uuid == CBUUID(string: "AA01") }) else { return }
+        mokoResetInFlight = true
+        peripheral.writeValue(WallaaMokoGATT.dismissAlarmCommand(), for: custom, type: .withResponse)
+        NSLog("[WALLAA][MOKO] acknowledging stored click")
     }
 
     private func authenticateMokoIfReady(_ peripheral: CBPeripheral) {
@@ -790,7 +905,16 @@ private var scanRearmWorkItem: DispatchWorkItem?
             }
             return
         }
-        if characteristic.uuid==CBUUID(string:"AA01") { receiveMokoTelemetry(value);return }
+        if characteristic.uuid==CBUUID(string:"AA01") {
+            if let accepted = WallaaMokoGATT.dismissAlarmReply(value) {
+                NSLog("[WALLAA][MOKO] click acknowledgement accepted=\(accepted)")
+                if !accepted {
+                    mokoResetInFlight = false
+                    if mokoStatus == "synchronizing" { central?.cancelPeripheralConnection(peripheral) }
+                }
+            } else { receiveMokoTelemetry(value) }
+            return
+        }
         if characteristic.uuid == CBUUID(string:"AA02") { NSLog("[WALLAA][MOKO] device disconnect code=\(value.count > 4 ? Int(value[4]) : -1)");return }
         if characteristic.uuid == CBUUID(string: "AA07") {
             guard let accepted = WallaaMokoGATT.authenticationReply(value) else { return }
@@ -826,6 +950,14 @@ private var scanRearmWorkItem: DispatchWorkItem?
         mokoLastEventAt = now
         mokoLastCount = count
         UserDefaults.standard.set(count, forKey: "wallaa.moko.gatt.counter.\(hardwareId)")
+        if count == 0 {
+            mokoResetInFlight = false
+            mokoStatus = "ready"; mokoHandshakeTimeout?.cancel()
+            mokoDisconnectedAt = nil; updateNativeConnectionGuard()
+            requestMokoMotionSample()
+            NSLog("[WALLAA][MOKO] click baseline cleared, stream ready")
+            return
+        }
         if synchronizing { synchronizeMokoEventStream(); return }
         mokoStatus = "ready"; mokoHandshakeTimeout?.cancel(); mokoDisconnectedAt = nil;updateNativeConnectionGuard()
         NSLog("[WALLAA][MOKO] event count=\(count) previous=\(previous.map(String.init) ?? "none") setup=\(mokoSetupInProgress)")
@@ -994,6 +1126,22 @@ private var scanRearmWorkItem: DispatchWorkItem?
         refreshConfiguration()
         for peripheral in peripherals where peripheral.identifier.uuidString.caseInsensitiveCompare(config?.deviceId ?? "") == .orderedSame && mokoConnectionWanted {
             mokoPeripheral = peripheral; peripheral.delegate = self
+            let channels = peripheral.services?.first(where: { $0.uuid == CBUUID(string: "AA00") })?.characteristics ?? []
+            if peripheral.state == .connected,
+               let events = channels.first(where: { $0.uuid == CBUUID(string: "AA08") && $0.isNotifying }),
+               let hardwareId = config?.hardwareId, WallaaMokoKeychain.read(hardwareId) != nil,
+               WallaaMokoGATT.controlChannelsReady(Set(channels.filter { $0.isNotifying }.map { $0.uuid.uuidString })) {
+                // iOS preserved the authenticated connection and subscriptions.
+                // Re-authentication would discard the very notification that woke us.
+                mokoEventsCharacteristic = events
+                mokoPasswordCharacteristic = channels.first { $0.uuid == CBUUID(string: "AA07") }
+                mokoControlCharacteristics = channels.filter { ["AA01", "AA02", "AA07"].contains($0.uuid.uuidString.uppercased()) }
+                mokoMotionCharacteristic = channels.first { $0.uuid == CBUUID(string: "AA06") }
+                mokoAuthenticated = true; mokoStatus = "ready"
+                mokoLastCount = UserDefaults.standard.object(forKey: "wallaa.moko.gatt.counter.\(hardwareId)") as? Int ?? 0
+                NSLog("[WALLAA][MOKO] restored live event subscription without clearing pending press")
+                continue
+            }
             if peripheral.state == .connected, !mokoAuthenticated, mokoStatus != "authenticating" { mokoStatus = "restoring" }
         }
         if central.state == .poweredOn {
@@ -1131,6 +1279,8 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private func triggerBackgroundAlert(button: WallaaDecodedButton, peripheralId: String) {
         #if DEBUG
         NSLog("[WALLAA][MOKO] diagnostic hardware event, dispatch suppressed")
+        wallaaDiagnosticRecord("acceptedPress", details: ["event": button.event, "packetId": button.packetId ?? -1])
+        acknowledgeMokoPress()
         return
         #endif
         guard !mokoSetupInProgress else { return }
@@ -1464,7 +1614,12 @@ private var scanRearmWorkItem: DispatchWorkItem?
             if (json["liveTracking"] as? Bool) == true && self.config?.profile.sosLocationEnabled != false {
                 DispatchQueue.main.async { self.startLiveTracking(alertId: alertId) }
             }
-            DispatchQueue.main.async { self.finishBackgroundSend() }
+            DispatchQueue.main.async {
+                // Confirm hardware only after the server has accepted the SOS.
+                // This never ends the server alert or its live location session.
+                if self.mokoPeripheral?.identifier.uuidString == self.pendingPeripheralId { self.acknowledgeMokoPress() }
+                self.finishBackgroundSend()
+            }
         }.resume()
     }
 
@@ -1759,6 +1914,13 @@ private var scanRearmWorkItem: DispatchWorkItem?
 }
 
 private enum WallaaMokoGATT {
+    // Official MOKO iOS SDK bxd_configDismissAlarmWithSucBlock.
+    static func dismissAlarmCommand() -> Data { Data([0xea, 0x01, 0x41, 0x00]) }
+    static func dismissAlarmReply(_ data: Data) -> Bool? {
+        let bytes = [UInt8](data)
+        guard bytes.count == 5, Array(bytes.prefix(4)) == [0xeb, 0x01, 0x41, 0x01] else { return nil }
+        return bytes[4] == 0xaa
+    }
     static func medianAcceleration(_ samples:[[String:Int]])->[String:Int]? {
         guard samples.count == 5, samples.allSatisfy({ sample in ["x","y","z"].allSatisfy { sample[$0] != nil } }) else { return nil }
         return Dictionary(uniqueKeysWithValues: ["x","y","z"].map { axis in
@@ -1818,8 +1980,8 @@ private enum WallaaMokoGATT {
     }
     static func shouldEmit(previous: Int?, count: Int, initialRead: Bool, quietGap: TimeInterval = 0) -> Bool {
         guard !initialRead, (1...255).contains(count) else { return false }
-        guard let previous, (0...255).contains(previous) else { return quietGap >= 1.5 }
-        return previous != count || quietGap >= 1.5
+        guard let previous, (0...255).contains(previous) else { return false }
+        return previous != count
     }
 }
 

@@ -14,11 +14,13 @@ precondition(!WallaaMokoGATT.shouldEmit(previous:3,count:3,initialRead:false))
 precondition(!WallaaMokoGATT.shouldEmit(previous:3,count:0,initialRead:false))
 precondition(WallaaMokoGATT.shouldEmit(previous:0,count:1,initialRead:false))
 precondition(WallaaMokoGATT.shouldEmit(previous:255,count:1,initialRead:false))
-// Observed H1 packets: a new single press still reports 1 a minute later.
-precondition(WallaaMokoGATT.shouldEmit(previous:1,count:1,initialRead:false,quietGap:59))
-precondition(WallaaMokoGATT.shouldEmit(previous:1,count:1,initialRead:false,quietGap:2))
+// Same latched positive count stays a duplicate even after a delay.
+// After the vendor acknowledges it with zero, the next single press emits.
+precondition(WallaaMokoGATT.shouldEmit(previous:0,count:1,initialRead:false,quietGap:0.1))
+precondition(!WallaaMokoGATT.shouldEmit(previous:1,count:1,initialRead:false,quietGap:59))
+precondition(!WallaaMokoGATT.shouldEmit(previous:1,count:1,initialRead:false,quietGap:2))
 precondition(!WallaaMokoGATT.shouldEmit(previous:1,count:1,initialRead:false,quietGap:0.423))
-precondition(WallaaMokoGATT.shouldEmit(previous:nil,count:1,initialRead:false,quietGap:10))
+precondition(!WallaaMokoGATT.shouldEmit(previous:nil,count:1,initialRead:false,quietGap:10))
 precondition(WallaaMokoGATT.shouldEmit(previous:1,count:5,initialRead:false,quietGap:0.3))
 precondition(!WallaaMokoGATT.shouldEmit(previous:1,count:1,initialRead:true,quietGap:59))
 print("16 verifiche protocollo GATT superate")
@@ -74,3 +76,10 @@ let shifted = ["x":180,"y":-40,"z":1012]
 assert(WallaaMokoGATT.medianAcceleration([stationary,stationary,shifted,shifted,shifted]) == shifted)
 assert(WallaaMokoGATT.medianAcceleration([stationary,stationary]) == nil)
 print("4 verifiche rumore del sensore e movimento reale superate")
+
+precondition(WallaaMokoGATT.dismissAlarmCommand() == Data([0xea,1,0x41,0]))
+precondition(WallaaMokoGATT.dismissAlarmReply(Data([0xeb,1,0x41,1,0xaa])) == true)
+precondition(WallaaMokoGATT.dismissAlarmReply(Data([0xeb,1,0x41,1,0])) == false)
+precondition(WallaaMokoGATT.dismissAlarmReply(Data([0xeb,0,0x41,1,0xaa])) == nil)
+precondition(WallaaMokoGATT.dismissAlarmReply(Data([0xeb,1,0x41,1])) == nil)
+print("5 verifiche conferma hardware superate")

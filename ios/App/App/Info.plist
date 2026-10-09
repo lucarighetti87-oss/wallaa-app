@@ -19,11 +19,17 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>4.0.112</string>
+	<string>4.0.113</string>
 	<key>CFBundleVersion</key>
-	<string>112</string>
+	<string>113</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAccessorySetupKitSupports</key>
+	<array><string>Bluetooth</string></array>
+	<key>NSAccessorySetupBluetoothServices</key>
+	<array><string>AA00</string></array>
+	<key>NSAccessorySetupBluetoothNames</key>
+	<array><string>MK Button</string></array>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Wallaa Safe Button utilizza il Bluetooth per comunicare con il tuo Wallaa Button e rilevare le richieste di sicurezza.</string>
 	<key>NSCameraUsageDescription</key>
