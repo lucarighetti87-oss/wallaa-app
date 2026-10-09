@@ -199,11 +199,11 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
         authToken: networkIdentity?.authToken || ''
       },
       connectionGuard,
-      healthCheck:{enabled:healthCheck.data.settings?.enabled===true&&armed,thresholdMinutes:healthCheck.data.settings?.thresholdMinutes||30},
+      healthCheck:{enabled:healthCheck.data.settings?.enabled===true&&armed,thresholdMinutes:healthCheck.data.settings?.thresholdMinutes||30,nightMode:healthCheck.data.settings?.nightMode},
       savedAt: new Date().toISOString()
     };
     storage.setBackgroundConfig(config).catch(() => {});
-  }, [loaded, armed, trigger, device?.id, device?.hardwareId, device?.claimToken, profile, contacts, networkIdentity?.installationId, networkIdentity?.authToken,healthCheck.data.settings?.enabled,healthCheck.data.settings?.thresholdMinutes,connectionGuard]);
+  }, [loaded, armed, trigger, device?.id, device?.hardwareId, device?.claimToken, profile, contacts, networkIdentity?.installationId, networkIdentity?.authToken,healthCheck.data.settings?.enabled,healthCheck.data.settings?.thresholdMinutes,healthCheck.data.settings?.nightMode?.enabled,healthCheck.data.settings?.nightMode?.start,healthCheck.data.settings?.nightMode?.end,healthCheck.data.settings?.nightMode?.timeZone,connectionGuard]);
 
   // If a hardware SOS was sent natively while Wallaa was in background, restore the
   // active alert immediately when the WebView becomes visible again.
