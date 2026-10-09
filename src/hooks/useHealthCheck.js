@@ -11,6 +11,20 @@ export function useHealthCheck({identity,device,profile,armed,loaded,visible}){
  const refresh=useCallback(async()=>{if(!identityRef.current?.authToken)return;const current=++generation.current;const session=identityRef.current.authToken;try{const value=await getHealthCheck(identityRef.current);if(current===generation.current&&session===identityRef.current?.authToken)apply(value);return value;}catch(e){if(current===generation.current)setError(e.message);return null;}},[apply]);
  useEffect(()=>{if(!loaded||!visible||!identity?.authToken)return;refresh();const timer=setInterval(refresh,8000);return()=>clearInterval(timer);},[loaded,visible,identity?.authToken,refresh]);
  useEffect(()=>{if(!identity?.authToken){setData({settings:{enabled:false,thresholdMinutes:30},sensor:{},cycle:null});setRequested(false);proofRef.current=null;setProof(null);}},[identity?.authToken]);
+ useEffect(()=>{
+  if(!loaded||!visible||!armed||!data.settings.enabled||profile?.plan!=='pro'||!identity?.authToken||!device?.claimToken)return;
+  let lastSent=0,publishing=false;
+  const activity=async event=>{
+   if(!event.isTrusted||document.visibilityState==='hidden'||publishing||Date.now()-lastSent<15000)return;
+   publishing=true;lastSent=Date.now();
+   try{
+    const result=await healthRequest('/phone-activity',{identity,method:'POST',body:{device:{hardwareId:device.hardwareId,claimToken:device.claimToken},at:new Date().toISOString(),source:'wallaa-interaction'}});
+    if(!result.ignored){if(data.cycle?.id)await clearHealthNotifications(data.cycle.id).catch(()=>{});refresh();}
+   }catch{}finally{publishing=false;}
+  };
+  window.addEventListener('pointerdown',activity,{passive:true});window.addEventListener('keydown',activity);
+  return()=>{window.removeEventListener('pointerdown',activity);window.removeEventListener('keydown',activity);};
+ },[loaded,visible,armed,data.settings.enabled,profile?.plan,identity?.authToken,device?.hardwareId,device?.claimToken,data.cycle?.id,refresh]);
  useEffect(()=>{const listener=event=>{refresh();if(event.detail?.opened)setRequested(true);};window.addEventListener('wallaa:health-check',listener);return()=>window.removeEventListener('wallaa:health-check',listener);},[refresh]);
  const verify=useCallback(async()=>{
   if(!device?.hardwareId?.startsWith('MOKO:')||!device.claimToken)throw new Error('Collega un WB-001 per verificare il sensore.');

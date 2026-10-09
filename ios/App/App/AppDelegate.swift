@@ -5,6 +5,7 @@ import CoreLocation
 import UserNotifications
 import Security
 import AccessorySetupKit
+import CoreMotion
 
 #if DEBUG
 private func wallaaDiagnosticRecord(_ kind: String, details: [String: Any] = [:]) {
@@ -534,6 +535,10 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private var healthMotionAnchor:[String:Int]?
     private var healthPreviousAxes:[String:Int]?
     private var healthMotionSamples:[[String:Int]]=[]
+    private let healthPhoneMotion = CMMotionManager()
+    private var healthPhoneMotionStreak = 0
+    private var healthPhoneActivityAt = Date.distantPast
+    private var healthPhonePublishing = false
     private var healthMovementPending=false
     private var healthPublishing=false
     private var healthLastPublish=Date.distantPast
@@ -706,6 +711,51 @@ private var scanRearmWorkItem: DispatchWorkItem?
             DispatchQueue.main.async {guard let self else{return};self.healthPublishing=false
                 if error != nil || !((response as? HTTPURLResponse).map{(200...299).contains($0.statusCode)} ?? false) {if moving {self.healthMovementPending=true}}
                 else if moving && reply?["ignored"] as? Bool != true && self.config?.identity.authToken == token && self.config?.hardwareId == hardwareId {self.clearHealthNotifications()}
+            }
+        }.resume()
+    }
+
+    private func reconcileHealthPhoneMotion() {
+        let wanted = nativeHealthEnabled && mokoAuthenticated && mokoStatus == "ready" && config?.healthCheck?.nightMode?.active != true
+        guard wanted else {
+            healthPhoneMotion.stopDeviceMotionUpdates(); healthPhoneMotionStreak = 0
+            return
+        }
+        guard healthPhoneMotion.isDeviceMotionAvailable, !healthPhoneMotion.isDeviceMotionActive else { return }
+        healthPhoneMotion.deviceMotionUpdateInterval = 0.2
+        healthPhoneMotion.startDeviceMotionUpdates(to: .main) { [weak self] sample, error in
+            guard let self, let sample, error == nil else { return }
+            let a = sample.userAcceleration, r = sample.rotationRate
+            let moving = WallaaMokoGATT.phoneMoving(acceleration: [a.x,a.y,a.z], rotation: [r.x,r.y,r.z])
+            self.healthPhoneMotionStreak = moving ? self.healthPhoneMotionStreak + 1 : 0
+            if self.healthPhoneMotionStreak >= 3 { self.publishHealthPhoneActivity() }
+        }
+    }
+
+    private func publishHealthPhoneActivity() {
+        guard nativeHealthEnabled, !healthPhonePublishing,
+              Date().timeIntervalSince(healthPhoneActivityAt) >= 15,
+              mokoAuthenticated, mokoStatus == "ready", config?.healthCheck?.nightMode?.active != true,
+              let config, let hardwareId = config.hardwareId,
+              let token = config.identity.authToken, !token.isEmpty, var base = URL(string: config.apiUrl) else { return }
+        base.deleteLastPathComponent()
+        let payload: [String:Any] = ["device":["hardwareId":hardwareId,"claimToken":config.claimToken ?? ""],
+                                   "at":ISO8601DateFormatter().string(from:Date()),"source":"phone-motion"]
+        guard let data = try? JSONSerialization.data(withJSONObject:payload) else { return }
+        var request = URLRequest(url:base.appendingPathComponent("health-check").appendingPathComponent("phone-activity"))
+        request.httpMethod="POST";request.httpBody=data;request.timeoutInterval=10
+        request.setValue("application/json",forHTTPHeaderField:"Content-Type")
+        request.setValue(config.identity.installationId ?? "",forHTTPHeaderField:"x-wallaa-installation-id")
+        request.setValue(token,forHTTPHeaderField:"x-wallaa-install-token")
+        healthPhonePublishing=true;healthPhoneActivityAt=Date()
+        URLSession.shared.dataTask(with:request){[weak self] data,response,error in
+            let reply=data.flatMap{try? JSONSerialization.jsonObject(with:$0) as? [String:Any]}
+            DispatchQueue.main.async {
+                guard let self else { return };self.healthPhonePublishing=false
+                if error == nil, (response as? HTTPURLResponse)?.statusCode == 200,
+                   reply?["ignored"] as? Bool != true, self.config?.identity.authToken == token {
+                    self.clearHealthNotifications()
+                }
             }
         }.resume()
     }
@@ -955,6 +1005,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
             mokoStatus = "ready"; mokoHandshakeTimeout?.cancel()
             mokoDisconnectedAt = nil; updateNativeConnectionGuard()
             requestMokoMotionSample()
+            reconcileHealthPhoneMotion()
             NSLog("[WALLAA][MOKO] click baseline cleared, stream ready")
             return
         }
@@ -984,6 +1035,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         guard peripheral == mokoPeripheral else { return }
         mokoAuthenticated = false; mokoRssi=nil;mokoRssiMeasuredAt=nil;mokoHandshakeTimeout?.cancel()
+        healthPhoneMotion.stopDeviceMotionUpdates();healthPhoneMotionStreak=0
         mokoStreamReady?.cancel()
         NSLog("[WALLAA][MOKO] disconnected: \(error?.localizedDescription ?? "no error")")
         if mokoConnectionWanted && !mokoAuthenticationBlocked {
@@ -1043,6 +1095,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
         }
         let previousHealth=nativeHealthEnabled
         config = decoded
+        reconcileHealthPhoneMotion()
         updateNativeConnectionGuard()
         if previousHealth && !nativeHealthEnabled,let characteristic=mokoMotionCharacteristic,characteristic.isNotifying {mokoPeripheral?.setNotifyValue(false,for:characteristic);healthMotionAnchor=nil;healthPreviousAxes=nil;healthMotionSamples=[];healthMovementPending=false}
         if nativeHealthEnabled {requestMokoMotionSample()}
@@ -1146,6 +1199,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
         }
         if central.state == .poweredOn {
             reconcileMokoConnection()
+            reconcileHealthPhoneMotion()
             startScanIfNeeded(forceRestart: true, reason: "state-restoration")
         }
     }
@@ -1914,6 +1968,11 @@ private var scanRearmWorkItem: DispatchWorkItem?
 }
 
 private enum WallaaMokoGATT {
+    static func phoneMoving(acceleration: [Double], rotation: [Double]) -> Bool {
+        guard acceleration.count == 3, rotation.count == 3,
+              (acceleration + rotation).allSatisfy({ $0.isFinite }) else { return false }
+        return acceleration.map { abs($0) }.max()! >= 0.05 || rotation.map { abs($0) }.max()! >= 0.35
+    }
     // Official MOKO iOS SDK bxd_configDismissAlarmWithSucBlock.
     static func dismissAlarmCommand() -> Data { Data([0xea, 0x01, 0x41, 0x00]) }
     static func dismissAlarmReply(_ data: Data) -> Bool? {
