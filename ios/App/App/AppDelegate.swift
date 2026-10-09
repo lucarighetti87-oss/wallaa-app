@@ -132,9 +132,25 @@ private struct WallaaNativeIdentity: Codable {
 
 private struct WallaaNativeConnectionGuard:Codable { let enabled:Bool?;let delaySeconds:Int? }
 
+private struct WallaaNativeNightMode:Codable {
+    let enabled:Bool
+    let start:String
+    let end:String
+    let timeZone:String
+    var active:Bool {
+        guard enabled,let zone=TimeZone(identifier:timeZone) else{return false}
+        var calendar=Calendar(identifier:.gregorian);calendar.timeZone=zone
+        let now=calendar.dateComponents([.hour,.minute],from:Date())
+        let parse:(String)->Int?={value in let parts=value.split(separator:":");guard parts.count==2,let h=Int(parts[0]),let m=Int(parts[1]),(0...23).contains(h),(0...59).contains(m) else{return nil};return h*60+m}
+        guard let from=parse(start),let to=parse(end),from != to else{return false}
+        let current=(now.hour ?? 0)*60+(now.minute ?? 0)
+        return from<to ? current>=from && current<to : current>=from || current<to
+    }
+}
 private struct WallaaNativeHealthCheck: Codable {
     let enabled:Bool
     let thresholdMinutes:Int?
+    let nightMode:WallaaNativeNightMode?
 }
 
 private struct WallaaNativeConfig: Codable {
@@ -545,6 +561,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     }
 
     private func observeHealthMotion(_ axes:[String:Int]) {
+        if config?.healthCheck?.nightMode?.active == true {healthMotionAnchor=nil;healthPreviousAxes=nil;healthMovementPending=false;return}
         guard nativeHealthEnabled,mokoAuthenticated,mokoStatus == "ready",let config,let hardwareId=config.hardwareId else{return}
         if healthSampleHardware != hardwareId {healthSampleHardware=hardwareId;healthMotionAnchor=nil;healthPreviousAxes=nil;healthLastPublish = .distantPast;healthMovementPending=false}
         if healthMotionAnchor == nil {healthMotionAnchor=axes}

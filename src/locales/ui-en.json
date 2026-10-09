@@ -613,5 +613,18 @@
   "Attiva la protezione Wallaa prima di Health Check.": "Turn on Wallaa protection before using Health Check.",
   "Attiva le notifiche Wallaa prima di usare Health Check.": "Enable Wallaa notifications before using Health Check.",
   "Nessun controllo in attesa.": "No check awaiting a response.",
-  "Health Check non disponibile.": "Health Check is unavailable."
+  "Health Check non disponibile.": "Health Check is unavailable.",
+  "Scegli la fascia oraria quotidiana in cui Health Check resta sospeso. Il pulsante SOS rimane attivo.": "Choose the daily time window when Health Check is suspended. Your SOS button stays active.",
+  "Attiva Night Mode": "Enable Night Mode",
+  "Dalle": "From",
+  "Alle": "To",
+  "Inizio Night Mode": "Night Mode start",
+  "Fine Night Mode": "Night Mode end",
+  "Inizio e fine di Night Mode devono essere diversi.": "Night Mode start and end must be different.",
+  "Ogni giorno, anche quando la fascia attraversa la mezzanotte. Alla fine il conteggio riparte da zero con nuovi dati del pulsante.": "Every day, including overnight windows. At the end, the countdown starts from zero with fresh button data.",
+  "Fuso orario": "Time zone",
+  "Night Mode attivo: Health Check sospeso": "Night Mode active: Health Check suspended",
+  "Salva Night Mode": "Save Night Mode",
+  "Scegli orari validi per Night Mode.": "Choose valid times for Night Mode.",
+  "Fuso orario di Night Mode non valido.": "Invalid Night Mode time zone."
 }

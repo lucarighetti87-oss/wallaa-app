@@ -8343,3 +8343,5 @@ html.ios-keyboard-open .wallaa-new-chat-backdrop .wallaa-new-chat-results {
 @keyframes healthCoreLight{0%,100%{filter:brightness(.95)}50%{filter:brightness(1.15)}}
 @keyframes healthOrbitPulse{0%,100%{transform:scale(.96);opacity:.3}50%{transform:scale(1.03);opacity:.8}}
 @media(prefers-reduced-motion:reduce){.health-core,.health-ring{animation:none!important}}
+
+.health-night-card .health-setting-title>svg{color:#9bafff}.health-night-card.active{border-color:#798df4;box-shadow:0 0 28px rgba(121,141,244,.1)}.health-night-toggle{display:flex;justify-content:space-between;align-items:center;gap:20px;margin:20px 0}.health-night-toggle input{accent-color:#92a9ff;width:24px;height:24px}.health-night-times{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}.health-night-times label{display:grid;gap:10px;color:#9cbdcb}.health-night-times input{min-width:0;width:100%;box-sizing:border-box;color:#f0f8ff;background:#061b2b;border:1px solid #315c77;border-radius:14px;padding:14px;font:inherit;color-scheme:dark}.health-night-status{display:flex;align-items:center;gap:10px;color:#b2c0ff;font-weight:700}
