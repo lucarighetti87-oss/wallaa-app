@@ -1,3 +1,4 @@
+import {useLegalDocuments} from '../hooks/useLegalDocuments';
 import {uiText,uiLocale} from '../uiText.js';
 import { Check, Eye, EyeOff, Lock, Mail, Phone, ShieldCheck, UserRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -6,6 +7,7 @@ import { resendWallaaVerification } from '../services/network';
 import { PHONE_COUNTRIES } from '../data/phoneCountries';
 
 export default function OnboardingScreen({ profile, onComplete, onLogin, t, initialMode = 'register' }) {
+  const docs=useLegalDocuments();
   const [mode, setMode] = useState(initialMode);
   const [showPassword, setShowPassword] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
@@ -58,7 +60,7 @@ export default function OnboardingScreen({ profile, onComplete, onLogin, t, init
         await onLogin({ identifier: form.email, password: form.password });
       } else {
         if (form.password !== form.confirmPassword) throw new Error(t('v417.auth.passwordMismatch'));
-        const result = await onComplete({ ...form });
+        const result = await onComplete({ ...form,privacyPolicyVersion:docs.privacy_policy.version,termsVersion:docs.terms.version,safetyNoticeVersion:docs.safety_notice.version });
         if (result?.pendingVerification) {
           setVerificationEmail(result.email || form.email.trim());
           if (result.verificationEmailSent === false) {
@@ -183,9 +185,9 @@ export default function OnboardingScreen({ profile, onComplete, onLogin, t, init
         </>}
 
         {!isLogin && <div className="onboarding-consents v405-consents">
-          <label className="check-row"><input type="checkbox" checked={form.privacyAccepted} onChange={(e)=>set('privacyAccepted',e.target.checked)}/><span className="check-box">{form.privacyAccepted && <Check size={14}/>}</span><span>{t('v405.legal.acceptPrivacy')} <a href={CONFIG.privacyPolicyUrl} target="_blank" rel="noreferrer">{t('v405.legal.privacy')}</a></span></label>
-          <label className="check-row"><input type="checkbox" checked={form.termsAccepted} onChange={(e)=>set('termsAccepted',e.target.checked)}/><span className="check-box">{form.termsAccepted && <Check size={14}/>}</span><span>{t('v405.legal.acceptTerms')} <a href={CONFIG.termsUrl} target="_blank" rel="noreferrer">{t('v405.legal.terms')}</a></span></label>
-          <label className="check-row v411-safety-consent"><input type="checkbox" checked={form.safetyNoticeAccepted} onChange={(e)=>set('safetyNoticeAccepted',e.target.checked)}/><span className="check-box">{form.safetyNoticeAccepted && <Check size={14}/>}</span><span><a href={CONFIG.safetyNoticeUrl} target="_blank" rel="noreferrer">{t('v411.legal.safetyNotice')}</a></span></label>
+          <label className="check-row"><input type="checkbox" checked={form.privacyAccepted} onChange={(e)=>set('privacyAccepted',e.target.checked)}/><span className="check-box">{form.privacyAccepted && <Check size={14}/>}</span><span>{t('v405.legal.acceptPrivacy')} <a href={docs.privacy_policy.url} target="_blank" rel="noreferrer">{t('v405.legal.privacy')}</a></span></label>
+          <label className="check-row"><input type="checkbox" checked={form.termsAccepted} onChange={(e)=>set('termsAccepted',e.target.checked)}/><span className="check-box">{form.termsAccepted && <Check size={14}/>}</span><span>{t('v405.legal.acceptTerms')} <a href={docs.terms.url} target="_blank" rel="noreferrer">{t('v405.legal.terms')}</a></span></label>
+          <label className="check-row v411-safety-consent"><input type="checkbox" checked={form.safetyNoticeAccepted} onChange={(e)=>set('safetyNoticeAccepted',e.target.checked)}/><span className="check-box">{form.safetyNoticeAccepted && <Check size={14}/>}</span><span><a href={docs.safety_notice.url} target="_blank" rel="noreferrer">{t('v411.legal.safetyNotice')}</a></span></label>
         </div>}
 
         {error && <div className="onboarding-error" role="alert">{error}</div>}

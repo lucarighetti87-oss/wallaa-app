@@ -110,3 +110,7 @@ if (fs.existsSync(androidManifest)) {
   fs.writeFileSync(androidManifest, manifest);
   console.log('✓ AndroidManifest Wallaa Safe Button aggiornato');
 }
+
+// Gentle Health Check / proximity reminder sound in the main iOS bundle.
+const softSource=path.resolve('public/wallaa-soft-chime.wav');
+if(fs.existsSync(softSource)){fs.copyFileSync(softSource,path.resolve('ios/App/App/wallaa-soft-chime.wav'));let project=fs.readFileSync(iosProject,'utf8');if(!project.includes('wallaa-soft-chime.wav')){const file='AA1080010000000000000001',build='AA1080020000000000000002';project=project.replace('/* End PBXBuildFile section */',`\t\t${build} /* wallaa-soft-chime.wav in Resources */ = {isa = PBXBuildFile; fileRef = ${file} /* wallaa-soft-chime.wav */; };\n/* End PBXBuildFile section */`).replace('/* End PBXFileReference section */',`\t\t${file} /* wallaa-soft-chime.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "wallaa-soft-chime.wav"; sourceTree = "<group>"; };\n/* End PBXFileReference section */`).replace('\t\t\t\t50B271D01FEDC1A000F3C39B /* public */,',`\t\t\t\t50B271D01FEDC1A000F3C39B /* public */,\n\t\t\t\t${file} /* wallaa-soft-chime.wav */,`).replace('\t\t\t\t2FAD9763203C412B000D30F8 /* config.xml in Resources */,',`\t\t\t\t2FAD9763203C412B000D30F8 /* config.xml in Resources */,\n\t\t\t\t${build} /* wallaa-soft-chime.wav in Resources */,`);fs.writeFileSync(iosProject,project);}}

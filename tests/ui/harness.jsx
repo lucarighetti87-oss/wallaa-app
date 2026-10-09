@@ -1,3 +1,4 @@
+import HealthCheckScreen from '../../src/screens/HealthCheckScreen';
 import GuardianContactEditor from '../../src/components/GuardianContactEditor';
 import SentinelHomeAura from '../../src/components/SentinelHomeAura';
 import {storage} from '../../src/services/storage';
@@ -55,7 +56,14 @@ window.fetch=async(input,options={})=>{
  return new Response(JSON.stringify(data),{status:200,headers:{'Content-Type':'application/json'}});
 };
 
+function HealthHarness(){
+ const[state,setState]=useState(parameters.get('mode')||'settings'),[enabled,setEnabled]=useState(parameters.has('enabled'));
+ const data={settings:{enabled,thresholdMinutes:30},sensor:{fresh:true},serverTime:new Date().toISOString(),cycle:state==='pending'?{id:'test-cycle',status:'pending',stage:2,startedAt:new Date().toISOString(),deadlineAt:new Date(Date.now()+600000).toISOString()}:state==='movement'?{id:'test-cycle',status:'movement'}:null};
+ const health={data,proof:{available:true},verify:async()=>{},save:async value=>{setEnabled(value.enabled);window.healthAction=value;},answer:async choice=>{window.healthAction={answer:choice};setState(choice==='well'?'movement':'sent');}};
+ return <div className="app-shell-v4"><main className="app-main-v4"><HealthCheckScreen health={health} profile={{plan:parameters.has('basic')?'basic':'pro'}} onBack={()=>setState('back')} onOpenSOS={()=>{}}/>{state==='sent'&&<p role="status">mock SOS requested</p>}</main></div>;
+}
 function Harness(){
+ if(parameters.get('screen')==='health')return <HealthHarness/>;
  const[language,setLanguage]=useState(parameters.get('language')||'it');setUiLanguage(language);const t=(key,vars)=>translate(language,key,vars);
  const [push,setPush]=useState(offer);
  const [selected,setSelected]=useState(null);const[editing,setEditing]=useState(null);

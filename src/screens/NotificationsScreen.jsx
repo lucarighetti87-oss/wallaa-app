@@ -9,9 +9,9 @@ function IconFor({ entry }) {
   return <CheckCircle2 size={18}/>;
 }
 
-export default function NotificationsScreen({ activities = [], onClear, onBack, onOpenAlert, t, language }) {
+export default function NotificationsScreen({ activities = [], onClear, onBack, onOpenAlert, onOpenHealth, t, language }) {
   const [selected,setSelected]=useState(null),[error,setError]=useState('');
-  async function open(entry){setSelected(entry);setError('');if(entry.alertId&&onOpenAlert){try{await onOpenAlert(entry.alertId);setSelected(null);}catch(e){setError(e.message||uiText("Evento non disponibile."));}}}
+  async function open(entry){if(entry.healthCycleId&&onOpenHealth){onOpenHealth();return;}setSelected(entry);setError('');if(entry.alertId&&onOpenAlert){try{await onOpenAlert(entry.alertId);setSelected(null);}catch(e){setError(e.message||uiText("Evento non disponibile."));}}}
   const rows = [...activities].sort((a,b) => new Date(b.at || 0) - new Date(a.at || 0));
   const unread = rows.filter((x) => x.type === 'alert' || x.type === 'network-alert').length;
   const handleClear = (event) => {

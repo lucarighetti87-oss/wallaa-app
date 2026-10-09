@@ -36,6 +36,18 @@ export async function stopPushListeners() {
   await Promise.all(current.map((h) => h?.remove?.().catch?.(() => {}) || Promise.resolve()));
 }
 
+export async function clearHealthNotifications(cycleId){
+ if(!Capacitor.isNativePlatform())return;
+ const delivered=await PushNotifications.getDeliveredNotifications();
+ const notifications=(delivered.notifications||[]).filter(item=>item.data?.type==='wallaa_health_check'&&(!cycleId||item.data?.healthCycleId===cycleId));
+ if(notifications.length)await PushNotifications.removeDeliveredNotifications({notifications});
+}
+function emitHealthCheck(raw,opened=false){
+ const data=normalizeLocationRequestData(raw);if(!['wallaa_health_check','wallaa_health_resolved'].includes(data.type))return false;
+ if(data.type==='wallaa_health_resolved')clearHealthNotifications(data.healthCycleId).catch(()=>{});
+ window.dispatchEvent(new CustomEvent('wallaa:health-check',{detail:{...data,opened}}));return true;
+}
+
 export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentinelOffer, onMessage, onCentralMessage, onDisconnect, onError } = {}) {
   if (!Capacitor.isNativePlatform()) return { supported: false, permission: 'web' };
 
@@ -58,6 +70,7 @@ export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentin
     onError?.(error);
   }));
   handles.push(await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+    if (emitHealthCheck(notification?.data||{}))return;
     if (emitAdminLocationRequest(notification?.data || {})) return;
     console.info('[WALLAA][PUSH] received foreground', notification?.data?.type || 'unknown', notification?.data?.alertId || '');
     if (notification?.data?.type === 'wallaa_sos') {
@@ -128,6 +141,7 @@ export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentin
     }
   }));
   handles.push(await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+    if(emitHealthCheck(action?.notification?.data||{},true))return;
     if (emitAdminLocationRequest(action?.notification?.data || {})) return;
     console.info('[WALLAA][PUSH] notification action', action?.notification?.data?.type || 'unknown');
     const notification = action?.notification;

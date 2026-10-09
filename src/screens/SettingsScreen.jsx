@@ -166,6 +166,7 @@ export default function SettingsScreen({ networkReceiverStatus={},connectionGuar
         <label className="v4-switch"><input type="checkbox" disabled={!isPro} checked={isPro && profile.liveProtectionEnabled === true} onChange={(e)=>onSaveProfile({...profile,liveProtectionEnabled:e.target.checked})}/><span/></label>
       </section>
 
+      <button type="button" className="health-settings-entry" onClick={()=>onNavigate?.('health-check')}><Activity size={23}/><span><strong>Health Check</strong><small>{uiText('Controllo del movimento e conferma di benessere')}</small></span><i>PRO</i></button>
       <div className="v412-settings-section-label">{t('v412.settings.systemSection')}</div>
       <section className="v404-sound-card">
         <div className="settings-row-title"><Volume2 size={19}/><div><strong>{t('v404.sound.title')}</strong><span>{t('v404.sound.subtitle')}</span></div></div>

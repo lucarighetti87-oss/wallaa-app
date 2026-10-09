@@ -16,7 +16,7 @@ export default function SentinelApplicationScreen({networkIdentity,profile,onBac
  const profileComplete=Boolean(profile?.firstName&&profile?.lastName&&profile?.dateOfBirth&&profile?.birthCountry&&profile?.birthPlace&&profile?.email&&profile?.phone);
  const documentReady=Boolean(form.documentCountry&&form.documentExpiry&&form.documentFront&&(form.documentType!=='identity_card'||form.documentBack));
  const legalReady=form.identityDeclaration&&form.sentinelTermsAccepted&&form.privacyNoticeAccepted;
- async function submit(){setBusy(true);try{await applyAsSentinel(networkIdentity,{...form,challengeCode,sentinelTermsVersion:'1.0',privacyNoticeVersion:'1.0'});setToast?.({type:'success',text:uiText("Candidatura Sentinel inviata.")});await onSubmitted?.();}catch(error){setToast?.({type:'error',text:error.message});}finally{setBusy(false);}}
+ async function submit(){setBusy(true);try{await applyAsSentinel(networkIdentity,{...form,challengeCode,sentinelTermsVersion:'1.2',privacyNoticeVersion:'1.2'});setToast?.({type:'success',text:uiText("Candidatura Sentinel inviata.")});await onSubmitted?.();}catch(error){setToast?.({type:'error',text:error.message});}finally{setBusy(false);}}
  return <section className="sentinel-application-page">
   <div className="sentinel-application-top"><button onClick={onBack}><ArrowLeft/></button><div><small>WALLAA SENTINEL</small><strong>{"" + uiText("Verifica identità") + ""}</strong></div><ShieldCheck/></div>
   <div className="sentinel-application-progress">{[1,2,3,4].map(n=><span key={n} className={step>=n?'active':''}>{step>n?<Check size={13}/>:n}</span>)}</div>
@@ -27,9 +27,9 @@ export default function SentinelApplicationScreen({networkIdentity,profile,onBac
 
         {/* WALLAA_SENTINEL_LEGAL_LINKS_V1_1 */}
         <div className="sentinel-legal-doc-links">
-          <a href="https://wallaasafety.com/legal/wallaa-sentinel-terms-1.1-2026-09-16.pdf" target="_blank" rel="noreferrer">{"" + uiText("Apri Termini Sentinel v1.1") + ""}</a>
-          <a href="https://wallaasafety.com/legal/wallaa-sentinel-privacy-notice-1.1-2026-09-16.pdf" target="_blank" rel="noreferrer">{"" + uiText("Apri Sentinel Privacy Notice v1.1") + ""}</a>
-          <a href="https://wallaasafety.com/legal/wallaa-safety-notice-2.1-2026-09-16.pdf" target="_blank" rel="noreferrer">{"" + uiText("Apri Safety Notice v2.1") + ""}</a>
+          <a href="https://wallaasafety.com/legal/wallaa-sentinel-terms-1.2-2026-10-09.pdf" target="_blank" rel="noreferrer">{"" + uiText("Apri Termini Sentinel v1.2") + ""}</a>
+          <a href="https://wallaasafety.com/legal/wallaa-sentinel-privacy-notice-1.2-2026-10-09.pdf" target="_blank" rel="noreferrer">{"" + uiText("Apri Sentinel Privacy Notice v1.2") + ""}</a>
+          <a href="https://wallaasafety.com/legal/wallaa-safety-notice-2.2-2026-10-09.pdf" target="_blank" rel="noreferrer">{"" + uiText("Apri Safety Notice v2.1") + ""}</a>
         </div>
 </section>;
 }

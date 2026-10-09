@@ -1,3 +1,4 @@
+import {useLegalDocuments} from '../hooks/useLegalDocuments';
 import {uiText,uiLocale} from '../uiText.js';
 import { useMemo, useState } from 'react';
 import { Check, ExternalLink, FileText, ShieldCheck } from 'lucide-react';
@@ -92,6 +93,7 @@ export default function LegalUpdateScreen({
   legalError = ''
 }) {
   const copy = COPY[language] || COPY.en;
+  const docs=useLegalDocuments();
 
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -115,7 +117,7 @@ export default function LegalUpdateScreen({
       await onAccept({
         privacyAccepted,
         termsAccepted,
-        safetyNoticeAccepted
+        safetyNoticeAccepted,versions:{privacyPolicyVersion:docs.privacy_policy.version,termsVersion:docs.terms.version,safetyNoticeVersion:docs.safety_notice.version}
       });
     } catch (err) {
       setError(err?.message || copy.error);
@@ -160,7 +162,7 @@ export default function LegalUpdateScreen({
             </span>
             <span>
               <a
-                href={CONFIG.privacyPolicyUrl}
+                href={docs.privacy_policy.url}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -180,7 +182,7 @@ export default function LegalUpdateScreen({
             </span>
             <span>
               <a
-                href={CONFIG.termsUrl}
+                href={docs.terms.url}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -200,7 +202,7 @@ export default function LegalUpdateScreen({
             </span>
             <span>
               <a
-                href={CONFIG.safetyNoticeUrl}
+                href={docs.safety_notice.url}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -212,21 +214,21 @@ export default function LegalUpdateScreen({
         </div>
 
         <div className="v411-legal-links">
-          <a href={CONFIG.privacyPolicyUrl} target="_blank" rel="noreferrer">
+          <a href={docs.privacy_policy.url} target="_blank" rel="noreferrer">
             <FileText size={17}/>
             <span>Privacy Policy · {CONFIG.privacyPolicyVersion}</span>
             <ExternalLink size={15}/>
           </a>
 
-          <a href={CONFIG.termsUrl} target="_blank" rel="noreferrer">
+          <a href={docs.terms.url} target="_blank" rel="noreferrer">
             <FileText size={17}/>
             <span>Terms · {CONFIG.termsVersion}</span>
             <ExternalLink size={15}/>
           </a>
 
-          <a href={CONFIG.safetyNoticeUrl} target="_blank" rel="noreferrer">
+          <a href={docs.safety_notice.url} target="_blank" rel="noreferrer">
             <ShieldCheck size={17}/>
-            <span>Safety Notice · {CONFIG.safetyNoticeVersion}</span>
+            <span>Safety Notice · {docs.safety_notice.version}</span>
             <ExternalLink size={15}/>
           </a>
         </div>

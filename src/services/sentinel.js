@@ -2,7 +2,7 @@ import { CONFIG } from '../config';
 
 function headers(identity) {
   return {
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/json','x-wallaa-legal-version':CONFIG.privacyPolicyVersion,
     ...(identity?.installationId ? { 'x-wallaa-installation-id': identity.installationId } : {}),
     ...(identity?.authToken ? {
       'x-wallaa-install-token': identity.authToken,
@@ -96,12 +96,12 @@ export async function applyAsSentinel(identity, application) {
   form.append('identityDeclaration', String(application.identityDeclaration === true));
   form.append('sentinelTermsAccepted', String(application.sentinelTermsAccepted === true));
   form.append('privacyNoticeAccepted', String(application.privacyNoticeAccepted === true));
-  form.append('sentinelTermsVersion', '1.1');
-  form.append('privacyNoticeVersion', '1.1');
+  form.append('sentinelTermsVersion', '1.2');
+  form.append('privacyNoticeVersion', '1.2');
   form.append('documentFront', application.documentFront);
   if (application.documentBack) form.append('documentBack', application.documentBack);
   form.append('selfieDocument', application.selfieDocument);
-  const uploadHeaders = {
+  const uploadHeaders = {'x-wallaa-legal-version':CONFIG.privacyPolicyVersion,
     ...(identity?.installationId ? { 'x-wallaa-installation-id': identity.installationId } : {}),
     ...(identity?.authToken ? { 'x-wallaa-install-token': identity.authToken, 'x-wallaa-auth-token': identity.authToken, 'Authorization': `Bearer ${identity.authToken}` } : {})
   };

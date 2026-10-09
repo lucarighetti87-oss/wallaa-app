@@ -1,3 +1,4 @@
+import {useHealthCheck} from './useHealthCheck';
 import {observationDue} from '../services/observationCadence';
 import {mergeMokoTelemetry} from '../services/radioTelemetry';
 import {combineReceiverStatus} from '../services/networkReceiver';
@@ -170,6 +171,8 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   }, []);
 
 
+  const healthCheck=useHealthCheck({identity:networkIdentity,device,profile,armed,loaded,visible:appVisible});
+
   // Keep a native-readable safety snapshot in UserDefaults. The Swift CoreBluetooth
   // monitor uses this while the WebView is suspended (screen locked / another app open).
   useEffect(() => {
@@ -195,10 +198,12 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
         installationId: networkIdentity?.installationId || '',
         authToken: networkIdentity?.authToken || ''
       },
+      connectionGuard,
+      healthCheck:{enabled:healthCheck.data.settings?.enabled===true&&armed,thresholdMinutes:healthCheck.data.settings?.thresholdMinutes||30},
       savedAt: new Date().toISOString()
     };
     storage.setBackgroundConfig(config).catch(() => {});
-  }, [loaded, armed, trigger, device?.id, device?.hardwareId, device?.claimToken, profile, contacts, networkIdentity?.installationId, networkIdentity?.authToken]);
+  }, [loaded, armed, trigger, device?.id, device?.hardwareId, device?.claimToken, profile, contacts, networkIdentity?.installationId, networkIdentity?.authToken,healthCheck.data.settings?.enabled,healthCheck.data.settings?.thresholdMinutes,connectionGuard]);
 
   // If a hardware SOS was sent natively while Wallaa was in background, restore the
   // active alert immediately when the WebView becomes visible again.
@@ -1147,11 +1152,11 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     const delay = connectionGuard.delaySeconds;
     const language = profileRef.current?.language || 'en';
     const delayLabel = translate(language, delay === 30 ? 'v4.device.delay30' : delay === 60 ? 'v4.device.delay60' : 'v4.device.delay300');
-    const guardTitle = translate(language, 'v4.guard.disconnectActivity');
-    const guardBody = translate(language, 'v4.guard.disconnectToast', { delay: delayLabel });
+    const guardTitle=language==='en'?'Your Wallaa Button is no longer with you':'Wallaa Button non è più con te';
+    const guardBody=language==='en'?'Check that you have it with you and that Bluetooth is on.':'Controlla di averlo con te e che il Bluetooth sia attivo.';
     setToast({ type: 'error', text: guardBody });
     feedbackWarning();
-    showLocalSafetyNotification({ title: guardTitle, body: guardBody, extra: { type: 'connection-guard', deviceId: device.id } }).catch(() => {});
+    if(!device.hardwareId?.startsWith('MOKO:'))showLocalSafetyNotification({ title: guardTitle, body: guardBody, sound:'wallaa-soft-chime.wav',extra: { type: 'connection-guard', deviceId: device.id } }).catch(() => {});
     pushActivity({ type: 'disconnect', status: 'error', title: guardTitle, detail: `Connection Guard: ${delay}s` }).catch(() => {});
     const recipients = contactsRef.current
       .filter((c) => c.email?.trim() && c.permissions?.disconnectAlerts !== false)
@@ -1225,13 +1230,14 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
 
   const saveProfile = useCallback(async (next) => {
     const normalized = { ...next, name: profileName(next) || next.name || '' };
+    if(healthCheck.data.settings?.enabled){try{await healthCheck.updateContext(normalized);}catch(error){setToast({type:'error',text:error.message});return;}}
     setProfile(normalized); profileRef.current = normalized;
     await storage.setProfile(normalized);
     if (profileSyncTimerRef.current) clearTimeout(profileSyncTimerRef.current);
     profileSyncTimerRef.current = setTimeout(() => {
       syncNetworkIdentity({ nextProfile: profileRef.current }).catch(() => {});
     }, 650);
-  }, [syncNetworkIdentity]);
+  }, [syncNetworkIdentity,healthCheck.data.settings?.enabled,healthCheck.updateContext]);
 
   const setGuardianMode = useCallback(async (enabled) => {
     if (profileRef.current?.plan !== 'pro' && enabled) throw new Error('Guardian Mode è disponibile con Wallaa Pro.');
@@ -1262,7 +1268,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     if (!next.privacyAccepted || !next.termsAccepted || !next.safetyNoticeAccepted) throw new Error(tx('v405.auth.acceptLegal'));
     if (!password || password.length < 8) throw new Error(tx('v405.auth.passwordLength'));
     const baseIdentity = networkIdentityRef.current || newNetworkIdentity();
-    const draftProfile = { ...profileRef.current, ...next, privacyPolicyVersion: CONFIG.privacyPolicyVersion, termsVersion: CONFIG.termsVersion, safetyNoticeVersion: CONFIG.safetyNoticeVersion, name: `${next.firstName} ${next.lastName}`.trim(), plan: 'basic', networkObserverEnabled:true, sosLocationEnabled: true, liveProtectionEnabled: false, onboardingComplete: true };
+    const draftProfile = { ...profileRef.current, ...next, privacyPolicyVersion: next.privacyPolicyVersion||CONFIG.privacyPolicyVersion, termsVersion: next.termsVersion||CONFIG.termsVersion, safetyNoticeVersion: next.safetyNoticeVersion||CONFIG.safetyNoticeVersion, name: `${next.firstName} ${next.lastName}`.trim(), plan: 'basic', networkObserverEnabled:true, sosLocationEnabled: true, liveProtectionEnabled: false, onboardingComplete: true };
     const registered = await registerWallaaAccount({ installationId: baseIdentity.installationId, profile: draftProfile, password, platform: Capacitor.getPlatform() });
     if (registered?.pendingVerification) return registered;
     const identity = { ...baseIdentity, userId: registered.userId, authToken: registered.authToken, qrToken: registered.qrToken || '', qrPayload: registered.qrPayload || '' };
@@ -1340,7 +1346,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const acceptLegalUpdate = useCallback(async ({
     privacyAccepted,
     termsAccepted,
-    safetyNoticeAccepted
+    safetyNoticeAccepted,versions
   }) => {
     const identity = networkIdentityRef.current;
 
@@ -1356,7 +1362,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       privacyAccepted,
       termsAccepted,
       safetyNoticeAccepted,
-      language: currentLanguage()
+      language: currentLanguage(),versions
     });
 
     const accepted = result?.accepted || {};
@@ -1401,9 +1407,10 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
 
   const signOut = useCallback(async () => {
     const currentIdentity = networkIdentityRef.current;
+    if(healthCheck.data.settings?.enabled)await healthCheck.save({enabled:false});
     try { await logoutWallaaAccount(currentIdentity); } catch { /* local sign-out still proceeds */ }
     await resetLocalSession();
-  }, [resetLocalSession]);
+  }, [resetLocalSession,healthCheck.data.settings?.enabled,healthCheck.save]);
 
   const addOrUpdateContact = useCallback(async (input) => {
     if (!networkIdentityRef.current?.authToken) throw new Error('Accedi a Wallaa per aggiornare la Rete di Sicurezza.');
@@ -1653,14 +1660,16 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     !legalChecked
   );
 
+  const restoreHealthSOS=alert=>{if(!alert?.id)return;setActiveAlert(alert);activeAlertRef.current=alert;setLastAlert(alert);storage.setActiveAlert(alert).catch(()=>{});};
+  const setProtectionEnabled=async value=>{try{if(!value&&healthCheck.data.settings?.enabled)await healthCheck.save({enabled:false});setArmed(value);}catch(error){setToast({type:'error',text:error.message});}};
   return {
-    loaded, profile, contacts, device, armed, trigger, activities, telemetry, pairingState, pairingError, busy, dispatchingAlert, dispatchStage, ready, toast, lastAlert,
+    restoreHealthSOS,loaded, profile, contacts, device, armed, trigger, activities, telemetry, pairingState, pairingError, busy, dispatchingAlert, dispatchStage, ready, toast, lastAlert,
     networkIdentity, networkState, qrDataUrl, incomingAlert, incomingAlertMinimized, activeGuardianAlerts, acknowledgeIncomingAlert, openGuardianAlert, sentinelOffer, connectionGuard, appearance, connectionStatus, lastSignalAgeSeconds,
     messagePush,
     centralMessagePush,
-    showSafetyGuide,safetyPermissions,activateSafetyPermissions,refreshSafetyPermissions,finishSafetyGuide,openSafetySettings,refreshButtonStatus,pendingMokoDevice,resumeMokoSetup,pairingCandidates,selectPairingCandidate,cancelPairing,setupMokoDevice,networkOwnedDevices, networkDevice, networkReceiverStatus, setNetworkObserver, setDeviceNetworkTracking, mokoConnection, setMokoConnectionOptions, signalQuality, safetyLevel, activeAlert, resolvedAlert, systemHealth, currentLocation, locationStatus, authenticated: Boolean(networkIdentity?.authToken && profile?.onboardingComplete),
+    healthCheck,showSafetyGuide,safetyPermissions,activateSafetyPermissions,refreshSafetyPermissions,finishSafetyGuide,openSafetySettings,refreshButtonStatus,pendingMokoDevice,resumeMokoSetup,pairingCandidates,selectPairingCandidate,cancelPairing,setupMokoDevice,networkOwnedDevices, networkDevice, networkReceiverStatus, setNetworkObserver, setDeviceNetworkTracking, mokoConnection, setMokoConnectionOptions, signalQuality, safetyLevel, activeAlert, resolvedAlert, systemHealth, currentLocation, locationStatus, authenticated: Boolean(networkIdentity?.authToken && profile?.onboardingComplete),
     legalStatus, legalChecked, legalRequired, legalGatePending, legalError,
-    setToast, setArmed, setTrigger, saveProfile, setGuardianMode, dismissResolvedAlert, completeOnboarding, loginAccount, signOut, acceptLegalUpdate, refreshLegalStatus, addOrUpdateContact, removeContact, pairDevice, disconnectDevice,
+    setToast, setArmed:setProtectionEnabled, setTrigger, saveProfile, setGuardianMode, dismissResolvedAlert, completeOnboarding, loginAccount, signOut, acceptLegalUpdate, refreshLegalStatus, addOrUpdateContact, removeContact, pairDevice, disconnectDevice,
     fireAlert, closeActiveAlert, clearActivities, clearData, deleteAccount, refreshNetwork, scanNetworkQr, rotateQr, removeNetworkLink,
     setIncomingAlert, clearSentinelOffer, setConnectionGuard, setAppearance, refreshSystemHealth, sendTestEmail, testAlarmSound, refreshCurrentLocation
   };
