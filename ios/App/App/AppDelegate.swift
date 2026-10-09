@@ -411,10 +411,14 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private var mokoAuthenticationBlocked = false
     private var mokoStatus = "disabled"
     private var mokoLastCount: Int?
+    private var mokoLastEventAt = Date.distantPast
+    private var mokoStreamStartedAt = Date.distantPast
+    private var mokoStreamReady: DispatchWorkItem?
     private var mokoLastLoggedStatus = ""
     private var mokoMotionCharacteristic:CBCharacteristic?
     private var healthMotionAnchor:[String:Int]?
     private var healthPreviousAxes:[String:Int]?
+    private var healthMotionSamples:[[String:Int]]=[]
     private var healthMovementPending=false
     private var healthPublishing=false
     private var healthLastPublish=Date.distantPast
@@ -561,14 +565,17 @@ private var scanRearmWorkItem: DispatchWorkItem?
     }
 
     private func observeHealthMotion(_ axes:[String:Int]) {
-        if config?.healthCheck?.nightMode?.active == true {healthMotionAnchor=nil;healthPreviousAxes=nil;healthMovementPending=false;return}
+        if config?.healthCheck?.nightMode?.active == true {healthMotionAnchor=nil;healthPreviousAxes=nil;healthMotionSamples=[];healthMovementPending=false;return}
         guard nativeHealthEnabled,mokoAuthenticated,mokoStatus == "ready",let config,let hardwareId=config.hardwareId else{return}
-        if healthSampleHardware != hardwareId {healthSampleHardware=hardwareId;healthMotionAnchor=nil;healthPreviousAxes=nil;healthLastPublish = .distantPast;healthMovementPending=false}
-        if healthMotionAnchor == nil {healthMotionAnchor=axes}
+        if healthSampleHardware != hardwareId {healthSampleHardware=hardwareId;healthMotionAnchor=nil;healthPreviousAxes=nil;healthMotionSamples=[];healthLastPublish = .distantPast;healthMovementPending=false}
+        healthMotionSamples.append(axes)
+        if healthMotionSamples.count > 5 { healthMotionSamples.removeFirst() }
+        guard let filtered = WallaaMokoGATT.medianAcceleration(healthMotionSamples) else { return }
+        if healthMotionAnchor == nil {healthMotionAnchor=filtered}
         if let previous=healthPreviousAxes,let anchor=healthMotionAnchor {
-            if WallaaMokoGATT.accelerationDelta(previous,axes)>=40 || WallaaMokoGATT.accelerationDelta(anchor,axes)>=60 {healthMovementPending=true;healthMotionAnchor=axes}
+            if WallaaMokoGATT.accelerationDelta(previous,filtered)>=40 || WallaaMokoGATT.accelerationDelta(anchor,filtered)>=60 {healthMovementPending=true;healthMotionAnchor=filtered}
         }
-        healthPreviousAxes=axes
+        healthPreviousAxes=filtered
         guard !healthPublishing,(healthMovementPending && Date().timeIntervalSince(healthLastPublish)>=2) || Date().timeIntervalSince(healthLastPublish)>=20,
               let token=config.identity.authToken,!token.isEmpty,var base=URL(string:config.apiUrl) else{return}
         base.deleteLastPathComponent();let url=base.appendingPathComponent("health-check").appendingPathComponent("observation")
@@ -639,6 +646,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
         mokoStatus = "connecting"
         central?.connect(peripheral, options: nil)
         mokoConnectTimeout?.cancel()
+        mokoStreamReady?.cancel()
         let timeout=DispatchWorkItem { [weak self,weak peripheral] in
             guard let self,let peripheral,self.mokoPeripheral==peripheral,peripheral.state == .connecting else { return }
             self.mokoStatus="disconnected"
@@ -658,8 +666,10 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private func beginMokoAuthentication(_ peripheral: CBPeripheral) {
         guard central?.state == .poweredOn, mokoConnectionWanted else { return }
         mokoConnectTimeout?.cancel()
+        mokoStreamReady?.cancel()
         mokoPeripheral = peripheral; peripheral.delegate = self
         mokoAuthenticated = false; mokoStatus = "authenticating"
+        healthMotionAnchor=nil;healthPreviousAxes=nil;healthMotionSamples=[];healthMovementPending=false
         NSLog("[WALLAA][MOKO] connected, authenticating")
         mokoPasswordCharacteristic = nil; mokoEventsCharacteristic = nil; mokoControlCharacteristics = []; mokoAuthenticationSent = false
         peripheral.discoverServices([CBUUID(string: "AA00")])
@@ -710,10 +720,25 @@ private var scanRearmWorkItem: DispatchWorkItem?
         if characteristic.uuid != CBUUID(string:"AA08") {
             authenticateMokoIfReady(peripheral)
         } else if characteristic.uuid == CBUUID(string: "AA08") {
-            // The confirmed setup counter is the baseline for this stream.
-            mokoStatus = mokoLastCount == nil ? "synchronizing" : "ready"
-            if mokoStatus == "ready" { mokoHandshakeTimeout?.cancel(); mokoDisconnectedAt = nil;updateNativeConnectionGuard() }
+            synchronizeMokoEventStream()
         }
+    }
+
+    private func synchronizeMokoEventStream() {
+        mokoStatus = "synchronizing"
+        mokoStreamReady?.cancel()
+        let peripheral = mokoPeripheral
+        let timeout = DispatchWorkItem { [weak self] in
+            guard let self, self.mokoAuthenticated, self.mokoPeripheral == peripheral else { return }
+            self.mokoStatus = "ready"; self.mokoHandshakeTimeout?.cancel()
+            self.mokoDisconnectedAt = nil; self.updateNativeConnectionGuard()
+            self.requestMokoMotionSample()
+        }
+        mokoStreamReady = timeout
+        // This firmware replays the previous event shortly after subscription.
+        // Drain that replay before exposing a ready connection to the user.
+        let delay = max(1, 4 - Date().timeIntervalSince(mokoStreamStartedAt))
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: timeout)
     }
 
     private func authenticateMokoIfReady(_ peripheral: CBPeripheral) {
@@ -739,8 +764,20 @@ private var scanRearmWorkItem: DispatchWorkItem?
         guard peripheral == mokoPeripheral else { return }
         if let error { NSLog("[WALLAA][MOKO] characteristic update error: \(error.localizedDescription)"); return }
         guard let value = characteristic.value else { return }
+        #if DEBUG
+        if characteristic.uuid == CBUUID(string:"AA08") {
+            let hex = value.map { String(format: "%02X", $0) }.joined()
+            NSLog("[WALLAA][DIAGNOSTIC] AA08 bytes=\(hex) authenticated=\(mokoAuthenticated) setup=\(mokoSetupInProgress) armed=\(config?.armed == true)")
+        }
+        #endif
         if characteristic.uuid==CBUUID(string:"AA06") {
             if let axes=WallaaMokoGATT.acceleration(value){
+                // Health Check keeps notifications open. A peak from hours ago
+                // must not leave the live diagnostic permanently marked moving.
+                if nativeHealthEnabled && Date().timeIntervalSince(mokoMotionCaptureAt)>=3 {
+                    mokoMotionCaptureAt=Date();mokoMotionPeakDelta=0;mokoMotionSampleCount=0
+                    mokoTelemetry["motionObserved"]=false
+                }
                 if let previous=mokoMotionPrevious {mokoMotionPeakDelta=max(mokoMotionPeakDelta,WallaaMokoGATT.accelerationDelta(previous,axes))}
                 mokoMotionPrevious=axes;mokoMotionSampleCount+=1;mokoTelemetry["acceleration"]=axes;mokoTelemetry["motionSampledAt"]=ISO8601DateFormatter().string(from:Date())
                 if mokoMotionSampleCount>=2 {mokoTelemetry["motionObserved"]=mokoMotionPeakDelta>=150}
@@ -763,6 +800,8 @@ private var scanRearmWorkItem: DispatchWorkItem?
             }
             NSLog("[WALLAA][MOKO] authentication accepted")
             mokoAuthenticated = true
+            mokoStreamStartedAt = Date()
+            mokoLastEventAt = .distantPast
             mokoStatus = "synchronizing"
             if let hardwareId = config?.hardwareId {
                 mokoLastCount = UserDefaults.standard.object(forKey: "wallaa.moko.gatt.counter.\(hardwareId)") as? Int
@@ -771,7 +810,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
             // already persisted a confirmed counter; no speculative GATT read
             // may consume the first physical SOS or break the connection.
             if let events = mokoEventsCharacteristic {
-                if events.isNotifying { mokoStatus = mokoLastCount == nil ? "synchronizing" : "ready"; if mokoStatus == "ready" { mokoHandshakeTimeout?.cancel(); mokoDisconnectedAt = nil;updateNativeConnectionGuard() } }
+                if events.isNotifying { synchronizeMokoEventStream() }
                 else { peripheral.setNotifyValue(true, for: events) }
             }
             reconcileLocationTracking()
@@ -781,13 +820,23 @@ private var scanRearmWorkItem: DispatchWorkItem?
               let count = WallaaMokoGATT.connectionCount(value),
               let hardwareId = config?.hardwareId else { return }
         let previous = mokoLastCount
+        let synchronizing = mokoStatus != "ready"
+        let now = Date()
+        let quietGap = now.timeIntervalSince(mokoLastEventAt)
+        mokoLastEventAt = now
         mokoLastCount = count
         UserDefaults.standard.set(count, forKey: "wallaa.moko.gatt.counter.\(hardwareId)")
+        if synchronizing { synchronizeMokoEventStream(); return }
         mokoStatus = "ready"; mokoHandshakeTimeout?.cancel(); mokoDisconnectedAt = nil;updateNativeConnectionGuard()
         NSLog("[WALLAA][MOKO] event count=\(count) previous=\(previous.map(String.init) ?? "none") setup=\(mokoSetupInProgress)")
-        guard WallaaMokoGATT.shouldEmit(previous: previous, count: count, initialRead: false), mokoConnectionWanted,
+        guard WallaaMokoGATT.shouldEmit(previous: previous, count: count, initialRead: false, quietGap: quietGap), mokoConnectionWanted,
               let config, triggerMatches(config.trigger, event: "press") else { return }
-        triggerBackgroundAlert(button: WallaaDecodedButton(packetId: count, battery: nil, buttonCode: 1,
+        // AA08 is a click quantity, NOT a unique lifetime event counter. Allocate
+        // a separate id so two later single presses are not deduplicated by the API.
+        let sequenceKey = "wallaa.moko.gatt.sequence.\(hardwareId)"
+        let sequence = (UserDefaults.standard.integer(forKey: sequenceKey) % 65535) + 1
+        UserDefaults.standard.set(sequence, forKey: sequenceKey)
+        triggerBackgroundAlert(button: WallaaDecodedButton(packetId: sequence, battery: nil, buttonCode: 1,
                               event: "press", fingerprint: "moko-gatt:\(count)"), peripheralId: peripheral.identifier.uuidString)
     }
 
@@ -803,6 +852,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         guard peripheral == mokoPeripheral else { return }
         mokoAuthenticated = false; mokoRssi=nil;mokoRssiMeasuredAt=nil;mokoHandshakeTimeout?.cancel()
+        mokoStreamReady?.cancel()
         NSLog("[WALLAA][MOKO] disconnected: \(error?.localizedDescription ?? "no error")")
         if mokoConnectionWanted && !mokoAuthenticationBlocked {
             mokoStatus = "disconnected"; if mokoDisconnectedAt == nil { mokoDisconnectedAt = Date() }; updateNativeConnectionGuard();scheduleMokoReconnect()
@@ -862,7 +912,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
         let previousHealth=nativeHealthEnabled
         config = decoded
         updateNativeConnectionGuard()
-        if previousHealth && !nativeHealthEnabled,let characteristic=mokoMotionCharacteristic,characteristic.isNotifying {mokoPeripheral?.setNotifyValue(false,for:characteristic);healthMotionAnchor=nil;healthPreviousAxes=nil;healthMovementPending=false}
+        if previousHealth && !nativeHealthEnabled,let characteristic=mokoMotionCharacteristic,characteristic.isNotifying {mokoPeripheral?.setNotifyValue(false,for:characteristic);healthMotionAnchor=nil;healthPreviousAxes=nil;healthMotionSamples=[];healthMovementPending=false}
         if nativeHealthEnabled {requestMokoMotionSample()}
         if communityEnabled && !communityRequestedAlways && locationManager.authorizationStatus == .authorizedWhenInUse {
             communityRequestedAlways=true
@@ -1023,11 +1073,14 @@ private var scanRearmWorkItem: DispatchWorkItem?
         let mode = String(bytes[0])
         let counter = Int(bytes[2]) * 256 + Int(bytes[3])
         let previous = counters[mode]
-        counters[mode] = counter
+        let triggered = bytes[1] & 0x02 != 0
+        // Match the foreground decoder: telemetry for the new counter may
+        // arrive before its alarm packet and must not consume that alarm.
+        counters[mode] = !triggered && previous != nil ? previous : counter
         guard let encoded = try? JSONEncoder().encode(counters),
               let raw = String(data: encoded, encoding: .utf8) else { return nil }
         UserDefaults.standard.set(raw, forKey: key)
-        guard bytes[1] & 0x02 != 0, let previous, previous != counter else { return nil }
+        guard triggered, let previous, previous != counter else { return nil }
         return WallaaDecodedButton(packetId: counter, battery: nil, buttonCode: code, event: event, fingerprint: "moko:\(mode):\(counter)")
     }
 
@@ -1706,6 +1759,12 @@ private var scanRearmWorkItem: DispatchWorkItem?
 }
 
 private enum WallaaMokoGATT {
+    static func medianAcceleration(_ samples:[[String:Int]])->[String:Int]? {
+        guard samples.count == 5, samples.allSatisfy({ sample in ["x","y","z"].allSatisfy { sample[$0] != nil } }) else { return nil }
+        return Dictionary(uniqueKeysWithValues: ["x","y","z"].map { axis in
+            (axis, samples.compactMap { $0[axis] }.sorted()[2])
+        })
+    }
     static func observationInterval(moving:Bool?)->TimeInterval{moving==true ? 15 : moving==false ? 45 : 30}
     static func movementFlag(_ data:Data)->Bool?{let b=[UInt8](data);guard (9...12).contains(b.count),[0x20,0x21,0x22].contains(b[0]),b[b.count-2]<=1,b[b.count-1]<=1 else{return nil};return b[b.count-1]==1}
 
@@ -1757,9 +1816,10 @@ private enum WallaaMokoGATT {
         guard bytes.count == 5, Array(bytes.prefix(4)) == [0xEB, 0x02, 0x06, 0x01] else { return nil }
         return Int(bytes[4])
     }
-    static func shouldEmit(previous: Int?, count: Int, initialRead: Bool) -> Bool {
-        guard !initialRead, let previous, (0...255).contains(previous), (1...255).contains(count) else { return false }
-        return previous != count
+    static func shouldEmit(previous: Int?, count: Int, initialRead: Bool, quietGap: TimeInterval = 0) -> Bool {
+        guard !initialRead, (1...255).contains(count) else { return false }
+        guard let previous, (0...255).contains(previous) else { return quietGap >= 1.5 }
+        return previous != count || quietGap >= 1.5
     }
 }
 
