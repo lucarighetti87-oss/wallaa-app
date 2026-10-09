@@ -1,6 +1,5 @@
 import HealthCheckScreen from './screens/HealthCheckScreen';
 import GuardianContactEditor from './components/GuardianContactEditor';
-import SentinelHomeAura from './components/SentinelHomeAura';
 import {setUiLanguage} from './uiText.js';
 import {uiText,uiLocale} from './uiText.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -305,7 +304,6 @@ export default function App() {
 
   return (
     <div className={`app-shell-v4 screen-${screen}`}>
-      {screen==='home'&&<SentinelHomeAura/>}
       {showTopBar && <V4TopBar onMenu={() => setDrawer(true)} onNotifications={() => navigateTo('notifications')} onHome={() => navigateTo('home')} t={t} />}
       <main ref={mainRef} className="app-main-v4"><div className="screen-transition" key={screen}>
         {screen==='home'&&safe.healthCheck?.data?.cycle?.status==='pending'&&<button className="health-home-alert" type="button" onClick={()=>safe.healthCheck.open()}><span>Health Check</span><strong>{uiText('Tutto bene?')}</strong><small>{uiText('Apri e rispondi al controllo')}</small></button>}
