@@ -550,5 +550,18 @@
   "Inserisci il nome del Guardian.": "Enter the Guardian’s name.",
   "Non puoi aggiungere te stesso alla Rete di Sicurezza.": "You cannot add yourself to your Safety Network.",
   "Questa persona ha scelto di avvisarti. I suoi permessi sono gestiti dal suo account.": "This person has chosen to notify you. Their permissions are managed by their account.",
-  "Smetti di ricevere i suoi SOS": "Stop receiving their SOS alerts"
+  "Smetti di ricevere i suoi SOS": "Stop receiving their SOS alerts",
+  "Scheda Guardian": "Guardian details",
+  "Dati del Guardian": "Guardian information",
+  "Dati aggiornati dal profilo Wallaa.": "Details updated from the Wallaa profile.",
+  "Cosa condivide il tuo account": "What your account shares",
+  "Posizione durante un SOS": "Location during an SOS",
+  "Avvisi di disconnessione": "Disconnection alerts",
+  "Consentito": "Allowed",
+  "Disattivato": "Disabled",
+  "Non usa Wallaa": "Does not use Wallaa",
+  "Chiama": "Call",
+  "Modifica": "Edit",
+  "Torna alla Rete di Sicurezza": "Back to Safety Network",
+  "Apri scheda di {name}": "Open details for {name}"
 }

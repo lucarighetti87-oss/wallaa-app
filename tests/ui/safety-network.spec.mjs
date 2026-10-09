@@ -7,9 +7,9 @@ test('one safety list merges the QR relationship and opens people and a discreet
  await expect(page.locator('.safety-cinematic-art')).toBeVisible();
  await page.waitForFunction(()=>document.querySelector('.safety-cinematic-art')?.naturalWidth>0);
  await expect(page.locator('.safety-person').last()).toHaveCSS('opacity','1');
- await page.screenshot({path:'artifacts/network-scene-build106.png'});
+ await page.screenshot({path:'artifacts/network-scene-build107.png'});
  await page.getByRole('button',{name:'Il mio QR',exact:true}).click();await expect(page.locator('.safety-qr-panel img')).toBeVisible();
- await page.getByRole('button',{name:/Marta Rossi/}).click();await expect(page.getByRole('status')).toHaveText('Marta Rossi');
+ await page.getByRole('button',{name:/Marta Rossi/}).click();await expect(page.getByRole('heading',{name:'Scheda Guardian'})).toBeVisible();await expect(page.getByText('WSB-MARTA',{exact:true})).toBeVisible();await expect(page.locator('input')).toHaveCount(0);await expect(page.getByRole('status')).toHaveCount(0);await page.screenshot({path:'artifacts/guardian-details-build107.png'});await page.getByRole('button',{name:'Modifica',exact:true}).click();const editor=page.getByRole('dialog');await expect(editor).toBeVisible();await expect(editor.getByLabel('Codice cliente Wallaa',{exact:true})).toHaveValue('WSB-MARTA');await expect(editor.getByLabel('Email',{exact:true})).toHaveAttribute('readonly','');await expect(editor.getByLabel('Nome',{exact:true})).not.toBeFocused();await editor.getByRole('button',{name:'Indietro',exact:true}).click();await expect(editor).toHaveCount(0);await page.getByRole('button',{name:'Indietro',exact:true}).click();await expect(page.getByRole('heading',{name:'Rete di Sicurezza',exact:true})).toBeVisible();
  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);expect(overflow).toBe(false);
  await page.locator('.app-main-v4').evaluate(el=>el.scrollTop=0);
  await page.screenshot({path:'artifacts/safety-network-mobile.png',fullPage:true});
@@ -17,7 +17,7 @@ test('one safety list merges the QR relationship and opens people and a discreet
 test('English and incoming-only details are readable; no private permission editing',async({page})=>{
  await page.goto('/tests/ui/index.html?screen=network&language=en');
  await expect(page.getByRole('heading',{name:'Safety Network',exact:true})).toBeVisible();
- await page.getByRole('button',{name:/Elena Verdi/}).click();await expect(page.getByRole('region',{name:'Elena Verdi'})).toBeVisible();
+ await page.getByRole('button',{name:/Elena Verdi/}).click();await expect(page.getByRole('heading',{name:'Guardian details'})).toBeVisible();await expect(page.getByText('WSB-ELENA',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Edit',exact:true})).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Stop receiving their SOS alerts'})).toBeVisible();
 });
 test('Sentinel sweep matches the active Sentinel user logo, including Basic, and respects reduced motion',async({page})=>{
@@ -50,5 +50,5 @@ test('capture the Guardian lighting animation for review',async({browser})=>{
  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,recordVideo:{dir:'artifacts/animation-capture',size:{width:390,height:844}}});
  const page=await context.newPage();await page.goto('http://127.0.0.1:5174/tests/ui/index.html?screen=network');
  await page.locator('.safety-scene-cinematic').scrollIntoViewIfNeeded();
- await page.waitForTimeout(6500);const video=page.video();await context.close();await video.saveAs('artifacts/guardian-animation-build106.webm');
+ await page.waitForTimeout(6500);const video=page.video();await context.close();await video.saveAs('artifacts/guardian-animation-build107.webm');
 });
