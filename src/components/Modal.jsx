@@ -1,7 +1,8 @@
+import {uiText} from '../uiText';
 import { useEffect, useRef } from 'react';
-import { X } from 'lucide-react';
+import { ArrowLeft, X } from 'lucide-react';
 
-export default function Modal({ open, title, children, onClose, className = '' }) {
+export default function Modal({ open, title, children, onClose, onBack, className = '' }) {
   const closeRef = useRef(onClose);
   useEffect(() => { closeRef.current = onClose; }, [onClose]);
 
@@ -27,6 +28,7 @@ export default function Modal({ open, title, children, onClose, className = '' }
       <section className={`modal-card ${className}`.trim()} role="dialog" aria-modal="true" aria-label={title}>
         <div className="modal-handle" />
         <div className="modal-title-row">
+          {onBack&&<button className="icon-button" type="button" onClick={onBack} aria-label={uiText('Indietro')}><ArrowLeft size={20}/></button>}
           <h2>{title}</h2>
           <button className="icon-button" type="button" onClick={onClose} aria-label="Close"><X size={20} /></button>
         </div>

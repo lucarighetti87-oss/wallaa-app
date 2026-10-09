@@ -1,3 +1,4 @@
+import GuardianContactEditor from './components/GuardianContactEditor';
 import SentinelHomeAura from './components/SentinelHomeAura';
 import {setUiLanguage} from './uiText.js';
 import {uiText,uiLocale} from './uiText.js';
@@ -334,7 +335,7 @@ export default function App() {
           />
         )}
         {screen === 'notifications' && <NotificationsScreen activities={safe.activities} onOpenAlert={safe.openGuardianAlert} onBack={()=>setScreen('home')} onClear={() => clearActivityFeed('notifications')} t={t} language={language} />}
-        {screen === 'network' && <NetworkScreen contacts={safe.contacts} onAdd={() => { setContactDraft(emptyContact); setContactModal(true); }} onEdit={contact=>{setContactDraft(contact);setContactModal(true);}} onGuardianSettings={()=>setScreen('guardian')} profile={safe.profile} networkState={safe.networkState} qrDataUrl={safe.qrDataUrl} onScan={async () => { try { await safe.scanNetworkQr(); } catch (error) { safe.setToast({ type:'error', text:error.message }); } }} onRotate={() => safe.rotateQr().catch((error) => safe.setToast({ type:'error', text:error.message }))} onRemoveLink={(id) => safe.removeNetworkLink(id).catch((error) => safe.setToast({ type:'error', text:error.message }))} onRefresh={() => safe.refreshNetwork().catch(() => {})} t={t} />}
+        {screen === 'network' && <NetworkScreen onBack={()=>navigateTo('home')} contacts={safe.contacts} onAdd={() => { setContactDraft(emptyContact); setContactModal(true); }} onEdit={contact=>{setContactDraft(contact);setContactModal(true);}} onGuardianSettings={()=>setScreen('guardian')} profile={safe.profile} networkState={safe.networkState} qrDataUrl={safe.qrDataUrl} onScan={async () => { try { await safe.scanNetworkQr(); } catch (error) { safe.setToast({ type:'error', text:error.message }); } }} onRotate={() => safe.rotateQr().catch((error) => safe.setToast({ type:'error', text:error.message }))} onRemoveLink={(id) => safe.removeNetworkLink(id).catch((error) => safe.setToast({ type:'error', text:error.message }))} onRefresh={() => safe.refreshNetwork().catch(() => {})} t={t} />}
         {screen === 'resolved-alert' && <ResolvedAlertScreen alert={safe.resolvedAlert} onHome={()=>{safe.dismissResolvedAlert();setScreen('home')}} />}
         {screen === 'active-alert' && <ActiveAlertScreen
           alert={safe.activeAlert}
@@ -361,21 +362,8 @@ export default function App() {
       <EmergencyDispatchOverlay open={safe.dispatchingAlert} stage={safe.dispatchStage} t={t} />
       <SOSActivation open={sosActivation && !safe.dispatchingAlert} onCancel={() => setSosActivation(false)} onConfirm={activateSOS} busy={safe.busy} t={t} />
 
-      <Modal open={contactModal} title={contactDraft.id || contactDraft.linkId ? t('v4.guardian.edit') : t('v4.guardian.new')} onClose={() => {if(!contactSaving)setContactModal(false);}} className="guardian-editor-sheet">
-        <form className="modal-form guardian-modal-form" onSubmit={submitContact}>
-          <label>{t('v4.guardian.name')}<input className="input" disabled={Boolean(contactDraft.linkId)} value={contactDraft.name} onChange={(e) => setContactDraft({ ...contactDraft, name:e.target.value })} placeholder={t('v4.guardian.namePlaceholder')} autoFocus /></label>
-          <label>{"" + uiText("Email") + ""}<input className="input" type="email" disabled={Boolean(contactDraft.linkId)} value={contactDraft.email||''} onChange={(e) => setContactDraft({ ...contactDraft, email:e.target.value })} placeholder="guardian@email.com" /></label>
-          <label>{t('v4.guardian.phone')}<input className="input" type="tel" disabled={Boolean(contactDraft.linkId)} value={contactDraft.phone||''} onChange={(e) => setContactDraft({ ...contactDraft, phone:e.target.value })} placeholder="+39…" /></label>
-          <label>{uiText('Codice cliente Wallaa')}<input className="input" disabled={Boolean(contactDraft.linkId)} value={contactDraft.customerId||''} onChange={e=>setContactDraft({...contactDraft,customerId:e.target.value.toUpperCase()})} placeholder="WSB-…" autoCapitalize="characters" /></label>
-          <p className="safety-editor-hint">{uiText('Basta telefono, email o codice cliente. Se la persona usa Wallaa, viene riconosciuta come W Guardian.')}</p>
-          <label>{t('v4.guardian.role')}<select className="input" value={contactDraft.role||'guardian'} onChange={(e)=>setContactDraft({...contactDraft,role:e.target.value})}><option value="guardian">{t('v4.guardian.guardian')}</option><option value="primary">{t('v4.guardian.primary')}</option><option value="guardian_pro">Guardian Pro</option></select></label>
-          <div className="guardian-permission-editor">
-            {[['sosAlerts',t('v4.contacts.sos')],['liveLocation',t('v4.contacts.live')],['disconnectAlerts',t('v4.contacts.disconnect')]].map(([key,label])=><label key={key} className="permission-toggle"><span>{label}</span><input type="checkbox" checked={contactDraft.permissions?.[key]!==false} onChange={(e)=>setContactDraft({...contactDraft,permissions:{...contactDraft.permissions,[key]:e.target.checked}})}/></label>)}
-          </div>
-          <button className="v4-primary" type="submit" disabled={contactSaving}>{contactSaving?uiText('Verifica e salvataggio…'):t('v4.guardian.save')}</button>
-          {contactDraft.id && <button className="danger-outline full" type="button" onClick={async () => { try {await safe.removeContact(contactDraft.id); setContactModal(false); setContactDraft(emptyContact);} catch(error){safe.setToast({type:'error',text:uiText(error.message)});} }}>{t('v4.guardian.delete')}</button>}
-        </form>
-      </Modal>
+      <GuardianContactEditor draft={contactModal?contactDraft:null} onChange={setContactDraft} saving={contactSaving} onSubmit={submitContact} onClose={()=>{if(!contactSaving)setContactModal(false);}} onDelete={async()=>{try{await safe.removeContact(contactDraft.id);setContactModal(false);setContactDraft(emptyContact);}catch(error){safe.setToast({type:'error',text:uiText(error.message)});}}} t={t}/>
+
 
       {safe.showSafetyGuide&&(!safe.incomingAlert||safe.incomingAlertMinimized)&&<SafetyPermissionGuide status={safe.safetyPermissions} onActivate={safe.activateSafetyPermissions} onRefresh={safe.refreshSafetyPermissions} onFinish={safe.finishSafetyGuide} onSettings={safe.openSafetySettings}/> }
       <Toast toast={safe.toast} onClose={() => safe.setToast(null)} t={t} />

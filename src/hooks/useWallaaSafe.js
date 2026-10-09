@@ -39,6 +39,7 @@ function normalizeContact(input = {}) {
     role: ['primary','guardian_pro'].includes(input.role) ? input.role : 'guardian',
     networkUserId: input.networkUserId || null,
     customerId: input.customerId || '',
+    countryCode: input.countryCode || '',
     source: input.source || 'manual',
     permissions: {
       sosAlerts: input.permissions?.sosAlerts !== false,
