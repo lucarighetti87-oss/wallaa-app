@@ -626,5 +626,14 @@
   "Night Mode attivo: Health Check sospeso": "Night Mode active: Health Check suspended",
   "Salva Night Mode": "Save Night Mode",
   "Scegli orari validi per Night Mode.": "Choose valid times for Night Mode.",
-  "Fuso orario di Night Mode non valido.": "Invalid Night Mode time zone."
+  "Fuso orario di Night Mode non valido.": "Invalid Night Mode time zone.",
+  "Email ai Guardian Pro tra": "Email to Guardian Pro contacts in",
+  "Email inviata ai Guardian Pro": "Email sent to Guardian Pro contacts",
+  "Nessun Guardian Pro con email disponibile": "No Guardian Pro contact has an available email",
+  "Invio email ai Guardian Pro in corso…": "Sending email to Guardian Pro contacts…",
+  "La mancata conferma non avvia un SOS e non condivide la posizione.": "A missing confirmation does not start an SOS or share your location.",
+  "Conferma Health Check": "Confirm Health Check",
+  "Health Check è in pausa: conferma il nuovo comportamento con solo email ai Guardian Pro.": "Health Check is paused: confirm the new email-only behaviour for Guardian Pro contacts.",
+  "Conferma il funzionamento di Health Check e delle email ai Guardian Pro.": "Confirm how Health Check and Guardian Pro emails work.",
+  "Acconsento espressamente al trattamento dei dati di movimento e delle mie risposte per Health Check, come descritto nell’informativa. Dopo tre avvisi, se non rispondo entro 15 minuti dal primo, Wallaa invia solo un’email ai Guardian Pro configurati con email e avvisi abilitati. La mancata conferma non avvia un SOS. Ho compreso che un pulsante fermo non dimostra un malessere.": "I explicitly consent to the processing of my movement data and Health Check responses as described in the privacy notice. After three reminders, if I do not respond within 15 minutes of the first, Wallaa sends only an email to configured Guardian Pro contacts with an email address and alerts enabled. A missing confirmation does not start an SOS. I understand that a stationary button does not indicate a health emergency."
 }
