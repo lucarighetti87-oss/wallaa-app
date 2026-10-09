@@ -7,6 +7,7 @@ import { CONFIG, QR_PREFIX } from '../config';
 
 function headers(identity, json = true) {
   return {
+    'x-wallaa-legal-version':CONFIG.privacyPolicyVersion,
     ...(json ? { 'Content-Type': 'application/json' } : {}),
     ...(identity?.installationId ? { 'x-wallaa-installation-id': identity.installationId } : {}),
     ...(identity?.authToken ? { 'x-wallaa-install-token': identity.authToken } : {})
@@ -90,7 +91,7 @@ export async function acceptWallaaLegalDocuments(identity, {
   privacyAccepted = false,
   termsAccepted = false,
   safetyNoticeAccepted = false,
-  language = 'en'
+  language = 'en',versions={}
 } = {}) {
   return api('/api/account/legal-acceptance', {
     method: 'POST',
@@ -99,9 +100,9 @@ export async function acceptWallaaLegalDocuments(identity, {
       privacyAccepted: Boolean(privacyAccepted),
       termsAccepted: Boolean(termsAccepted),
       safetyNoticeAccepted: Boolean(safetyNoticeAccepted),
-      privacyPolicyVersion: CONFIG.privacyPolicyVersion,
-      termsVersion: CONFIG.termsVersion,
-      safetyNoticeVersion: CONFIG.safetyNoticeVersion,
+      privacyPolicyVersion: versions.privacyPolicyVersion||CONFIG.privacyPolicyVersion,
+      termsVersion: versions.termsVersion||CONFIG.termsVersion,
+      safetyNoticeVersion: versions.safetyNoticeVersion||CONFIG.safetyNoticeVersion,
       language
     }
   });

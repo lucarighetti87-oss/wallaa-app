@@ -4,14 +4,14 @@ export const CONFIG = {
   apiUrl: alertUrl,
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL || alertUrl.replace(/\/api\/alert\/?$/, ''),
   demoMode: String(import.meta.env.VITE_DEMO_MODE || 'false').toLowerCase() === 'true',
-  privacyPolicyUrl: import.meta.env.VITE_PRIVACY_POLICY_URL || 'https://wallaasafety.com/legal/wallaa-privacy-policy-2.1-2026-09-16.pdf',
-  termsUrl: import.meta.env.VITE_TERMS_URL || 'https://wallaasafety.com/legal/wallaa-terms-2.1-2026-09-16.pdf',
-  safetyNoticeUrl: import.meta.env.VITE_SAFETY_NOTICE_URL || 'https://wallaasafety.com/legal/wallaa-safety-notice-2.1-2026-09-16.pdf',
+  privacyPolicyUrl: import.meta.env.VITE_PRIVACY_POLICY_URL || 'https://wallaasafety.com/legal/wallaa-privacy-policy-2.2-2026-10-09.pdf',
+  termsUrl: import.meta.env.VITE_TERMS_URL || 'https://wallaasafety.com/legal/wallaa-terms-2.2-2026-10-09.pdf',
+  safetyNoticeUrl: import.meta.env.VITE_SAFETY_NOTICE_URL || 'https://wallaasafety.com/legal/wallaa-safety-notice-2.2-2026-10-09.pdf',
   privacyChoicesUrl: import.meta.env.VITE_PRIVACY_CHOICES_URL || 'https://wallaasafety.com/privacy-choices',
   privacyContactEmail: import.meta.env.VITE_PRIVACY_CONTACT_EMAIL || 'safety@wallaasafety.com',
-  privacyPolicyVersion: import.meta.env.VITE_PRIVACY_POLICY_VERSION || '2.1',
-  termsVersion: import.meta.env.VITE_TERMS_VERSION || '2.1',
-  safetyNoticeVersion: import.meta.env.VITE_SAFETY_NOTICE_VERSION || '2.1'
+  privacyPolicyVersion: import.meta.env.VITE_PRIVACY_POLICY_VERSION || '2.2',
+  termsVersion: import.meta.env.VITE_TERMS_VERSION || '2.2',
+  safetyNoticeVersion: import.meta.env.VITE_SAFETY_NOTICE_VERSION || '2.2'
 };
 
 export const TRIGGERS = [

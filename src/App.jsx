@@ -1,3 +1,4 @@
+import HealthCheckScreen from './screens/HealthCheckScreen';
 import GuardianContactEditor from './components/GuardianContactEditor';
 import SentinelHomeAura from './components/SentinelHomeAura';
 import {setUiLanguage} from './uiText.js';
@@ -147,6 +148,8 @@ export default function App() {
   ]);
 
   const [drawer, setDrawer] = useState(false);
+  useEffect(()=>{if(safe.healthCheck?.requested)setScreen('health-check');},[safe.healthCheck?.requested]);
+  useEffect(()=>{if(safe.healthCheck?.data?.activeSOS&&safe.healthCheck?.data?.cycle?.status==='sos_sent'){safe.restoreHealthSOS?.(safe.healthCheck.data.activeSOS);setScreen('active-alert');}},[safe.healthCheck?.data?.activeSOS?.id,safe.healthCheck?.data?.cycle?.status]);
   const [contactModal, setContactModal] = useState(false);
   const [contactDraft, setContactDraft] = useState(emptyContact);
   const [contactSaving,setContactSaving]=useState(false);
@@ -218,7 +221,7 @@ export default function App() {
     return <OnboardingScreen profile={safe.profile} onComplete={safe.completeOnboarding} onLogin={safe.loginAccount} initialMode={safe.profile?.onboardingComplete ? 'login' : 'register'} t={t} />;
   }
 
-  const emergencyInProgress = Boolean(
+  const emergencyInProgress = Boolean(safe.healthCheck?.data?.cycle?.status==='pending'||
     safe.activeAlert?.active || safe.incomingAlert
   );
 
@@ -305,8 +308,10 @@ export default function App() {
       {screen==='home'&&<SentinelHomeAura/>}
       {showTopBar && <V4TopBar onMenu={() => setDrawer(true)} onNotifications={() => navigateTo('notifications')} onHome={() => navigateTo('home')} t={t} />}
       <main ref={mainRef} className="app-main-v4"><div className="screen-transition" key={screen}>
+        {screen==='home'&&safe.healthCheck?.data?.cycle?.status==='pending'&&<button className="health-home-alert" type="button" onClick={()=>safe.healthCheck.open()}><span>Health Check</span><strong>{uiText('Tutto bene?')}</strong><small>{uiText('Apri e rispondi al controllo')}</small></button>}
         {screen === 'home' && safe.activeGuardianAlerts?.length>0 && <section className="guardian-live-stack" aria-label="SOS dei tuoi contatti">{safe.activeGuardianAlerts.map(alert=><button key={alert.id} type="button" className="guardian-live-card" onClick={()=>safe.openGuardianAlert(alert.id).catch(e=>safe.setToast({type:'error',text:e.message}))}><span className="guardian-live-orbit">SOS</span><span><small>ALLARME ANCORA ATTIVO</small><strong>{alert.ownerName||'Un tuo contatto'}</strong><em>Apri allarme e posizione →</em></span></button>)}</section>}
         {screen === 'home' && <HomeV4Screen {...common} onSOSStart={() => setSosActivation(true)} onSOSCancel={() => { if (!safe.busy) setSosActivation(false); }} onSafetyCheck={() => setScreen('security-check')} />}
+        {screen==='health-check'&&<HealthCheckScreen health={safe.healthCheck} profile={safe.profile} onBack={()=>{safe.healthCheck.dismiss();navigateTo('home');}} onOpenSOS={()=>{safe.restoreHealthSOS(safe.healthCheck.data.activeSOS);navigateTo('active-alert');}}/>}
         {screen === 'security-check' && <SecurityCheckScreen {...common} onBack={() => setScreen('home')} onRefreshSystemHealth={safe.refreshSystemHealth} />}
         {screen === 'contacts' && <ContactsScreen contacts={safe.contacts} plan={safe.profile?.plan || 'basic'} t={t} onBack={() => setScreen('home')} onAdd={() => { setContactDraft(emptyContact); setContactModal(true); }} onEdit={(contact) => { setContactDraft(contact); setContactModal(true); }} />}
         {screen === 'guardian' && <GuardianModeScreen profile={safe.profile} currentLocation={safe.currentLocation} locationStatus={safe.locationStatus} networkState={safe.networkState} contacts={safe.contacts} onToggle={(v)=>safe.setGuardianMode(v).catch((e)=>safe.setToast({type:'error',text:e.message}))} onRefreshLocation={safe.refreshCurrentLocation} onBack={()=>setScreen('network')} />}
@@ -334,7 +339,7 @@ export default function App() {
             onDeleted={() => setSelectedConversation(null)}
           />
         )}
-        {screen === 'notifications' && <NotificationsScreen activities={safe.activities} onOpenAlert={safe.openGuardianAlert} onBack={()=>setScreen('home')} onClear={() => clearActivityFeed('notifications')} t={t} language={language} />}
+        {screen === 'notifications' && <NotificationsScreen activities={[...(['pending','escalating'].includes(safe.healthCheck?.data?.cycle?.status)?[{id:'health-current',healthCycleId:safe.healthCheck.data.cycle.id,at:safe.healthCheck.data.cycle.startedAt,type:'health-check',title:'Wallaa Health Check',detail:uiText('Apri e rispondi al controllo')}]:[]),...safe.activities]} onOpenHealth={()=>safe.healthCheck.open()} onOpenAlert={safe.openGuardianAlert} onBack={()=>setScreen('home')} onClear={() => clearActivityFeed('notifications')} t={t} language={language} />}
         {screen === 'network' && <NetworkScreen onBack={()=>navigateTo('home')} contacts={safe.contacts} onAdd={() => { setContactDraft(emptyContact); setContactModal(true); }} onEdit={contact=>{setContactDraft(contact);setContactModal(true);}} onGuardianSettings={()=>setScreen('guardian')} profile={safe.profile} networkState={safe.networkState} qrDataUrl={safe.qrDataUrl} onScan={async () => { try { await safe.scanNetworkQr(); } catch (error) { safe.setToast({ type:'error', text:error.message }); } }} onRotate={() => safe.rotateQr().catch((error) => safe.setToast({ type:'error', text:error.message }))} onRemoveLink={(id) => safe.removeNetworkLink(id).catch((error) => safe.setToast({ type:'error', text:error.message }))} onRefresh={() => safe.refreshNetwork().catch(() => {})} t={t} />}
         {screen === 'resolved-alert' && <ResolvedAlertScreen alert={safe.resolvedAlert} onHome={()=>{safe.dismissResolvedAlert();setScreen('home')}} />}
         {screen === 'active-alert' && <ActiveAlertScreen
