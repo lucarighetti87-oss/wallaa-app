@@ -1,3 +1,4 @@
+import SentinelHomeAura from '../components/SentinelHomeAura';
 import {useSentinelMode} from '../hooks/useSentinelMode';
 import {uiText,uiLocale} from '../uiText.js';
 import { useRef, useState } from 'react';
@@ -76,6 +77,7 @@ export default function HomeV4Screen({
       <div className="w37-bg-perspective-grid" aria-hidden="true" />
       <div className="w37-bg-globe-hologram" aria-hidden="true" />
 
+      <SentinelHomeAura/>
       <div className="w37-scroll-content">
         <section className="w37-user-hero-row">
           <div className="w37-user-copy">

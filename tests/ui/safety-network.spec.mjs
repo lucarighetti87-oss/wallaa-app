@@ -30,12 +30,12 @@ test('Sentinel sweep matches the active Sentinel user logo, including Basic, and
 test('Sentinel glow covers the visible phone screen at the top and after scrolling',async({page})=>{
  await page.goto('/tests/ui/index.html?screen=home&sentinel&basic');
  const aura=page.locator('.sentinel-mode-sweep');await expect(aura).toHaveCount(1);
- const original=await aura.boundingBox();expect(original.height).toBe(844);expect(original.y).toBe(0);
+ const original=await aura.boundingBox();expect(original.height).toBeCloseTo(844,1);expect(original.y).toBeCloseTo(0,1);
  const before=await aura.evaluate(el=>getComputedStyle(el,'::before').transform);
  await page.waitForTimeout(1300);
  const after=await aura.evaluate(el=>getComputedStyle(el,'::before').transform);expect(after).not.toBe(before);
  await page.screenshot({path:'artifacts/sentinel-aura-top-build105.png'});
- await page.evaluate(()=>window.scrollTo(0,700));const scrolled=await aura.boundingBox();expect(scrolled.y).toBe(0);expect(scrolled.height).toBe(844);
+ await page.locator('.app-main-v4').evaluate(el=>{el.scrollTop=500;});expect(await page.locator('.app-main-v4').evaluate(el=>el.scrollTop)).toBeGreaterThan(0);const scrolled=await aura.boundingBox();expect(scrolled.y).toBeCloseTo(0,1);expect(scrolled.height).toBeCloseTo(844,1);
  await page.screenshot({path:'artifacts/sentinel-aura-scrolled-build105.png'});
 });
 
@@ -51,4 +51,8 @@ test('capture the Guardian lighting animation for review',async({browser})=>{
  const page=await context.newPage();await page.goto('http://127.0.0.1:5174/tests/ui/index.html?screen=network');
  await page.locator('.safety-scene-cinematic').scrollIntoViewIfNeeded();
  await page.waitForTimeout(6500);const video=page.video();await context.close();await video.saveAs('artifacts/guardian-animation-build107.webm');
+});
+
+test('Sentinel light is below the clickable Home content while remaining a moving background',async({page})=>{
+ await page.goto('/tests/ui/index.html?screen=home&sentinel');const layer=page.locator('.sentinel-mode-sweep');expect(await layer.evaluate(el=>Number(getComputedStyle(el).zIndex))).toBeLessThan(await page.locator('.w37-scroll-content').evaluate(el=>Number(getComputedStyle(el).zIndex)));await page.locator('.w37-status-card').click();await page.screenshot({path:'artifacts/sentinel-below-cards-build111.png',fullPage:true});
 });
