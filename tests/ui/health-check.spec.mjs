@@ -11,7 +11,7 @@ test('Health Check requires explicit consent and offers all requested intervals'
 test('English pending check is readable and well closes it without an SOS',async({page})=>{
  await page.goto('/tests/ui/index.html?screen=health&mode=pending&language=en');
  await expect(page.getByRole('heading',{name:'Are you okay?'})).toBeVisible();
- await expect(page.getByText('Automatic SOS in')).toBeVisible();
+ await expect(page.getByText('Email to Guardian Pro contacts in')).toBeVisible();
  await page.screenshot({path:'artifacts/health-pending-build108.png',fullPage:true});
  await page.getByRole('button',{name:'Yes, I’m okay'}).click();
  expect(await page.evaluate(()=>window.healthAction.answer)).toBe('well');
@@ -50,3 +50,5 @@ test('Night Mode rejects an ambiguous full-day window',async({page})=>{
  await expect(page.getByRole('button',{name:'Salva Night Mode'})).toBeDisabled();
  await expect(page.getByRole('alert')).toContainText('devono essere diversi');
 });
+
+test('Health Check heading clears the iPhone status area and remains within the viewport',async({page})=>{await page.goto('/tests/ui/index.html?screen=health');const bounds=await page.locator('.health-heading').boundingBox();expect(bounds.y).toBeGreaterThanOrEqual(68);expect(bounds.x).toBeGreaterThanOrEqual(0);expect(bounds.x+bounds.width).toBeLessThanOrEqual(390);await page.screenshot({path:'artifacts/health-safe-area-build110.png',fullPage:true});});
