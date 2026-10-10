@@ -48,6 +48,8 @@ export default function SettingsScreen({ networkReceiverStatus={},connectionGuar
     <div className="screen v4-generic-screen v401-settings-screen">
       <div className="v4-screen-heading"><span>WALLAA</span><h1>{t('settings.title')}</h1><p>{t('v4.settings.subtitle')}</p></div>
 
+      <div className="settings-tier settings-tier-included" role="region" aria-labelledby="settings-included-title">
+      <header className="settings-tier-heading"><ShieldCheck size={21}/><div><h2 id="settings-included-title">{uiText('Funzioni incluse')}</h2><p>{uiText('Le impostazioni disponibili con ogni account Wallaa.')}</p></div></header>
       <div className="v412-settings-section-label">{t('v412.settings.accountSection')}</div>
       <section className="v4-settings-card">
         <div className="settings-row-title"><UserRound size={19}/><div><strong>{t('v4.settings.profile')}</strong><span>{t('v412.settings.profileLocked')}</span></div></div>
@@ -150,23 +152,6 @@ export default function SettingsScreen({ networkReceiverStatus={},connectionGuar
         <label className="v4-switch"><input type="checkbox" checked={profile.networkObserverEnabled === true} onChange={e=>onNetworkObserver?.(e.target.checked)}/><span/></label>
       </section>
       {profile.networkObserverEnabled&&<section className="v4-settings-card wb-network-receiver" aria-label={uiText('Stato ricevitore Wallaa')}><div className="settings-row-title"><Radio size={19}/><div><strong>{uiText('Stato ricevitore Wallaa')}</strong><span>{networkReceiverStatus.paused?uiText('Sessione da ripristinare'):networkReceiverStatus.error?uiText('Invio da riprovare'):networkReceiverStatus.lastReportAt?uiText('Dati inviati al servizio'):networkReceiverStatus.lastDetectedAt?uiText('Pulsante rilevato · invio in preparazione'):uiText('In attesa di un pulsante nelle vicinanze')}</span></div></div><p>{uiText('Ultimo rilevamento Bluetooth:')} {networkReceiverStatus.lastDetectedAt?new Date(networkReceiverStatus.lastDetectedAt).toLocaleString(uiLocale()):uiText('Non ancora rilevato')}</p><p>{uiText('Ultimo invio al servizio:')} {networkReceiverStatus.lastReportAt?new Date(networkReceiverStatus.lastReportAt).toLocaleString(uiLocale()):uiText('Non ancora inviato')}</p>{networkReceiverStatus.error&&<p role="status">{uiText(networkReceiverStatus.error==='HTTP 403'?'Verifica account e partecipazione alla rete. Il telefono riproverà.':networkReceiverStatus.error.startsWith('HTTP')?'Invio non riuscito. Controlla Internet e i permessi.':networkReceiverStatus.error)}</p>}<p>{uiText('Questo stato conferma il lavoro del telefono ricevente. Il proprietario verifica il risultato in Ultimo rilevamento del proprio WB-001.')}</p></section>}
-      <div className="v412-settings-section-label">WALLAA PRO</div>
-      <section className="v4-settings-card v412-plan-card">
-        <div className="settings-row-title"><Crown size={19}/><div><strong>Wallaa Pro</strong><span>{t('v412.pro.subtitle')}</span></div></div>
-        <span className={`v412-plan-badge ${isPro ? 'pro' : ''}`}><Crown size={12}/>{isPro ? t('v412.pro.active') : t('v412.pro.basicPlan')}</span>
-        <div className="v412-feature-list">
-          <div className="v412-feature-row"><UsersRound size={18}/><span><strong>{t('v412.pro.contactsTitle')}</strong><small>{isPro ? t('v412.pro.contactsPro') : t('v412.pro.contactsBasic')}</small></span><i className={`v412-feature-state ${isPro?'':'locked'}`}>{isPro ? t('v412.pro.included') : 'PRO'}</i></div>
-          <div className="v412-feature-row"><Server size={18}/><span><strong>{"" + uiText("Wallaa Operating Center") + ""}</strong><small>{t('v412.pro.centerBody')}</small></span><i className={`v412-feature-state ${isPro?'':'locked'}`}>{isPro ? t('v412.pro.activeShort') : 'PRO'}</i></div>
-          <div className="v412-feature-row"><Navigation size={18}/><span><strong>{t('v412.pro.liveTitle')}</strong><small>{isPro ? t('v412.pro.livePro') : t('v412.pro.liveBasic')}</small></span><i className={`v412-feature-state ${isPro?'':'locked'}`}>{isPro ? t('v412.pro.activeShort') : 'PRO'}</i></div>
-        </div>
-        {!isPro && <p className="v404-sound-note">{t('v412.pro.futureBilling')}</p>}
-      </section>
-      <section className={`v4-settings-card settings-switch-row v419-live-protection ${!isPro ? 'locked' : ''}`}>
-        <div className="settings-row-title"><Navigation size={19}/><div><strong>Guardian Mode</strong><span>{isPro ? uiText("I Guardian ricevono la tua posizione solo durante un SOS attivo. iOS può sospendere gli aggiornamenti in background.") : uiText("Disponibile con Wallaa Pro.")}</span></div></div>
-        <label className="v4-switch"><input type="checkbox" disabled={!isPro} checked={isPro && profile.liveProtectionEnabled === true} onChange={(e)=>onSaveProfile({...profile,liveProtectionEnabled:e.target.checked})}/><span/></label>
-      </section>
-
-      <button type="button" className="health-settings-entry" onClick={()=>onNavigate?.('health-check')}><Activity size={23}/><span><strong>Health Check</strong><small>{uiText('Controllo del movimento e conferma di benessere')}</small></span><i>PRO</i></button>
       <div className="v412-settings-section-label">{t('v412.settings.systemSection')}</div>
       <section className="v404-sound-card">
         <div className="settings-row-title"><Volume2 size={19}/><div><strong>{t('v404.sound.title')}</strong><span>{t('v404.sound.subtitle')}</span></div></div>
@@ -210,6 +195,26 @@ export default function SettingsScreen({ networkReceiverStatus={},connectionGuar
       <button className="danger-outline" onClick={onReset}><RotateCcw size={18}/> {t('v4.settings.reset')}</button>
       <button className="v405-signout-button" onClick={onSignOut}><LogOut size={18}/> {t('v405.auth.signOut')}</button>
       <button className="delete-account-button" onClick={onDeleteAccount}><Trash2 size={18}/> {t('v4.settings.deleteAccount')}</button>
+      </div>
+      <div className="settings-tier settings-tier-pro" role="region" aria-labelledby="settings-pro-title">
+      <header className="settings-tier-heading"><Crown size={21}/><div><h2 id="settings-pro-title">Wallaa Pro</h2><p>{uiText('Le funzioni aggiuntive del piano Pro, tutte in un unico posto.')}</p></div></header>
+      <section className="v4-settings-card v412-plan-card">
+        <div className="settings-row-title"><Crown size={19}/><div><strong>Wallaa Pro</strong><span>{t('v412.pro.subtitle')}</span></div></div>
+        <span className={`v412-plan-badge ${isPro ? 'pro' : ''}`}><Crown size={12}/>{isPro ? t('v412.pro.active') : t('v412.pro.basicPlan')}</span>
+        <div className="v412-feature-list">
+          <div className="v412-feature-row"><UsersRound size={18}/><span><strong>{t('v412.pro.contactsTitle')}</strong><small>{isPro ? t('v412.pro.contactsPro') : t('v412.pro.contactsBasic')}</small></span><i className={`v412-feature-state ${isPro?'':'locked'}`}>{isPro ? t('v412.pro.included') : 'PRO'}</i></div>
+          <div className="v412-feature-row"><Server size={18}/><span><strong>{"" + uiText("Wallaa Operating Center") + ""}</strong><small>{t('v412.pro.centerBody')}</small></span><i className={`v412-feature-state ${isPro?'':'locked'}`}>{isPro ? t('v412.pro.activeShort') : 'PRO'}</i></div>
+          <div className="v412-feature-row"><Navigation size={18}/><span><strong>{t('v412.pro.liveTitle')}</strong><small>{isPro ? t('v412.pro.livePro') : t('v412.pro.liveBasic')}</small></span><i className={`v412-feature-state ${isPro?'':'locked'}`}>{isPro ? t('v412.pro.activeShort') : 'PRO'}</i></div>
+        </div>
+        {!isPro && <p className="v404-sound-note">{t('v412.pro.futureBilling')}</p>}
+      </section>
+      <section className={`v4-settings-card settings-switch-row v419-live-protection ${!isPro ? 'locked' : ''}`}>
+        <div className="settings-row-title"><Navigation size={19}/><div><strong>Guardian Mode</strong><span>{isPro ? uiText("I Guardian ricevono la tua posizione solo durante un SOS attivo. iOS può sospendere gli aggiornamenti in background.") : uiText("Disponibile con Wallaa Pro.")}</span></div></div>
+        <label className="v4-switch"><input type="checkbox" disabled={!isPro} checked={isPro && profile.liveProtectionEnabled === true} onChange={(e)=>onSaveProfile({...profile,liveProtectionEnabled:e.target.checked})}/><span/></label>
+      </section>
+
+      <button type="button" className="health-settings-entry" onClick={()=>onNavigate?.('health-check')}><Activity size={23}/><span><strong>Health Check</strong><small>{uiText('Controllo del movimento e conferma di benessere')}</small></span><i>PRO</i></button>
+      </div>
     </div>
   );
 }
