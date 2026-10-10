@@ -766,6 +766,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
         healthPhoneMotion.startDeviceMotionUpdates(to: .main) { [weak self] sample, error in
             guard let self, let sample, error == nil else { return }
             let a = sample.userAcceleration, r = sample.rotationRate
+            guard [a.x,a.y,a.z,r.x,r.y,r.z].allSatisfy({$0.isFinite}) else {return}
             let moving = WallaaMokoGATT.phoneMoving(acceleration: [a.x,a.y,a.z], rotation: [r.x,r.y,r.z])
             self.healthPhoneMotionStreak = moving ? self.healthPhoneMotionStreak + 1 : 0
             self.publishHealthPhoneActivity(moving:self.healthPhoneMotionStreak >= 3)

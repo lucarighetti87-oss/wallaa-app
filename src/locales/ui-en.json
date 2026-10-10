@@ -652,5 +652,12 @@
   "Impossibile cancellare le notifiche.": "Unable to clear notifications.",
   "Il WB-001 è scollegato e l’iPhone non ha rilevato movimenti per {minutes} minuti.": "The WB-001 is disconnected and your iPhone has detected no movement for {minutes} minutes.",
   "Controllo tramite movimento dell’iPhone": "Monitoring iPhone motion",
-  "Se il WB-001 è scollegato, Health Check usa il movimento dell’iPhone quando disponibile. Senza letture recenti non può verificare l’immobilità.": "When the WB-001 is disconnected, Health Check uses iPhone motion when available. Without recent readings it cannot verify inactivity."
+  "Se il WB-001 è scollegato, Health Check usa il movimento dell’iPhone quando disponibile. Senza letture recenti non può verificare l’immobilità.": "When the WB-001 is disconnected, Health Check uses iPhone motion when available. Without recent readings it cannot verify inactivity.",
+  "In attesa di nuovi dati di movimento": "Waiting for new motion readings",
+  "Controllo in corso": "Monitoring in progress",
+  "Sensore in uso: iPhone": "Sensor in use: iPhone",
+  "Sensore in uso: WB-001": "Sensor in use: WB-001",
+  "Un movimento rilevato o l’attività nell’app Wallaa azzera il conteggio.": "Detected movement or activity in the Wallaa app resets the countdown.",
+  "Primo avviso tra": "First reminder in",
+  "Collegamento a Health Check temporaneamente non disponibile. Riprova tra poco.": "The Health Check connection is temporarily unavailable. Try again shortly."
 }

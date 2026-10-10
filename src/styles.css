@@ -8362,3 +8362,5 @@ html.ios-keyboard-open .wallaa-new-chat-backdrop .wallaa-new-chat-results {
 .app-shell-v4 .wb-device-screen .aa-device-metrics svg.wb-signal.weak{color:#ff627b!important;stroke:#ff627b!important}
 .app-shell-v4 .wb-device-screen .aa-device-metrics svg.wb-signal.unknown{color:#91adbf!important;stroke:#91adbf!important}
 .aa-device-hero-copy .aa-connection svg{width:24px;height:24px}
+
+.health-monitoring{display:flex;align-items:center;gap:16px;margin:0 0 24px;padding:22px;border:1px solid #2385a2;border-radius:24px;background:#062737;color:#dff7ff}.health-monitoring>svg{color:#47d5ed;flex-shrink:0}.health-monitoring>div{flex:1;min-width:0}.health-monitoring strong,.health-monitoring small{display:block}.health-monitoring small{font-size:12px;color:#a4c3d1;margin-top:6px}.health-monitoring p{font-size:12px;color:#a4c3d1;line-height:1.5;margin:8px 0 0}.health-monitoring>span{text-align:right;flex-shrink:0}.health-monitoring b{font-size:26px;font-variant-numeric:tabular-nums}@media(max-width:360px){.health-monitoring{flex-wrap:wrap}.health-monitoring>span{width:100%;text-align:center}}

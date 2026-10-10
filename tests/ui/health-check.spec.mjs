@@ -84,3 +84,5 @@ test('clear notifications removes Health Check records immediately and after rel
  await expect(page.getByText('Conferma Health Check ancora in Home',{exact:true})).toBeVisible();
  await page.reload();await expect(page.getByText('Wallaa Health Check',{exact:true})).toHaveCount(0);
 });
+
+test('active monitoring shows the first-reminder countdown; stale samples do not pretend it is running',async({page})=>{await page.goto('/tests/ui/index.html?screen=health&enabled&language=en');await expect(page.locator('.health-monitoring')).toContainText('Monitoring in progress');await expect(page.locator('.health-monitoring b')).toHaveText(/^(15:00|14:5[0-9])$/);await expect(page.locator('.health-monitoring')).toContainText('activity in the Wallaa app resets');await page.goto('/tests/ui/index.html?screen=health&enabled&staleHealth&language=en');await expect(page.locator('.health-monitoring')).toContainText('Waiting for new motion readings');await expect(page.locator('.health-monitoring b')).toHaveText('—');});
