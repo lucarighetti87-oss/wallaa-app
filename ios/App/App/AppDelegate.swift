@@ -709,10 +709,29 @@ private var scanRearmWorkItem: DispatchWorkItem?
         URLSession.shared.dataTask(with:request){[weak self] data,response,error in
             let reply=data.flatMap{try? JSONSerialization.jsonObject(with:$0) as? [String:Any]}
             DispatchQueue.main.async {guard let self else{return};self.healthPublishing=false
+                if error == nil, (response as? HTTPURLResponse)?.statusCode == 200,
+                   self.config?.identity.authToken == token, let cycle = reply?["cycle"] as? [String:Any],
+                   cycle["needsAcknowledgement"] as? Bool == true, let cycleId = cycle["id"] as? String {
+                    self.showHealthReceipt(cycleId:cycleId)
+                }
                 if error != nil || !((response as? HTTPURLResponse).map{(200...299).contains($0.statusCode)} ?? false) {if moving {self.healthMovementPending=true}}
-                else if moving && reply?["ignored"] as? Bool != true && self.config?.identity.authToken == token && self.config?.hardwareId == hardwareId {self.clearHealthNotifications()}
+                else if moving && reply?["ignored"] as? Bool != true && (reply?["cycle"] as? [String:Any])?["needsAcknowledgement"] as? Bool != true && self.config?.identity.authToken == token && self.config?.hardwareId == hardwareId {self.clearHealthNotifications()}
             }
         }.resume()
+    }
+
+    private func showHealthReceipt(cycleId:String) {
+        let key="wallaa.health.receipt.notifiedCycle"
+        guard UserDefaults.standard.string(forKey:key) != cycleId else { return }
+        UserDefaults.standard.set(cycleId,forKey:key)
+        let content=UNMutableNotificationContent()
+        content.title="Wallaa Health Check"
+        content.body=config?.profile.language == "en" ? "Your Guardian Pro contacts were notified because your check-in was missed. Open Wallaa to confirm you are okay." : "I Guardian Pro sono stati avvisati per la mancata conferma. Apri Wallaa per confermare che stai bene."
+        content.sound=UNNotificationSound(named:UNNotificationSoundName("wallaa-soft-chime.wav"))
+        content.userInfo=["type":"wallaa_health_check","healthCycleId":cycleId]
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier:"wallaa-health-receipt-\(cycleId)",content:content,trigger:UNTimeIntervalNotificationTrigger(timeInterval:1,repeats:false))) { error in
+            if error != nil { UserDefaults.standard.removeObject(forKey:key) }
+        }
     }
 
     private func reconcileHealthPhoneMotion() {
@@ -753,7 +772,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
             DispatchQueue.main.async {
                 guard let self else { return };self.healthPhonePublishing=false
                 if error == nil, (response as? HTTPURLResponse)?.statusCode == 200,
-                   reply?["ignored"] as? Bool != true, self.config?.identity.authToken == token {
+                   reply?["ignored"] as? Bool != true, reply?["needsAcknowledgement"] as? Bool != true, self.config?.identity.authToken == token {
                     self.clearHealthNotifications()
                 }
             }

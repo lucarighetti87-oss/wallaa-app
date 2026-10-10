@@ -637,5 +637,13 @@
   "Conferma il funzionamento di Health Check e delle email ai Guardian Pro.": "Confirm how Health Check and Guardian Pro emails work.",
   "Acconsento espressamente al trattamento dei dati di movimento e delle mie risposte per Health Check, come descritto nell’informativa. Dopo tre avvisi, se non rispondo entro 15 minuti dal primo, Wallaa invia solo un’email ai Guardian Pro configurati con email e avvisi abilitati. La mancata conferma non avvia un SOS. Ho compreso che un pulsante fermo non dimostra un malessere.": "I explicitly consent to the processing of my movement data and Health Check responses as described in the privacy notice. After three reminders, if I do not respond within 15 minutes of the first, Wallaa sends only an email to configured Guardian Pro contacts with an email address and alerts enabled. A missing confirmation does not start an SOS. I understand that a stationary button does not indicate a health emergency.",
   "Attività dell’iPhone rilevata: conteggio azzerato.": "iPhone activity detected: timer restarted.",
-  "Il conteggio riparte quando si muove il WB-001, quando usi Wallaa o quando viene rilevato movimento dell’iPhone. Non misura le tue condizioni fisiche.": "The timer restarts when your WB-001 moves, when you use Wallaa, or when iPhone movement is detected. It does not measure your physical health."
+  "Il conteggio riparte quando si muove il WB-001, quando usi Wallaa o quando viene rilevato movimento dell’iPhone. Non misura le tue condizioni fisiche.": "The timer restarts when your WB-001 moves, when you use Wallaa, or when iPhone movement is detected. It does not measure your physical health.",
+  "Cronologia Health Check": "Health Check history",
+  "Gli avvisi restano nella cronologia anche quando un movimento chiude il controllo.": "Alerts remain in history even when movement closes the check.",
+  "Controllo concluso": "Check completed",
+  "Email inviate": "Emails sent",
+  "Scaduto": "Expired",
+  "I Guardian Pro sono stati avvisati. Conferma che stai bene per chiudere questo avviso.": "Your Guardian Pro contacts were notified. Confirm you are okay to close this notice.",
+  "Conferma ancora mancante": "Check-in still missing",
+  "Guardian Pro avvisati · apri Health Check": "Guardian Pro notified · open Health Check"
 }

@@ -57,3 +57,14 @@ test('Night Mode time fields stay within the card on small iPhones and use the W
  for(const width of [320,390]){await page.setViewportSize({width,height:844});await page.goto('/tests/ui/index.html?screen=health&enabled');const card=page.locator('.health-night-card');await card.scrollIntoViewIfNeeded();const bounds=await card.boundingBox();const first=await page.getByLabel('Inizio Night Mode',{exact:true}).boundingBox();const last=await page.getByLabel('Fine Night Mode',{exact:true}).boundingBox();expect(first.x+first.width).toBeLessThanOrEqual(last.x);expect(last.x+last.width).toBeLessThanOrEqual(bounds.x+bounds.width-10);await expect(card.locator('.v4-switch')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);}
  await page.screenshot({path:'artifacts/health-night-aligned-build111.png',fullPage:true});
 });
+
+test('expired Guardian Pro notice stays visible even in Night Mode and needs an explicit well confirmation',async({page})=>{
+ await page.goto('/tests/ui/index.html?screen=health&mode=email_sent&night&language=en');
+ await expect(page.getByRole('heading',{name:'Are you okay?'})).toBeVisible();
+ await expect(page.getByText('Expired',{exact:true})).toBeVisible();
+ await expect(page.getByText('Email sent to Guardian Pro contacts',{exact:true})).toBeVisible();
+ await page.screenshot({path:'artifacts/health-expired-receipt-build115.png',fullPage:true});
+ await page.getByRole('button',{name:'Yes, I’m okay'}).click();
+ expect(await page.evaluate(()=>window.healthAction.answer)).toBe('well');
+ await expect(page.getByText('mock SOS requested')).toHaveCount(0);
+});
