@@ -8353,3 +8353,5 @@ html.ios-keyboard-open .wallaa-new-chat-backdrop .wallaa-new-chat-results {
 
 .health-check-screen .health-night-toggle .v4-switch{position:relative;display:inline-block;height:27px}.health-check-screen .health-night-toggle .v4-switch input{display:block!important;position:absolute!important;inset:0!important;opacity:0!important;z-index:2;cursor:pointer}.health-check-screen .health-night-toggle .v4-switch>span{pointer-events:none}.health-check-screen .health-night-toggle .v4-switch:focus-within{outline:2px solid #46d7f5;outline-offset:3px;border-radius:999px}
 .app-shell-v4.screen-home .screen-transition>.w37-home{transform:none!important;filter:none!important;will-change:opacity!important;animation-name:homeOpacityEnter!important}
+
+.health-history-item{display:flex;flex-direction:column;gap:8px;padding:18px 0;border-bottom:1px solid rgba(67,214,244,.16);min-width:0}.health-history-item:last-child{border-bottom:0}.health-history-item time,.health-history-item span{font-size:13px;color:#91adbc}.health-history-item strong{font-size:15px;color:#e7f8ff;overflow-wrap:anywhere}
