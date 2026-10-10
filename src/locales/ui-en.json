@@ -647,5 +647,6 @@
   "Conferma ancora mancante": "Check-in still missing",
   "Guardian Pro avvisati · apri Health Check": "Guardian Pro notified · open Health Check",
   "Email ai Guardian Pro inviate": "Emails sent to Guardian Pro contacts",
-  "Nessun Guardian Pro con email abilitata": "No Guardian Pro with email notifications enabled"
+  "Nessun Guardian Pro con email abilitata": "No Guardian Pro with email notifications enabled",
+  "I Guardian ricevono la tua posizione solo durante un SOS attivo. iOS può sospendere gli aggiornamenti in background.": "Guardians receive your location only during an active SOS. iOS may pause background updates."
 }

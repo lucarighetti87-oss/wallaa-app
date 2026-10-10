@@ -162,7 +162,7 @@ export default function SettingsScreen({ networkReceiverStatus={},connectionGuar
         {!isPro && <p className="v404-sound-note">{t('v412.pro.futureBilling')}</p>}
       </section>
       <section className={`v4-settings-card settings-switch-row v419-live-protection ${!isPro ? 'locked' : ''}`}>
-        <div className="settings-row-title"><Navigation size={19}/><div><strong>Guardian Mode</strong><span>{isPro ? uiText("Condividi la posizione con i Guardian autorizzati e la Centrale Wallaa mentre Guardian Mode è attiva. iOS può sospendere gli aggiornamenti in background.") : uiText("Disponibile con Wallaa Pro.")}</span></div></div>
+        <div className="settings-row-title"><Navigation size={19}/><div><strong>Guardian Mode</strong><span>{isPro ? uiText("I Guardian ricevono la tua posizione solo durante un SOS attivo. iOS può sospendere gli aggiornamenti in background.") : uiText("Disponibile con Wallaa Pro.")}</span></div></div>
         <label className="v4-switch"><input type="checkbox" disabled={!isPro} checked={isPro && profile.liveProtectionEnabled === true} onChange={(e)=>onSaveProfile({...profile,liveProtectionEnabled:e.target.checked})}/><span/></label>
       </section>
 
