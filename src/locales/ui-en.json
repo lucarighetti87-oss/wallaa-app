@@ -649,5 +649,8 @@
   "Email ai Guardian Pro inviate": "Emails sent to Guardian Pro contacts",
   "Nessun Guardian Pro con email abilitata": "No Guardian Pro with email notifications enabled",
   "I Guardian ricevono la tua posizione solo durante un SOS attivo. iOS può sospendere gli aggiornamenti in background.": "Guardians receive your location only during an active SOS. iOS may pause background updates.",
-  "Impossibile cancellare le notifiche.": "Unable to clear notifications."
+  "Impossibile cancellare le notifiche.": "Unable to clear notifications.",
+  "Il WB-001 è scollegato e l’iPhone non ha rilevato movimenti per {minutes} minuti.": "The WB-001 is disconnected and your iPhone has detected no movement for {minutes} minutes.",
+  "Controllo tramite movimento dell’iPhone": "Monitoring iPhone motion",
+  "Se il WB-001 è scollegato, Health Check usa il movimento dell’iPhone quando disponibile. Senza letture recenti non può verificare l’immobilità.": "When the WB-001 is disconnected, Health Check uses iPhone motion when available. Without recent readings it cannot verify inactivity."
 }

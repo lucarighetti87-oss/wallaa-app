@@ -14,7 +14,7 @@ export default function DeviceScreen({ onRefreshDevice, pairingError='', pending
   const isMoko=Boolean(device && (device.protocol==='moko-button'||device.hardwareId?.startsWith('MOKO:')||/^MK Button$/i.test(device.advertisedName||'')||!device.hardwareId||/^LEGACY-/i.test(device.hardwareId)));
   const radioFresh=freshRadio(telemetry);
   const linkTone=connectionStatus==='connected'?'good':connectionStatus==='disconnected'?'weak':'medium';
-  const linkText=connectionStatus==='connected'?uiText('Pronto'):connectionStatus==='disconnected'?uiText('Interrotto'):uiText('Da verificare');
+  const batteryTone=telemetry.battery==null?'unknown':telemetry.battery<=15?'weak':telemetry.battery<=30?'medium':'good';
   const needsSetup=isMoko && (!device.hardwareId?.startsWith('MOKO:')||device.mokoSetupVerified!==true);
   const setupLabels={scanning:uiText("Accendi il pulsante e tienilo vicino all’iPhone."),found:uiText("Pulsante rilevato."),selecting:uiText("Seleziona il pulsante che vuoi collegare."),checking:uiText("Verifica dell’associazione…"),connecting:uiText("Collegamento al pulsante…"),authenticating:uiText("Verifica del dispositivo…"),awaiting_press:uiText("Premi una volta il pulsante. Questa prova non invia SOS."),confirm_press:uiText("Premi ancora una volta per confermare il collegamento. Non viene inviato un SOS."),claiming:uiText("Associazione al tuo account…"),configuring:uiText("Wallaa sta applicando le impostazioni…"),verifying:uiText("Verifica delle impostazioni…"),checking_signal:uiText("Verifica del segnale…"),restoring:uiText("Verifica del collegamento finale…"),incomplete:uiText("Configurazione da completare. Premi Riprova."),password_error:uiText("La password del pulsante è stata modificata. Inseriscila per continuare.")};
   const setupBusy=['scanning','found','selecting','checking','connecting','authenticating','awaiting_press','confirm_press','claiming','configuring','verifying','checking_signal','restoring'].includes(pairingState);
@@ -68,7 +68,7 @@ export default function DeviceScreen({ onRefreshDevice, pairingError='', pending
         <WallaaButton3D status={visualStatus} size="lg"/>
       </div>
       <div className="aa-device-hero-copy">
-        <span className={`aa-connection ${visualStatus}`}><i/>{connectionLabel(needsSetup?'setup-required':connectionStatus)}</span>
+        <span className={`aa-connection ${visualStatus}`} aria-label={connectionLabel(needsSetup?'setup-required':connectionStatus)} title={connectionLabel(needsSetup?'setup-required':connectionStatus)}><i/>{needsSetup?uiText("Da configurare"):<Shield aria-hidden="true"/>}</span>
         <h2>{isMoko?'WB-001':uiText("Wallaa Button")}</h2>
         <small>{needsSetup?uiText("Associazione da completare"):uiText("Associato al tuo account")}</small>
         <button type="button" className="aa-device-side-cta" aria-label={uiText("Apri dettagli WB-001")} onClick={()=>{setShowDetails(true);onRefreshDevice?.();}}><ChevronRight/></button>
@@ -77,9 +77,9 @@ export default function DeviceScreen({ onRefreshDevice, pairingError='', pending
     </section>
 
     <section className="aa-device-metrics aa-device-metrics-v41">
-      <div><BatteryMedium/><small>{"" + uiText("Batteria") + ""}</small><strong>{telemetry.battery!=null?`${telemetry.battery}%`:telemetry.batteryVoltageMv?`${(telemetry.batteryVoltageMv/1000).toFixed(2)} V`:uiText("In lettura")}</strong></div>
-      <div><Radio/><small>{uiText("Collegamento")}</small><strong className={`wb-signal ${linkTone}`}>{linkText}</strong></div>
-      <div><Shield/><small>Signal</small><strong className="wb-signal radio-value">{radioFresh?`${telemetry.rssi} dBm`:uiText("Da aggiornare")}</strong>{radioFresh&&<small className="wb-radio-time">{uiText("Letto alle")} {new Date(telemetry.rssiSampledAt).toLocaleTimeString(uiLocale(),{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</small>}</div>
+      <div><BatteryMedium className={`wb-signal ${batteryTone}`}/><small>{"" + uiText("Batteria") + ""}</small><strong>{telemetry.battery!=null?`${telemetry.battery}%`:telemetry.batteryVoltageMv?`${(telemetry.batteryVoltageMv/1000).toFixed(2)} V`:uiText("In lettura")}</strong></div>
+      <div aria-label={connectionLabel(connectionStatus)}><Radio className={`wb-signal ${linkTone}`}/><small>{uiText("Collegamento")}</small><strong className={`wb-signal ${linkTone}`} aria-hidden="true">●</strong></div>
+      <div><Shield className={`wb-signal ${linkTone}`}/><small>Signal</small><strong className="wb-signal radio-value">{radioFresh?`${telemetry.rssi} dBm`:uiText("Da aggiornare")}</strong></div>
     </section>
 
     {isMoko && <section className="wb-card wb-control-card">
