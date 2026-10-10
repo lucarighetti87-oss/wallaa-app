@@ -68,3 +68,10 @@ test('expired Guardian Pro notice stays visible even in Night Mode and needs an 
  expect(await page.evaluate(()=>window.healthAction.answer)).toBe('well');
  await expect(page.getByText('mock SOS requested')).toHaveCount(0);
 });
+
+test('Health Check history shows reminder and email counts in English',async({page})=>{
+ await page.goto('/tests/ui/index.html?screen=health&history&language=en');
+ await expect(page.getByRole('heading',{name:'Health Check history'})).toBeVisible();
+ await expect(page.getByText('Emails sent to Guardian Pro contacts',{exact:true})).toBeVisible();
+ await expect(page.getByText('Reminders: 3 · Emails sent: 2',{exact:true})).toBeVisible();
+});

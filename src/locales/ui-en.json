@@ -645,5 +645,7 @@
   "Scaduto": "Expired",
   "I Guardian Pro sono stati avvisati. Conferma che stai bene per chiudere questo avviso.": "Your Guardian Pro contacts were notified. Confirm you are okay to close this notice.",
   "Conferma ancora mancante": "Check-in still missing",
-  "Guardian Pro avvisati · apri Health Check": "Guardian Pro notified · open Health Check"
+  "Guardian Pro avvisati · apri Health Check": "Guardian Pro notified · open Health Check",
+  "Email ai Guardian Pro inviate": "Emails sent to Guardian Pro contacts",
+  "Nessun Guardian Pro con email abilitata": "No Guardian Pro with email notifications enabled"
 }
