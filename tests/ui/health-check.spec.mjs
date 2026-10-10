@@ -75,3 +75,12 @@ test('Health Check history shows reminder and email counts in English',async({pa
  await expect(page.getByText('Emails sent to Guardian Pro contacts',{exact:true})).toBeVisible();
  await expect(page.getByText('Reminders: 3 · Emails sent: 2',{exact:true})).toBeVisible();
 });
+
+test('clear notifications removes Health Check records immediately and after reload without closing the Home check',async({page})=>{
+ await page.goto('/tests/ui/index.html?screen=health-notifications');
+ await expect(page.getByText('Wallaa Health Check',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Cancella tutto',exact:true}).click();
+ await expect(page.getByText('Wallaa Health Check',{exact:true})).toHaveCount(0);
+ await expect(page.getByText('Conferma Health Check ancora in Home',{exact:true})).toBeVisible();
+ await page.reload();await expect(page.getByText('Wallaa Health Check',{exact:true})).toHaveCount(0);
+});

@@ -15,6 +15,7 @@ import ChatScreen from '../../src/screens/ChatScreen.jsx';
 import CentralSosChat from '../../src/components/CentralSosChat.jsx';
 import NotificationsScreen from '../../src/screens/NotificationsScreen.jsx';
 import IncomingAlert from '../../src/components/IncomingAlert.jsx';
+import {healthNotificationEntries} from '../../src/services/healthNotifications.js';
 import MessagesScreen from '../../src/screens/MessagesScreen.jsx';
 import SettingsScreen from '../../src/screens/SettingsScreen.jsx';
 import DeviceScreen from '../../src/screens/DeviceScreen.jsx';
@@ -61,7 +62,16 @@ function HealthHarness(){
  const health={data,history:parameters.has('history')?[{id:'history-cycle',status:'email_sent',startedAt:new Date().toISOString(),remindersCompleted:3,emailsSent:2}]:[],proof:{available:true},verify:async()=>{},save:async value=>{if(typeof value.enabled==='boolean')setEnabled(value.enabled);window.healthAction=value;if(value.nightMode){window.healthNight=value.nightMode;setState('night-saved');}},answer:async choice=>{window.healthAction={answer:choice};setState(choice==='well'?'movement':'sent');}};
  return <div className="app-shell-v4"><main className="app-main-v4"><HealthCheckScreen health={health} profile={{plan:parameters.has('basic')?'basic':'pro'}} onBack={()=>setState('back')} onOpenSOS={()=>{}}/>{state==='sent'&&<p role="status">mock SOS requested</p>}</main></div>;
 }
+function HealthNotificationHarness(){
+ const clearedKey='wallaa-test-health-cleared';
+ const[cutoff,setCutoff]=useState(localStorage.getItem(clearedKey));
+ const at='2026-10-10T02:55:00.000Z';
+ const cycle={id:'health-test',status:'email_sent',needsAcknowledgement:true,startedAt:at,notificationAt:at,stage:3};
+ const entries=healthNotificationEntries([{id:cycle.id,startedAt:at,notificationAt:at,remindersCompleted:3,emailsSent:2}],cycle,cutoff);
+ return <div><div role="status">Conferma Health Check ancora in Home</div><NotificationsScreen activities={entries.map(item=>({id:item.id,title:'Wallaa Health Check',at:item.notificationAt,healthCycleId:item.id,detail:'Tre promemoria · due email'}))} onClear={()=>{localStorage.setItem(clearedKey,'2026-10-10T03:11:00.000Z');setCutoff('2026-10-10T03:11:00.000Z');}} language='it'/></div>;
+}
 function Harness(){
+ if(parameters.get('screen')==='health-notifications')return <HealthNotificationHarness/>;
  if(parameters.get('screen')==='health')return <HealthHarness/>;
  const[language,setLanguage]=useState(parameters.get('language')||'it');setUiLanguage(language);const t=(key,vars)=>translate(language,key,vars);
  const [push,setPush]=useState(offer);
