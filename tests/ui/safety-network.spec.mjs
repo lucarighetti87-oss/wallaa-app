@@ -56,3 +56,10 @@ test('capture the Guardian lighting animation for review',async({browser})=>{
 test('Sentinel light is below the clickable Home content while remaining a moving background',async({page})=>{
  await page.goto('/tests/ui/index.html?screen=home&sentinel');const layer=page.locator('.sentinel-mode-sweep');expect(await layer.evaluate(el=>Number(getComputedStyle(el).zIndex))).toBeLessThan(await page.locator('.w37-scroll-content').evaluate(el=>Number(getComputedStyle(el).zIndex)));await page.locator('.w37-status-card').click();await page.screenshot({path:'artifacts/sentinel-below-cards-build111.png',fullPage:true});
 });
+
+test('Sentinel light cannot cover the SOS button',async({page})=>{
+ await page.goto('/tests/ui/index.html?screen=home&sentinel');
+ const sos=page.locator('.w37-sos-button-core');await sos.scrollIntoViewIfNeeded();
+ expect(await sos.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2));})).toBe(true);
+ expect(await page.locator('.sentinel-mode-sweep').evaluate(el=>getComputedStyle(el).mixBlendMode)).toBe('normal');
+});
