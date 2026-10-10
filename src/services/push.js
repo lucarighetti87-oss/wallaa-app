@@ -1,5 +1,7 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
+const wallaaAudio=registerPlugin('WallaaMoko');
+let nativeAlarmGeneration=0;
 
 // WALLAA_ADMIN_LOCATION_REQUEST_V1
 function normalizeLocationRequestData(raw = {}) {
@@ -46,6 +48,7 @@ export async function clearHealthNotifications(cycleId,clearedAt){
 }
 function emitHealthCheck(raw,opened=false){
  const data=normalizeLocationRequestData(raw);if(!['wallaa_health_check','wallaa_health_resolved'].includes(data.type))return false;
+ if(!opened&&data.type==='wallaa_health_check'&&document.visibilityState==='visible'&&Capacitor.getPlatform()==='ios')wallaaAudio.alarmAudio({soft:true,loop:false}).catch(()=>{});
  if(data.type==='wallaa_health_resolved')clearHealthNotifications(data.healthCycleId).catch(()=>{});
  window.dispatchEvent(new CustomEvent('wallaa:health-check',{detail:{...data,opened}}));return true;
 }
@@ -133,6 +136,7 @@ export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentin
     }
 
     if (notification?.data?.type === 'wallaa_disconnect') {
+      if(document.visibilityState==='visible'&&Capacitor.getPlatform()==='ios')wallaaAudio.alarmAudio({soft:true,loop:false}).catch(()=>{});
       const d=notification?.data||{};
       feedbackWarning();
       onDisconnect?.({
@@ -245,6 +249,11 @@ function normalizePush(notification, { opened = false } = {}) {
 export function playWallaaAlarm({ loop = true } = {}) {
   try {
     stopWallaaAlarm();
+    if(Capacitor.getPlatform()==='ios'){
+      const generation=++nativeAlarmGeneration;
+      wallaaAudio.alarmAudio({loop:Boolean(loop)}).catch(error=>{if(generation===nativeAlarmGeneration)console.warn('[WALLAA] Alarm audio unavailable',error?.message);});
+      return;
+    }
     const audio = new Audio('/wallaa-guardian-siren.wav');
     audio.volume = 1;
     audio.loop = Boolean(loop);
@@ -258,6 +267,8 @@ export function playWallaaAlarm({ loop = true } = {}) {
 }
 
 export function stopWallaaAlarm() {
+  nativeAlarmGeneration++;
+  if(Capacitor.getPlatform()==='ios')wallaaAudio.alarmAudio({stop:true}).catch(()=>{});
   try {
     if (!guardianAlarmAudio) return;
     guardianAlarmAudio.pause();

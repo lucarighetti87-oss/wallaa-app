@@ -7,6 +7,7 @@ import Security
 import AccessorySetupKit
 import CoreMotion
 import CryptoKit
+import AVFoundation
 
 #if DEBUG
 private func wallaaDiagnosticRecord(_ kind: String, details: [String: Any] = [:]) {
@@ -538,6 +539,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private var healthMotionSamples:[[String:Int]]=[]
     private let healthPhoneMotion = CMMotionManager()
     private var healthPhoneMotionStreak = 0
+    private var healthPhoneLastMoving:Bool?
     private var healthPhoneActivityAt = Date.distantPast
     private var healthPhonePublishing = false
     private var healthMovementPending=false
@@ -754,7 +756,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     }
 
     private func reconcileHealthPhoneMotion() {
-        let wanted = nativeHealthEnabled && mokoAuthenticated && mokoStatus == "ready" && config?.healthCheck?.nightMode?.active != true
+        let wanted = nativeHealthEnabled && config?.healthCheck?.nightMode?.active != true
         guard wanted else {
             healthPhoneMotion.stopDeviceMotionUpdates(); healthPhoneMotionStreak = 0
             return
@@ -766,31 +768,31 @@ private var scanRearmWorkItem: DispatchWorkItem?
             let a = sample.userAcceleration, r = sample.rotationRate
             let moving = WallaaMokoGATT.phoneMoving(acceleration: [a.x,a.y,a.z], rotation: [r.x,r.y,r.z])
             self.healthPhoneMotionStreak = moving ? self.healthPhoneMotionStreak + 1 : 0
-            if self.healthPhoneMotionStreak >= 3 { self.publishHealthPhoneActivity() }
+            self.publishHealthPhoneActivity(moving:self.healthPhoneMotionStreak >= 3)
         }
     }
 
-    private func publishHealthPhoneActivity() {
+    private func publishHealthPhoneActivity(moving:Bool) {
         guard nativeHealthEnabled, !healthPhonePublishing,
-              Date().timeIntervalSince(healthPhoneActivityAt) >= 15,
-              mokoAuthenticated, mokoStatus == "ready", config?.healthCheck?.nightMode?.active != true,
+              (Date().timeIntervalSince(healthPhoneActivityAt) >= 15 || (moving && healthPhoneLastMoving != true)),
+              config?.healthCheck?.nightMode?.active != true,
               let config, let hardwareId = config.hardwareId,
               let token = config.identity.authToken, !token.isEmpty, var base = URL(string: config.apiUrl) else { return }
         base.deleteLastPathComponent()
         let payload: [String:Any] = ["device":["hardwareId":hardwareId,"claimToken":config.claimToken ?? ""],
-                                   "at":ISO8601DateFormatter().string(from:Date()),"source":"phone-motion"]
+                                   "sampledAt":ISO8601DateFormatter().string(from:Date()),"moving":moving,"buttonConnected":mokoAuthenticated && mokoStatus == "ready"]
         guard let data = try? JSONSerialization.data(withJSONObject:payload) else { return }
-        var request = URLRequest(url:base.appendingPathComponent("health-check").appendingPathComponent("phone-activity"))
+        var request = URLRequest(url:base.appendingPathComponent("health-check").appendingPathComponent("phone-observation"))
         request.httpMethod="POST";request.httpBody=data;request.timeoutInterval=10
         request.setValue("application/json",forHTTPHeaderField:"Content-Type")
         request.setValue(config.identity.installationId ?? "",forHTTPHeaderField:"x-wallaa-installation-id")
         request.setValue(token,forHTTPHeaderField:"x-wallaa-install-token")
-        healthPhonePublishing=true;healthPhoneActivityAt=Date()
+        healthPhonePublishing=true;healthPhoneActivityAt=Date();healthPhoneLastMoving=moving
         URLSession.shared.dataTask(with:request){[weak self] data,response,error in
             let reply=data.flatMap{try? JSONSerialization.jsonObject(with:$0) as? [String:Any]}
             DispatchQueue.main.async {
                 guard let self else { return };self.healthPhonePublishing=false
-                if error == nil, (response as? HTTPURLResponse)?.statusCode == 200,
+                if moving, error == nil, (response as? HTTPURLResponse)?.statusCode == 200,
                    reply?["ignored"] as? Bool != true, reply?["needsAcknowledgement"] as? Bool != true, self.config?.identity.authToken == token {
                     self.clearHealthNotifications()
                 }
@@ -1034,6 +1036,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
                 if events.isNotifying { synchronizeMokoEventStream() }
                 else { peripheral.setNotifyValue(true, for: events) }
             }
+            reconcileHealthPhoneMotion()
             reconcileLocationTracking()
             return
         }
@@ -1082,12 +1085,13 @@ private var scanRearmWorkItem: DispatchWorkItem?
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         guard peripheral == mokoPeripheral else { return }
         mokoAuthenticated = false; mokoRssi=nil;mokoRssiMeasuredAt=nil;mokoHandshakeTimeout?.cancel()
-        healthPhoneMotion.stopDeviceMotionUpdates();healthPhoneMotionStreak=0
+        healthPhoneMotionStreak=0
         mokoStreamReady?.cancel()
         NSLog("[WALLAA][MOKO] disconnected: \(error?.localizedDescription ?? "no error")")
         if mokoConnectionWanted && !mokoAuthenticationBlocked {
             mokoStatus = "disconnected"; if mokoDisconnectedAt == nil { mokoDisconnectedAt = Date() }; updateNativeConnectionGuard();scheduleMokoReconnect()
         }
+        reconcileHealthPhoneMotion()
         reconcileLocationTracking()
     }
 
@@ -2114,10 +2118,12 @@ private enum WallaaMokoKeychain {
 }
 
 @objc(WallaaMokoPlugin)
-public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin {
+public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegate {
+    private var alarmPlayer:AVAudioPlayer?
     public let identifier = "WallaaMokoPlugin"
     public let jsName = "WallaaMoko"
     public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "alarmAudio", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "configure", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearHealthNotices", returnType: CAPPluginReturnPromise),
@@ -2127,6 +2133,32 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "beginSetup", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endSetup", returnType: CAPPluginReturnPromise)
     ]
+    @objc func alarmAudio(_ call:CAPPluginCall) {
+        DispatchQueue.main.async {
+            let session=AVAudioSession.sharedInstance()
+            if call.getBool("stop") == true {
+                self.alarmPlayer?.stop();self.alarmPlayer=nil
+                try? session.setActive(false,options:.notifyOthersOnDeactivation)
+                call.resolve();return
+            }
+            if call.getBool("soft") == true,self.alarmPlayer?.isPlaying == true {call.resolve(["ignored":true]);return}
+            do {
+                guard let url=Bundle.main.url(forResource:call.getBool("soft") == true ? "wallaa-soft-chime" : "wallaa-guardian-siren",withExtension:"wav") else {call.reject("Suono non disponibile");return}
+                // Real alarm playback only. No silent loop to keep the app alive.
+                try session.setCategory(.playback,mode:.default,options:[.duckOthers])
+                try session.setActive(true)
+                self.alarmPlayer?.stop()
+                let player=try AVAudioPlayer(contentsOf:url)
+                player.delegate=self;player.volume=1;player.numberOfLoops=call.getBool("loop") == true ? -1 : 0
+                self.alarmPlayer=player
+                guard player.play() else {throw NSError(domain:"WallaaAudio",code:1)}
+                call.resolve(["route":session.currentRoute.outputs.map{$0.portType.rawValue}])
+            }catch{self.alarmPlayer=nil;try? session.setActive(false,options:.notifyOthersOnDeactivation);call.reject("Impossibile riprodurre l’avviso",nil,error)}
+        }
+    }
+    public func audioPlayerDidFinishPlaying(_ player:AVAudioPlayer,successfully flag:Bool) {
+        if alarmPlayer === player {alarmPlayer=nil;try? AVAudioSession.sharedInstance().setActive(false,options:.notifyOthersOnDeactivation)}
+    }
     @objc func configure(_ call: CAPPluginCall) {
         guard let hardwareId = call.getString("hardwareId"),
               hardwareId.range(of: "^MOKO:[0-9A-F]{12}$", options: .regularExpression) != nil else {
