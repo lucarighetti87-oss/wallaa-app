@@ -294,8 +294,7 @@ export default function App() {
 
   async function clearActivityFeed(targetScreen) {
     if (!confirm(t('v412.activity.clearConfirm'))) return;
-    await safe.clearActivities();
-    setScreen(targetScreen);
+    try {await safe.clearActivities();setScreen(targetScreen);}catch(error){safe.setToast({type:'error',text:uiText(error.message||'Impossibile cancellare le notifiche.')});}
   }
 
   const common = { ...safe, onNavigate: navigateTo, t, language };
@@ -337,7 +336,7 @@ export default function App() {
             onDeleted={() => setSelectedConversation(null)}
           />
         )}
-        {screen === 'notifications' && <NotificationsScreen activities={[...(safe.healthCheck?.history||[]).filter(item=>item.id!==safe.healthCheck?.data?.cycle?.id||!['pending','escalating'].includes(item.status)).map(item=>({id:'health-'+item.id,healthCycleId:item.id,at:item.startedAt,type:'health-check',title:'Wallaa Health Check',detail:`${uiText('Promemoria')}: ${item.remindersCompleted} · ${uiText('Email inviate')}: ${item.emailsSent}`})),...(['pending','escalating','email_pending','email_sent','email_no_recipients'].includes(safe.healthCheck?.data?.cycle?.status)?[{id:'health-current',healthCycleId:safe.healthCheck.data.cycle.id,at:safe.healthCheck.data.cycle.startedAt,type:'health-check',title:'Wallaa Health Check',detail:uiText('Apri e rispondi al controllo')}]:[]),...safe.activities]} onOpenHealth={()=>safe.healthCheck.open()} onOpenAlert={safe.openGuardianAlert} onBack={()=>setScreen('home')} onClear={() => clearActivityFeed('notifications')} t={t} language={language} />}
+        {screen === 'notifications' && <NotificationsScreen activities={[...(safe.healthCheck?.notificationEntries||[]).map(item=>({id:'health-'+item.id,healthCycleId:item.id,at:item.notificationAt||item.startedAt,type:'health-check',title:'Wallaa Health Check',detail:`${uiText('Promemoria')}: ${item.remindersCompleted} · ${uiText('Email inviate')}: ${item.emailsSent}`})),...safe.activities]} onOpenHealth={()=>safe.healthCheck.open()} onOpenAlert={safe.openGuardianAlert} onBack={()=>setScreen('home')} onClear={() => clearActivityFeed('notifications')} t={t} language={language} />}
         {screen === 'network' && <NetworkScreen onBack={()=>navigateTo('home')} contacts={safe.contacts} onAdd={() => { setContactDraft(emptyContact); setContactModal(true); }} onEdit={contact=>{setContactDraft(contact);setContactModal(true);}} onGuardianSettings={()=>setScreen('guardian')} profile={safe.profile} networkState={safe.networkState} qrDataUrl={safe.qrDataUrl} onScan={async () => { try { await safe.scanNetworkQr(); } catch (error) { safe.setToast({ type:'error', text:error.message }); } }} onRotate={() => safe.rotateQr().catch((error) => safe.setToast({ type:'error', text:error.message }))} onRemoveLink={(id) => safe.removeNetworkLink(id).catch((error) => safe.setToast({ type:'error', text:error.message }))} onRefresh={() => safe.refreshNetwork().catch(() => {})} t={t} />}
         {screen === 'resolved-alert' && <ResolvedAlertScreen alert={safe.resolvedAlert} onHome={()=>{safe.dismissResolvedAlert();setScreen('home')}} />}
         {screen === 'active-alert' && <ActiveAlertScreen

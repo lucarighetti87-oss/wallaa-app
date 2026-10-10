@@ -1598,10 +1598,12 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const clearActivities = useCallback(async () => {
     // WALLAA_V4_0_59_CLEAR_REMOTE_NOTIFICATIONS
     const identity=networkIdentityRef.current;
-    if(identity?.authToken) await clearWallaaNotificationHistory(identity).catch((error)=>console.warn('[WALLAA][NOTIFICATIONS] remote clear failed',error?.message||error));
+    const result=identity?.authToken?await clearWallaaNotificationHistory(identity):{};
+    if(identity?.authToken!==networkIdentityRef.current?.authToken)return;
+    await healthCheck.clearNotificationFeed(result.healthNotificationsClearedAt);
     setActivities([]);
     await storage.setActivities([]);
-  }, []);
+  }, [healthCheck.clearNotificationFeed]);
 
   const clearData = useCallback(async () => {
     await stopBleScan().catch(() => {});

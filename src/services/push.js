@@ -24,6 +24,7 @@ function emitAdminLocationRequest(raw = {}) {
 }
 
 import { Preferences } from '@capacitor/preferences';
+import {clearMokoHealthNotices} from './mokoConnection';
 import { showLocalSafetyNotification, feedbackWarning } from './nativeFeedback';
 
 let handles = [];
@@ -36,8 +37,9 @@ export async function stopPushListeners() {
   await Promise.all(current.map((h) => h?.remove?.().catch?.(() => {}) || Promise.resolve()));
 }
 
-export async function clearHealthNotifications(cycleId){
+export async function clearHealthNotifications(cycleId,clearedAt){
  if(!Capacitor.isNativePlatform())return;
+ await clearMokoHealthNotices({...(cycleId?{cycleId}:{}),...(clearedAt?{clearedAt}:{})}).catch(()=>{});
  const delivered=await PushNotifications.getDeliveredNotifications();
  const notifications=(delivered.notifications||[]).filter(item=>item.data?.type==='wallaa_health_check'&&(!cycleId||item.data?.healthCycleId===cycleId));
  if(notifications.length)await PushNotifications.removeDeliveredNotifications({notifications});

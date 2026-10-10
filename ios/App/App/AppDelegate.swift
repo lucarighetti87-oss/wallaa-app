@@ -6,6 +6,7 @@ import UserNotifications
 import Security
 import AccessorySetupKit
 import CoreMotion
+import CryptoKit
 
 #if DEBUG
 private func wallaaDiagnosticRecord(_ kind: String, details: [String: Any] = [:]) {
@@ -712,7 +713,9 @@ private var scanRearmWorkItem: DispatchWorkItem?
                 if error == nil, (response as? HTTPURLResponse)?.statusCode == 200,
                    self.config?.identity.authToken == token, let cycle = reply?["cycle"] as? [String:Any],
                    cycle["needsAcknowledgement"] as? Bool == true, let cycleId = cycle["id"] as? String {
-                    self.showHealthReceipt(cycleId:cycleId)
+                    if !self.healthNoticeWasCleared(notificationAt:cycle["notificationAt"] as? String,serverClearedAt:reply?["notificationsClearedAt"] as? String) {
+                        self.showHealthReceipt(cycleId:cycleId)
+                    }
                 }
                 if error != nil || !((response as? HTTPURLResponse).map{(200...299).contains($0.statusCode)} ?? false) {if moving {self.healthMovementPending=true}}
                 else if moving && reply?["ignored"] as? Bool != true && (reply?["cycle"] as? [String:Any])?["needsAcknowledgement"] as? Bool != true && self.config?.identity.authToken == token && self.config?.hardwareId == hardwareId {self.clearHealthNotifications()}
@@ -732,6 +735,22 @@ private var scanRearmWorkItem: DispatchWorkItem?
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier:"wallaa-health-receipt-\(cycleId)",content:content,trigger:UNTimeIntervalNotificationTrigger(timeInterval:1,repeats:false))) { error in
             if error != nil { UserDefaults.standard.removeObject(forKey:key) }
         }
+    }
+
+    private var healthNotificationClearKey:String? {
+        guard let token=config?.identity.authToken,!token.isEmpty else{return nil}
+        return "wallaa.health.notifications.clear."+SHA256.hash(data:Data(token.utf8)).map{String(format:"%02x",$0)}.joined()
+    }
+    func recordHealthNotificationClear(_ at:String?) {
+        if let at,let key=healthNotificationClearKey {UserDefaults.standard.set(at,forKey:key)}
+    }
+    private func healthNoticeWasCleared(notificationAt:String?,serverClearedAt:String?)->Bool {
+        let local=healthNotificationClearKey.flatMap{UserDefaults.standard.string(forKey:$0)}
+        let raw=[local,serverClearedAt].compactMap{$0}.max()
+        guard let raw,let notificationAt else{return false}
+        let formatter=ISO8601DateFormatter();formatter.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
+        guard let cutoff=formatter.date(from:raw),let notice=formatter.date(from:notificationAt) else{return false}
+        return notice<=cutoff
     }
 
     private func reconcileHealthPhoneMotion() {
@@ -789,8 +808,17 @@ private var scanRearmWorkItem: DispatchWorkItem?
     }
 
     func clearHealthNotifications(cycleId:String?=nil){
+        func matches(_ request:UNNotificationRequest)->Bool {
+            let data=request.content.userInfo,nested=data["data"] as? [String:Any] ?? [:]
+            let type=data["type"] as? String ?? nested["type"] as? String ?? ""
+            let id=data["healthCycleId"] as? String ?? nested["healthCycleId"] as? String ?? ""
+            return type=="wallaa_health_check" && (cycleId == nil || cycleId == id)
+        }
+        UNUserNotificationCenter.current().getPendingNotificationRequests{requests in
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers:requests.filter(matches).map{$0.identifier})
+        }
         UNUserNotificationCenter.current().getDeliveredNotifications{notifications in
-            let ids=notifications.filter{item in let data=item.request.content.userInfo;let type=data["type"] as? String ?? (data["data"] as? [String:Any])?["type"] as? String ?? "";let id=data["healthCycleId"] as? String ?? "";return type=="wallaa_health_check" && (cycleId == nil || cycleId == id)}.map{$0.request.identifier}
+            let ids=notifications.filter{matches($0.request)}.map{$0.request.identifier}
             UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers:ids)
         }
     }
@@ -2092,6 +2120,7 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "configure", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearHealthNotices", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "permissions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestLocation", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openSettings", returnType: CAPPluginReturnPromise),
@@ -2158,6 +2187,13 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin {
     }
     @objc func status(_ call: CAPPluginCall) {
         DispatchQueue.main.async { call.resolve(WallaaBackgroundBLEManager.shared.mokoConnectionStatus(refresh:call.getBool("refresh") ?? false)) }
+    }
+    @objc func clearHealthNotices(_ call:CAPPluginCall) {
+        DispatchQueue.main.async {
+            let manager=WallaaBackgroundBLEManager.shared
+            manager.recordHealthNotificationClear(call.getString("clearedAt"))
+            manager.clearHealthNotifications(cycleId:call.getString("cycleId"));call.resolve()
+        }
     }
 }
 

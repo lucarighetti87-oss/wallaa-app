@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {getHealthCheck,saveHealthCheck,answerHealthCheck,healthRequest} from '../services/healthCheck';
+import {healthNotificationEntries} from '../services/healthNotifications';
 import {getMokoConnectionStatus} from '../services/mokoConnection';
 import {ensureLocalNotificationPermission} from '../services/nativeFeedback';
 import {clearHealthNotifications} from '../services/push';
@@ -9,7 +10,7 @@ export function useHealthCheck({identity,device,profile,armed,loaded,visible}){
  const[history,setHistory]=useState([]);const historyAt=useRef(0);
  const generation=useRef(0),identityRef=useRef(identity),proofRef=useRef(null);identityRef.current=identity;
  const apply=useCallback(value=>{setData(value);setError('');if(value.cycle&&!value.cycle.needsAcknowledgement&&!['pending','escalating','email_pending','email_sent','email_no_recipients'].includes(value.cycle.status))clearHealthNotifications(value.cycle.id).catch(()=>{});return value;},[]);
- const refresh=useCallback(async()=>{if(!identityRef.current?.authToken)return;const current=++generation.current;const session=identityRef.current.authToken;try{const value=await getHealthCheck(identityRef.current);if(current===generation.current&&session===identityRef.current?.authToken)apply(value);if(Date.now()-historyAt.current>60000){historyAt.current=Date.now();try{const result=await healthRequest('/history',{identity:identityRef.current});if(session===identityRef.current?.authToken)setHistory(result.items||[]);}catch{historyAt.current=0;}}return value;}catch(e){if(current===generation.current)setError(e.message);return null;}},[apply]);
+ const refresh=useCallback(async()=>{if(!identityRef.current?.authToken)return;const current=++generation.current;const session=identityRef.current.authToken;try{const value=await getHealthCheck(identityRef.current);if(current===generation.current&&session===identityRef.current?.authToken)apply(value);if(Date.now()-historyAt.current>60000){historyAt.current=Date.now();try{const result=await healthRequest('/history',{identity:identityRef.current});if(current===generation.current&&session===identityRef.current?.authToken)setHistory(result.items||[]);}catch{historyAt.current=0;}}return value;}catch(e){if(current===generation.current)setError(e.message);return null;}},[apply]);
  useEffect(()=>{if(!loaded||!visible||!identity?.authToken)return;refresh();const timer=setInterval(refresh,8000);return()=>clearInterval(timer);},[loaded,visible,identity?.authToken,refresh]);
  useEffect(()=>{setHistory([]);historyAt.current=0;if(!identity?.authToken){setData({settings:{enabled:false,thresholdMinutes:30},sensor:{},cycle:null});setRequested(false);proofRef.current=null;setProof(null);}},[identity?.authToken]);
  useEffect(()=>{
@@ -45,6 +46,7 @@ export function useHealthCheck({identity,device,profile,armed,loaded,visible}){
   const value=await saveHealthCheck(identityRef.current,{...changes,device:{hardwareId:device?.hardwareId,claimToken:device?.claimToken},sensorProof:proofRef.current,context:{language:profile?.language||'it',safetyWord:profile?.safetyWord||'',locationSharingAllowed:profile?.sosLocationEnabled!==false}});return apply(value);
  },[device?.hardwareId,device?.claimToken,profile?.language,profile?.safetyWord,profile?.sosLocationEnabled,armed,apply,verify]);
  const answer=useCallback(async choice=>{if(!data.cycle?.id)throw new Error('Nessun controllo in attesa.');const value=await answerHealthCheck(identityRef.current,data.cycle.id,choice,{language:profile?.language||'it',safetyWord:profile?.safetyWord||'',locationSharingAllowed:profile?.sosLocationEnabled!==false});return apply(value);},[data.cycle?.id,apply,profile?.language,profile?.safetyWord,profile?.sosLocationEnabled]);
+ const clearNotificationFeed=useCallback(async at=>{generation.current++;setHistory([]);setData(current=>({...current,notificationsClearedAt:at||new Date().toISOString()}));historyAt.current=0;await clearHealthNotifications(undefined,at).catch(()=>{});},[]);
  const updateContext=useCallback(next=>healthRequest('/context',{identity:identityRef.current,method:'PATCH',body:{language:next.language||'it',safetyWord:next.safetyWord||'',locationSharingAllowed:next.sosLocationEnabled!==false}}),[]);
- return {data,history,requested,error,checking,proof,updateContext,refresh,verify,save,answer,open:()=>{historyAt.current=0;setRequested(true);refresh();},dismiss:()=>setRequested(false)};
+ return {data,history,notificationEntries:healthNotificationEntries(history,data.cycle,data.notificationsClearedAt),clearNotificationFeed,requested,error,checking,proof,updateContext,refresh,verify,save,answer,open:()=>{historyAt.current=0;setRequested(true);refresh();},dismiss:()=>setRequested(false)};
 }
