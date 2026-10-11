@@ -220,6 +220,8 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
         activeAlertRef.current = restored;
         await storage.setActiveAlert(restored);
       }
+      const historyEntry={id:'native-sos-'+nativeAlert.id,at:nativeAlert.at||new Date().toISOString(),type:'alert',status:'success',titleKey:'activity.alertSent',trigger:nativeAlert.trigger||'press',source:'native-background',alertId:nativeAlert.id,deliveredCount:(nativeAlert.delivered||[]).length,pushDeliveredCount:(nativeAlert.pushDelivered||[]).length,failedCount:(nativeAlert.failed||[]).length+(nativeAlert.pushFailed||[]).length};
+      setActivities(current=>{if(current.some(row=>row.id===historyEntry.id))return current;const next=pruneActivities([historyEntry,...current]);storage.setActivities(next).catch(()=>{});return next;});
       await storage.clearNativeAlert();
     };
     consumeNativeAlert().catch(() => {});
@@ -476,7 +478,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       }
 
       await pushActivity({
-        type: 'alert', status: 'success', titleKey: 'activity.alertSent', trigger: event,
+        type: 'alert', status: 'success', titleKey: 'activity.alertSent', trigger: event, alertId:alertResult.id,
         location: result.location,
         deliveredCount: alertResult.delivered.length,
         pushDeliveredCount: alertResult.pushDelivered.length,

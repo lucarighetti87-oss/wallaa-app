@@ -1,5 +1,6 @@
+import NotificationDetails from '../components/NotificationDetails';
 import {uiText,uiLocale} from '../uiText.js';
-import {useState} from 'react';
+import {useCallback,useLayoutEffect,useRef,useState} from 'react';
 import { ArrowLeft, BellRing, CheckCircle2, MapPin, ShieldCheck, Trash2, TriangleAlert } from 'lucide-react';
 import { activityTitle, formatDateTime } from '../utils/format';
 
@@ -9,9 +10,12 @@ function IconFor({ entry }) {
   return <CheckCircle2 size={18}/>;
 }
 
-export default function NotificationsScreen({ activities = [], onClear, onBack, onOpenAlert, onOpenHealth, t, language }) {
-  const [selected,setSelected]=useState(null),[error,setError]=useState('');
-  async function open(entry){if(entry.healthCycleId&&onOpenHealth){onOpenHealth();return;}setSelected(entry);setError('');if(entry.alertId&&onOpenAlert){try{await onOpenAlert(entry.alertId);setSelected(null);}catch(e){setError(e.message||uiText("Evento non disponibile."));}}}
+export default function NotificationsScreen({ activities = [], onClear, onBack, onOpenAlert, onOpenHealth, priorityAlertId='', t, language }) {
+  const [selected,setSelected]=useState(null);
+  const previousPriority=useRef(priorityAlertId);
+  useLayoutEffect(()=>{if(priorityAlertId!==previousPriority.current&&String(priorityAlertId).replaceAll(':',''))setSelected(null);previousPriority.current=priorityAlertId;},[priorityAlertId]);
+  const close=useCallback(()=>setSelected(null),[]);
+  function open(entry){setSelected(entry);}
   const rows = [...activities].sort((a,b) => new Date(b.at || 0) - new Date(a.at || 0));
   const unread = rows.filter((x) => x.type === 'alert' || x.type === 'network-alert').length;
   const handleClear = (event) => {
@@ -37,7 +41,7 @@ export default function NotificationsScreen({ activities = [], onClear, onBack, 
         <button type="button" onClick={handleClear} disabled={!rows.length}><Trash2/><span>{"" + uiText("Cancella tutto") + ""}</span></button>
       </section>
 
-      {selected&&<div className="notification-detail-backdrop"><section className="notification-detail" role="dialog" aria-modal="true" aria-label={uiText("Dettagli notifica")}><BellRing/><h2>{activityTitle(selected,language)}</h2><time>{formatDateTime(selected.at,language)}</time><p>{selected.detail||uiText("Aggiornamento del tuo servizio Wallaa.")}</p>{error&&<p role="alert">{error}</p>}{selected.location?.mapsUrl&&<a href={selected.location.mapsUrl} target="_blank" rel="noreferrer">{"" + uiText("Apri posizione") + ""}</a>}<button type="button" onClick={()=>setSelected(null)}>{"" + uiText("Chiudi dettagli") + ""}</button></section></div>}
+      {selected&&<NotificationDetails key={selected.id} entry={selected} language={language} onClose={close} onOpenAlert={onOpenAlert} onOpenHealth={onOpenHealth}/>}
       <section className="aa-notifications-feed aa-notifications-feed-v38">
         {rows.map((entry) => {
           const title = activityTitle(entry, language);
@@ -48,7 +52,7 @@ export default function NotificationsScreen({ activities = [], onClear, onBack, 
               <div className="aa-notification-copy">
                 <strong>{title}</strong>
                 <small>{entry.detail || (emergency ? uiText("Aggiornamento sicurezza Wallaa") : uiText("Evento Wallaa"))}</small>
-                {entry.location?.mapsUrl && <a href={entry.location.mapsUrl} target="_blank" rel="noreferrer" onClick={event=>event.stopPropagation()}><MapPin size={13}/>{"" + uiText("Apri posizione") + ""}</a>}
+                {entry.location?.mapsUrl && !String(entry.type||'').startsWith('network-') && <a href={entry.location.mapsUrl} target="_blank" rel="noreferrer" onClick={event=>event.stopPropagation()}><MapPin size={13}/>{"" + uiText("Apri posizione") + ""}</a>}
               </div>
               <time>{formatDateTime(entry.at, language)}</time>
             </article>
