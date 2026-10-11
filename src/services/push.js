@@ -45,6 +45,7 @@ export async function clearHealthNotifications(cycleId,clearedAt){
  const delivered=await PushNotifications.getDeliveredNotifications();
  const notifications=(delivered.notifications||[]).filter(item=>item.data?.type==='wallaa_health_check'&&(!cycleId||item.data?.healthCycleId===cycleId));
  if(notifications.length)await PushNotifications.removeDeliveredNotifications({notifications});
+ if(Capacitor.getPlatform()==='ios'&&!(await PushNotifications.getDeliveredNotifications()).notifications?.length)await wallaaAudio.clearIconBadge().catch(()=>{});
 }
 function emitHealthCheck(raw,opened=false){
  const data=normalizeLocationRequestData(raw);if(!['wallaa_health_check','wallaa_health_resolved'].includes(data.type))return false;
@@ -278,5 +279,5 @@ export function stopWallaaAlarm() {
 }
 
 export async function clearDeliveredWallaaNotifications() {
-  try { if (Capacitor.isNativePlatform()) await PushNotifications.removeAllDeliveredNotifications(); } catch { /* noop */ }
+  try { if (Capacitor.isNativePlatform()) {await PushNotifications.removeAllDeliveredNotifications();if(Capacitor.getPlatform()==='ios')await wallaaAudio.clearIconBadge();} } catch { /* noop */ }
 }

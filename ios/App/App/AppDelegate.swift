@@ -23,6 +23,17 @@ private func wallaaDiagnosticRecord(_ kind: String, details: [String: Any] = [:]
 }
 #endif
 
+// The icon badge acknowledges delivered pushes, independently of SOS/Health state.
+enum WallaaIconBadge {
+    static func clear() {
+        if #available(iOS 16.0, *) {
+            UNUserNotificationCenter.current().setBadgeCount(0) { error in
+                if let error {NSLog("[WALLAA][BADGE] clear failed: \(error.localizedDescription)")}
+            }
+        } else {UIApplication.shared.applicationIconBadgeNumber = 0}
+    }
+}
+
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
@@ -38,7 +49,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // subsystem initialization before UIApplication has completed launch.
         // Start the native BLE monitor on the next main-loop turn instead.
         scheduleWallaaNativeStartup()
-        application.applicationIconBadgeNumber = 0
+        WallaaIconBadge.clear()
         logWallaaNotificationState()
         return true
     }
@@ -58,7 +69,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         WallaaAccessoryBootstrap.shared.presentMigrationIfNeeded()
         guard WallaaAccessoryBootstrap.shared.ready else { return }
         wallaaBackgroundBLE.enterForegroundMode()
-        application.applicationIconBadgeNumber = 0
+        WallaaIconBadge.clear()
     }
     func applicationWillTerminate(_ application: UIApplication) {}
 
@@ -2124,6 +2135,7 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
     public let identifier = "WallaaMokoPlugin"
     public let jsName = "WallaaMoko"
     public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "clearIconBadge", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "alarmAudio", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "configure", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
@@ -2134,6 +2146,9 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
         CAPPluginMethod(name: "beginSetup", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endSetup", returnType: CAPPluginReturnPromise)
     ]
+    @objc func clearIconBadge(_ call:CAPPluginCall) {
+        DispatchQueue.main.async {WallaaIconBadge.clear();call.resolve()}
+    }
     @objc func alarmAudio(_ call:CAPPluginCall) {
         DispatchQueue.main.async {
             let session=AVAudioSession.sharedInstance()
