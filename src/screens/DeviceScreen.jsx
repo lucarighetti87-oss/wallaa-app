@@ -77,9 +77,9 @@ export default function DeviceScreen({ onRefreshDevice, pairingError='', pending
     </section>
 
     <section className="aa-device-metrics aa-device-metrics-v41">
-      <div><BatteryMedium className={`wb-signal ${batteryTone}`}/><small>{"" + uiText("Batteria") + ""}</small><strong>{telemetry.battery!=null?`${telemetry.battery}%`:telemetry.batteryVoltageMv?`${(telemetry.batteryVoltageMv/1000).toFixed(2)} V`:uiText("In lettura")}</strong></div>
+      <div><BatteryMedium className={`wb-signal ${batteryTone}`}/><small>{"" + uiText("Batteria") + ""}</small><strong className={telemetry.battery==null&&!telemetry.batteryVoltageMv?'wb-metric-pending':''}>{telemetry.battery!=null?`${telemetry.battery}%`:telemetry.batteryVoltageMv?`${(telemetry.batteryVoltageMv/1000).toFixed(2)} V`:uiText("In lettura")}</strong></div>
       <div aria-label={connectionLabel(connectionStatus)}><Radio className={`wb-signal ${linkTone}`}/><small>{uiText("Collegamento")}</small><strong className={`wb-signal ${linkTone}`} aria-hidden="true">●</strong></div>
-      <div><Shield className={`wb-signal ${linkTone}`}/><small>Signal</small><strong className="wb-signal radio-value">{radioFresh?`${telemetry.rssi} dBm`:uiText("Da aggiornare")}</strong></div>
+      <div><Shield className={`wb-signal ${linkTone}`}/><small>Signal</small><strong className={`wb-signal radio-value ${radioFresh?'':'wb-metric-pending'}`}>{radioFresh?`${telemetry.rssi} dBm`:uiText("Da aggiornare")}</strong></div>
     </section>
 
     {isMoko && <section className="wb-card wb-control-card">
