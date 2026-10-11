@@ -19,9 +19,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>4.0.125</string>
+	<string>4.0.126</string>
 	<key>CFBundleVersion</key>
-	<string>125</string>
+	<string>126</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAccessorySetupKitSupports</key>
@@ -35,11 +35,11 @@
 	<key>NSMotionUsageDescription</key>
 	<string>Health Check può usare il movimento dell’iPhone per far ripartire il conteggio quando il telefono si muove. I dati grezzi del sensore restano sul telefono.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Wallaa Safe Button utilizza la fotocamera per scansionare i QR code e collegarti alle persone della tua rete di sicurezza.</string>
+	<string>Wallaa usa la fotocamera per scansionare i QR code della Rete di Sicurezza e, se richiedi il ruolo Sentinel, acquisire le foto e i documenti richiesti per la verifica.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Wallaa Safe Button può utilizzare la tua posizione anche in background quando viene attivato un allarme tramite Wallaa Button, per condividerla con le persone della tua rete di sicurezza.</string>
+	<string>Wallaa può usare la posizione in background per aggiornare un SOS attivo, la disponibilità del tuo ruolo Sentinel e i rilevamenti della rete Wallaa quando queste funzioni sono abilitate. I Guardian ricevono la tua posizione solo durante un SOS attivo e con i permessi previsti.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Wallaa Safe Button utilizza la tua posizione per condividerla con le persone della tua rete di sicurezza quando attivi un allarme.</string>
+	<string>Wallaa usa la posizione per la mappa, gli SOS, la disponibilità Sentinel e i rilevamenti della rete Wallaa quando queste funzioni sono abilitate. I Guardian ricevono la tua posizione solo durante un SOS attivo e con i permessi previsti.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
