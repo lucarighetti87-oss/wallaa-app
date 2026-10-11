@@ -689,5 +689,20 @@
   "Il conteggio degli invii non conferma la lettura dei destinatari.": "Submission counts do not confirm that recipients have read the alert.",
   "Apri richiesta SOS": "Open SOS request",
   "Torna alle notifiche": "Back to notifications",
-  "Pressione del pulsante": "Button press"
+  "Pressione del pulsante": "Button press",
+  "Sicurezza della chat": "Chat safety",
+  "Utente bloccato nella chat.": "User blocked in chat.",
+  "Utente sbloccato nella chat.": "User unblocked in chat.",
+  "Segnalazione ricevuta dalla Centrale Wallaa.": "Report received by Wallaa Central.",
+  "Operazione non riuscita.": "Operation failed.",
+  "Invio sospeso: blocco della chat attivo.": "Sending paused: chat block active.",
+  "Segnala messaggio": "Report message",
+  "Segnala": "Report",
+  "Blocca i messaggi o segnala un comportamento scorretto. Il blocco riguarda la chat: non modifica i tuoi Guardian o un SOS attivo.": "Block messages or report abusive behavior. Blocking affects chat only: it does not change your Guardians or an active SOS.",
+  "Sblocca utente": "Unblock user",
+  "Blocca utente": "Block user",
+  "Segnala questo messaggio": "Report this message",
+  "Segnala utente": "Report user",
+  "Descrivi cosa è successo": "Describe what happened",
+  "Invia segnalazione": "Send report"
 }

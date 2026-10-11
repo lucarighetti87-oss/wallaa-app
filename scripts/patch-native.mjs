@@ -31,9 +31,9 @@ if (fs.existsSync(iosPlist)) {
   plist = ensurePlistKey(plist, 'UIUserInterfaceStyle', '\t<string>Dark</string>');
   plist = plist.replace(/<key>CFBundleDisplayName<\/key>\s*<string>[^<]*<\/string>/, '<key>CFBundleDisplayName</key>\n\t<string>WALLAA</string>');
   plist = ensurePlistKey(plist, 'NSBluetoothAlwaysUsageDescription', '\t<string>Wallaa Safe Button usa Bluetooth per ricevere gli eventi del Wallaa Button.</string>');
-  plist = ensurePlistKey(plist, 'NSLocationWhenInUseUsageDescription', '\t<string>Wallaa Safe Button usa la posizione per inviarla alle persone di fiducia quando attivi un alert.</string>');
-  plist = ensurePlistKey(plist, 'NSLocationAlwaysAndWhenInUseUsageDescription', '\t<string>Wallaa Safe Button può aver bisogno della posizione quando un alert viene attivato mentre l’app è in background.</string>');
-  plist = ensurePlistKey(plist, 'NSCameraUsageDescription', '\t<string>Wallaa Safe Button usa la fotocamera per scansionare i QR personali della Rete Wallaa.</string>');
+  plist = ensurePlistKey(plist, 'NSLocationWhenInUseUsageDescription', '\t<string>Wallaa usa la posizione per la mappa, gli SOS, la disponibilità Sentinel e i rilevamenti della rete Wallaa quando queste funzioni sono abilitate. I Guardian ricevono la tua posizione solo durante un SOS attivo e con i permessi previsti.</string>');
+  plist = ensurePlistKey(plist, 'NSLocationAlwaysAndWhenInUseUsageDescription', '\t<string>Wallaa può usare la posizione in background per aggiornare un SOS attivo, la disponibilità del tuo ruolo Sentinel e i rilevamenti della rete Wallaa quando queste funzioni sono abilitate. I Guardian ricevono la tua posizione solo durante un SOS attivo e con i permessi previsti.</string>');
+  plist = ensurePlistKey(plist, 'NSCameraUsageDescription', '\t<string>Wallaa usa la fotocamera per scansionare i QR code della Rete di Sicurezza e, se richiedi il ruolo Sentinel, acquisire le foto e i documenti richiesti per la verifica.</string>');
   plist = ensurePlistKey(plist, 'UIBackgroundModes', '\t<array>\n\t\t<string>bluetooth-central</string>\n\t\t<string>location</string>\n\t\t<string>remote-notification</string>\n\t</array>');
   // App Store 1.0 scope: iPhone portrait only. This prevents untested iPad/landscape layouts from being advertised.
   plist = plist.replace(/\t<key>UISupportedInterfaceOrientations<\/key>\n\t<array>[\s\S]*?\t<\/array>/, '\t<key>UISupportedInterfaceOrientations</key>\n\t<array>\n\t\t<string>UIInterfaceOrientationPortrait</string>\n\t</array>');

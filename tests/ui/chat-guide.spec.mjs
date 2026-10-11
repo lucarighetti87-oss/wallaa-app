@@ -25,3 +25,22 @@ test('notification details stay in the viewport after scrolling a long transform
 test('SOS notice explains source and time before opening the request; failed opening keeps details visible',async({page},testInfo)=>{await page.goto('/tests/ui/index.html?screen=notifications&ownSOS');await page.getByRole('button',{name:'Apri notifica: SOS inviato'}).click();const dialog=page.getByRole('dialog');await expect(dialog).toContainText('Comando del WB-001');await expect(dialog).toContainText('Pressione del pulsante');await expect(dialog).toContainText('2026');expect(await page.evaluate(()=>window.notificationOpened)).toBeUndefined();await page.screenshot({path:testInfo.outputPath('notification-sos-details.png')});await dialog.getByRole('button',{name:'Apri richiesta SOS'}).click();expect(await page.evaluate(()=>window.notificationOpened)).toBe('own-test');await page.goto('/tests/ui/index.html?screen=notifications&ownSOS&notificationError');await page.getByRole('button',{name:'Apri notifica: SOS inviato'}).click();await page.getByRole('button',{name:'Apri richiesta SOS'}).click();await expect(page.getByRole('dialog')).toContainText('Richiesta non disponibile');});
 
 test('a newly arriving SOS dismisses notification details so the emergency is not covered',async({page})=>{await page.goto('/tests/ui/index.html?screen=notifications');await page.getByRole('button',{name:'Apri notifica: WB-001 riconnesso'}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.evaluate(()=>document.querySelector('[data-test-arrival]').click());await expect(page.getByRole('dialog')).toHaveCount(0);});
+
+test('chat safety blocks sending, can unblock and submits a report without deleting the conversation',async({page},testInfo)=>{
+ await page.goto('/tests/ui/index.html?screen=chat');
+ await page.getByRole('button',{name:'Sicurezza della chat'}).click();
+ const dialog=page.getByRole('dialog',{name:'Sicurezza della chat'});
+ await dialog.getByRole('button',{name:'Blocca utente',exact:true}).click();
+ await expect(dialog).toContainText('Utente bloccato nella chat.');
+ await dialog.getByRole('button',{name:'Chiudi',exact:true}).click();
+ await expect(page.locator('.wallaa-chat-composer textarea')).toBeDisabled();
+ await page.getByRole('button',{name:'Sicurezza della chat'}).click();
+ await dialog.getByRole('button',{name:'Sblocca utente',exact:true}).click();
+ await dialog.locator('textarea').fill('Messaggi offensivi');
+ await dialog.getByRole('button',{name:'Invia segnalazione'}).click();
+ await expect(dialog).toContainText('Segnalazione ricevuta');
+ expect(await page.evaluate(()=>window.chatReported.reason)).toBe('Messaggi offensivi');
+ await page.screenshot({path:testInfo.outputPath('chat-safety.png')});
+ await dialog.getByRole('button',{name:'Chiudi',exact:true}).click();
+ await expect(page.locator('.wallaa-chat-composer textarea')).toBeEnabled();
+});

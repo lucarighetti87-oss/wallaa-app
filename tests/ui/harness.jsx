@@ -33,13 +33,16 @@ const expiresAt=new Date(Date.now()+(mode==='expired'?-1000:mode==='expires'?200
 const offer={offerId:'ui-offer',incidentId:'ui-incident',routeDistanceM:1200,etaSeconds:240,expiresAt,opened:true};
 // Every network call is answered locally. This harness must never send a real SOS.
 let chatMessages=[];
+let chatSafety={blockedByMe:false,canSend:true};
 window.fetch=async(input,options={})=>{
  const url=new URL(String(input),location.origin);let data;
- if(url.pathname.includes('/ui-chat/messages')||url.pathname==='/api/messages/conversations/ui-chat'||url.pathname==='/api/messages/central/ui-alert'){
+ if(url.pathname.endsWith('/ui-chat/block')){chatSafety={blockedByMe:JSON.parse(options.body).blocked,canSend:!JSON.parse(options.body).blocked};data={safety:chatSafety};}
+ else if(url.pathname.endsWith('/ui-chat/report')){window.chatReported=JSON.parse(options.body);data={received:true};}
+ else if(url.pathname.includes('/ui-chat/messages')||url.pathname==='/api/messages/conversations/ui-chat'||url.pathname==='/api/messages/central/ui-alert'){
   if(options.method==='POST'){
    if(parameters.has('sendError'))return new Response(JSON.stringify({error:'Invio di prova non riuscito'}),{status:503,headers:{'Content-Type':'application/json'}});
    const message={id:`msg-${chatMessages.length}`,body:JSON.parse(options.body).body,senderUserId:'ui-owner',createdAt:new Date().toISOString()};chatMessages.push(message);data={message};
-  }else data={messages:chatMessages,conversation:{conversationType:'sentinel',closed:mode==='closed'},alert:{status:mode==='closed'?'closed':'active'}};
+  }else data={messages:chatMessages,conversation:{conversationType:'sentinel',closed:mode==='closed',safety:chatSafety},alert:{status:mode==='closed'?'closed':'active'}};
  }
  else if(url.pathname==='/api/messages/conversations')data={conversations:[{id:'ui-chat',name:'Marta Test',lastMessage:'Messaggio di prova',updatedAt:new Date().toISOString()}]};
  else if(url.pathname.includes('/api/messages/users')){
