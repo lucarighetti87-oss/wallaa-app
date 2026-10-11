@@ -44,8 +44,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
+        WallaaIconBadge.clear()
         NSLog("[WALLAA][ACCESSORY] scene active")
         WallaaAccessoryBootstrap.shared.presentMigrationIfNeeded()
+    }
+
+    func sceneWillResignActive(_ scene: UIScene) {
+        // A foreground push can set a badge after activation; acknowledge it on exit too.
+        WallaaIconBadge.clear()
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
