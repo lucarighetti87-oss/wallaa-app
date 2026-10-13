@@ -5,12 +5,16 @@ import { confirmApplePurchase } from './applePurchaseFlow.mjs';
 const Store = registerPlugin('WallaaStore');
 export const applePurchasesSupported = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
 async function request(identity, path, body) {
-  const response = await fetch(`${CONFIG.apiBaseUrl}/api/billing/apple/${path}`, {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  let response;
+  try { response = await fetch(`${CONFIG.apiBaseUrl}/api/billing/apple/${path}`, {
+    signal: controller.signal,
     method: body ? 'POST' : 'GET',
     headers: { 'Content-Type': 'application/json', 'x-wallaa-legal-version': CONFIG.privacyPolicyVersion,
       'x-wallaa-installation-id': identity?.installationId || '', 'x-wallaa-install-token': identity?.authToken || '' },
     ...(body ? { body: JSON.stringify(body) } : {})
-  });
+  }); } finally { clearTimeout(timeout); }
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || 'Apple subscription unavailable.');
   return result;
@@ -40,16 +44,33 @@ export async function restoreApplePro(identity, refresh) {
 }
 export async function observeApplePurchases(identity, refresh) {
   if (!applePurchasesSupported() || !identity?.authToken) return () => {};
-  const status = await readAppleSubscription(identity);
-  if (!status.enabled) return () => {};
+  let closed = false, recovering = false;
   const listener = await Store.addListener('transaction', receipt => {
-    // Failed delivery stays unfinished and is recovered on the next connection.
-    confirm(identity, receipt, refresh).catch(() => {});
+    if (!closed) confirm(identity, receipt, refresh).catch(() => {});
   });
-  try {
-    const { transactions = [] } = await Store.pending();
-    for (const receipt of transactions) await confirm(identity, receipt, refresh);
-  } catch { /* Do not consume receipts after an offline or rejected verification. */ }
-  return () => listener.remove();
+  async function recover() {
+    if (closed || recovering) return;
+    recovering = true;
+    try {
+      const status = await readAppleSubscription(identity);
+      if (closed || !status.enabled) return;
+      const { transactions = [] } = await Store.pending();
+      for (const receipt of transactions) {
+        if (closed) break;
+        await confirm(identity, receipt, refresh);
+      }
+    } catch { /* Offline or rejected receipts remain unfinished for the next recovery. */ }
+    finally { recovering = false; }
+  }
+  const onVisible = () => { if (document.visibilityState === 'visible') recover(); };
+  window.addEventListener('online', recover);
+  document.addEventListener('visibilitychange', onVisible);
+  recover();
+  return () => {
+    closed = true;
+    window.removeEventListener('online', recover);
+    document.removeEventListener('visibilitychange', onVisible);
+    return listener.remove();
+  };
 }
 export const manageAppleSubscription = () => Store.manage();
