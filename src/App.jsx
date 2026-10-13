@@ -1,3 +1,5 @@
+import {appleDeletionNotice} from './components/AppleProSubscription';
+import {observeApplePurchases,applePurchasesSupported} from './services/appleSubscriptions';
 import HealthCheckScreen from './screens/HealthCheckScreen';
 import GuardianContactEditor from './components/GuardianContactEditor';
 import {setUiLanguage} from './uiText.js';
@@ -43,6 +45,14 @@ const emptyContact = {
 
 export default function App() {
   const safe = useWallaaSafe();
+  useEffect(() => {
+    let cancelled = false, stop;
+    observeApplePurchases(safe.networkIdentity, safe.refreshNetwork).then(cleanup => {
+      if (cancelled) cleanup(); else stop = cleanup;
+    }).catch(() => {});
+    return () => { cancelled = true; stop?.(); };
+  }, [safe.networkIdentity?.authToken, safe.refreshNetwork]);
+
   const [screen, setScreen] = useState('home');
 
   // WALLAA 4.0.72 — every normal screen opens from the top.
@@ -282,7 +292,7 @@ export default function App() {
   }
 
   async function deleteAccount() {
-    if (!confirm(t('v4.confirm.deleteAccount'))) return;
+    if (!confirm(t('v4.confirm.deleteAccount') + (applePurchasesSupported() ? '\n\n' + appleDeletionNotice(language) : ''))) return;
     try { await safe.deleteAccount(); setScreen('home'); }
     catch (error) { safe.setToast({ type: 'error', text: error.message }); }
   }
@@ -356,7 +366,7 @@ export default function App() {
           language={language}
         />}
         {screen === 'privacy' && <PrivacyCenterScreen profile={safe.profile} onNavigate={navigateTo} onDeleteAccount={deleteAccount} t={t} />}
-        {screen === 'settings' && <SettingsScreen networkReceiverStatus={safe.networkReceiverStatus} device={safe.device} networkDevice={safe.networkDevice} onNetworkTracking={safe.setDeviceNetworkTracking} onNetworkObserver={safe.setNetworkObserver} profile={safe.profile} onSaveProfile={safe.saveProfile} armed={safe.armed} onArmed={safe.setArmed} onReset={resetAll} appearance={safe.appearance} onAppearance={safe.setAppearance} onDeleteAccount={deleteAccount} onSignOut={safe.signOut} networkState={safe.networkState} systemHealth={safe.systemHealth} onRefreshSystemHealth={safe.refreshSystemHealth} onTestEmail={safe.sendTestEmail} onTestAlarmSound={safe.testAlarmSound} onNavigate={navigateTo} connectionGuard={safe.connectionGuard} onConnectionGuard={safe.setConnectionGuard} connectionStatus={safe.connectionStatus} t={t} />}
+        {screen === 'settings' && <SettingsScreen networkIdentity={safe.networkIdentity} onSubscriptionChanged={safe.refreshNetwork} networkReceiverStatus={safe.networkReceiverStatus} device={safe.device} networkDevice={safe.networkDevice} onNetworkTracking={safe.setDeviceNetworkTracking} onNetworkObserver={safe.setNetworkObserver} profile={safe.profile} onSaveProfile={safe.saveProfile} armed={safe.armed} onArmed={safe.setArmed} onReset={resetAll} appearance={safe.appearance} onAppearance={safe.setAppearance} onDeleteAccount={deleteAccount} onSignOut={safe.signOut} networkState={safe.networkState} systemHealth={safe.systemHealth} onRefreshSystemHealth={safe.refreshSystemHealth} onTestEmail={safe.sendTestEmail} onTestAlarmSound={safe.testAlarmSound} onNavigate={navigateTo} connectionGuard={safe.connectionGuard} onConnectionGuard={safe.setConnectionGuard} connectionStatus={safe.connectionStatus} t={t} />}
       </div></main>
 
       {showDock && <V4BottomNav active={screen} onChange={navigateTo} t={t} />}
