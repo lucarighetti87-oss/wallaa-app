@@ -8,6 +8,7 @@ import AccessorySetupKit
 import CoreMotion
 import CryptoKit
 import AVFoundation
+import AudioToolbox
 
 #if DEBUG
 private func wallaaDiagnosticRecord(_ kind: String, details: [String: Any] = [:]) {
@@ -1732,6 +1733,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
                 DispatchQueue.main.async { self.startLiveTracking(alertId: alertId) }
             }
             DispatchQueue.main.async {
+                AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
                 // Confirm hardware only after the server has accepted the SOS.
                 // This never ends the server alert or its live location session.
                 if self.mokoPeripheral?.identifier.uuidString == self.pendingPeripheralId { self.acknowledgeMokoPress() }
@@ -2132,6 +2134,7 @@ private enum WallaaMokoKeychain {
 @objc(WallaaMokoPlugin)
 public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegate {
     private var alarmPlayer:AVAudioPlayer?
+    private var alarmVibrationTimer:Timer?
     public let identifier = "WallaaMokoPlugin"
     public let jsName = "WallaaMoko"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -2154,10 +2157,20 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
             let session=AVAudioSession.sharedInstance()
             if call.getBool("stop") == true {
                 self.alarmPlayer?.stop();self.alarmPlayer=nil
+                self.alarmVibrationTimer?.invalidate();self.alarmVibrationTimer=nil
                 try? session.setActive(false,options:.notifyOthersOnDeactivation)
                 call.resolve();return
             }
             if call.getBool("soft") == true,self.alarmPlayer?.isPlaying == true {call.resolve(["ignored":true]);return}
+            if call.getBool("soft") != true {
+                self.alarmVibrationTimer?.invalidate();self.alarmVibrationTimer=nil
+                AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+                if call.getBool("loop") == true {
+                    self.alarmVibrationTimer=Timer.scheduledTimer(withTimeInterval:2,repeats:true) { _ in
+                        AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+                    }
+                }
+            }
             do {
                 guard let url=Bundle.main.url(forResource:call.getBool("soft") == true ? "wallaa-soft-chime" : "wallaa-guardian-siren",withExtension:"wav") else {call.reject("Suono non disponibile");return}
                 // Real alarm playback only. No silent loop to keep the app alive.
@@ -2173,7 +2186,7 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
         }
     }
     public func audioPlayerDidFinishPlaying(_ player:AVAudioPlayer,successfully flag:Bool) {
-        if alarmPlayer === player {alarmPlayer=nil;try? AVAudioSession.sharedInstance().setActive(false,options:.notifyOthersOnDeactivation)}
+        if alarmPlayer === player {alarmVibrationTimer?.invalidate();alarmVibrationTimer=nil;alarmPlayer=nil;try? AVAudioSession.sharedInstance().setActive(false,options:.notifyOthersOnDeactivation)}
     }
     @objc func configure(_ call: CAPPluginCall) {
         guard let hardwareId = call.getString("hardwareId"),
