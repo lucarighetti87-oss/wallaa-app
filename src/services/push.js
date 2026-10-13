@@ -48,7 +48,7 @@ export async function clearHealthNotifications(cycleId,clearedAt){
  if(Capacitor.getPlatform()==='ios'&&!(await PushNotifications.getDeliveredNotifications()).notifications?.length)await wallaaAudio.clearIconBadge().catch(()=>{});
 }
 function emitHealthCheck(raw,opened=false){
- const data=normalizeLocationRequestData(raw);if(!['wallaa_health_check','wallaa_health_resolved'].includes(data.type))return false;
+ const data=normalizeLocationRequestData(raw);if(data.type==='wallaa_night_mode'){window.dispatchEvent(new CustomEvent('wallaa:night-mode',{detail:{...data,opened}}));return true;}if(!['wallaa_health_check','wallaa_health_resolved'].includes(data.type))return false;
  if(!opened&&data.type==='wallaa_health_check'&&document.visibilityState==='visible'&&Capacitor.getPlatform()==='ios')wallaaAudio.alarmAudio({soft:true,loop:false}).catch(()=>{});
  if(data.type==='wallaa_health_resolved')clearHealthNotifications(data.healthCycleId).catch(()=>{});
  window.dispatchEvent(new CustomEvent('wallaa:health-check',{detail:{...data,opened}}));return true;

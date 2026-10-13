@@ -431,6 +431,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     busyRef.current = true;
     setBusy(true);
     if (event !== 'manual_test') {
+      feedbackWarning();
       setDispatchStage('sending');
       setDispatchingAlert(true);
     }
@@ -652,6 +653,24 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     let stopped=false;
     getWallaaNotificationHistory(networkIdentityRef.current).then(result=>{if(stopped)return;const rows=(result.notifications||[]).map(item=>({id:`remote-${item.id}`,at:item.createdAt,type:item.type==='sos'?'network-alert':'network-event',status:item.type==='sos'?'error':'success',title:item.title,detail:item.body,alertId:item.alertId,location:item.location}));setActivities(current=>{const ids=new Set(current.map(item=>item.id));const next=pruneActivities([...rows.filter(item=>!ids.has(item.id)),...current]);storage.setActivities(next).catch(()=>{});return next;});}).catch(()=>{});
     return()=>{stopped=true;};
+  },[loaded,networkIdentity?.authToken]);
+
+  const nightFeedGeneration=useRef(0);
+  useEffect(()=>{
+    if(!loaded||!networkIdentity?.authToken)return;
+    let stopped=false,busy=false;
+    const refreshNight=async()=>{
+      if(stopped||busy||document.visibilityState==='hidden')return;
+      busy=true;const generation=nightFeedGeneration.current;
+      try{
+        const response=await fetch(`${CONFIG.apiBaseUrl}/api/health-check/night-events`,{headers:{'x-wallaa-installation-id':networkIdentity.installationId,'x-wallaa-install-token':networkIdentity.authToken,'x-wallaa-legal-version':CONFIG.privacyPolicyVersion}});
+        if(!response.ok)return;const result=await response.json();if(stopped||generation!==nightFeedGeneration.current)return;
+        const rows=(result.items||[]).map(item=>({id:`night-${item.id}`,at:item.createdAt,type:'network-event',status:'success',title:item.title,detail:item.body}));
+        setActivities(current=>{const ids=new Set(current.map(item=>item.id));const next=pruneActivities([...rows.filter(item=>!ids.has(item.id)),...current]);storage.setActivities(next).catch(()=>{});return next;});
+      }catch{}finally{busy=false;}
+    };
+    refreshNight();const timer=setInterval(refreshNight,15000);window.addEventListener('wallaa:night-mode',refreshNight);document.addEventListener('visibilitychange',refreshNight);
+    return()=>{stopped=true;clearInterval(timer);window.removeEventListener('wallaa:night-mode',refreshNight);document.removeEventListener('visibilitychange',refreshNight);};
   },[loaded,networkIdentity?.authToken]);
 
   // Keep a Guardian's incoming SOS position live while the app is open.
@@ -1598,6 +1617,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   }, [refreshNetwork]);
 
   const clearActivities = useCallback(async () => {
+    nightFeedGeneration.current++;
     // WALLAA_V4_0_59_CLEAR_REMOTE_NOTIFICATIONS
     const identity=networkIdentityRef.current;
     const result=identity?.authToken?await clearWallaaNotificationHistory(identity):{};

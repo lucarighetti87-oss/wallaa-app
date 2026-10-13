@@ -537,7 +537,7 @@ const v404Translations = {
     'v404.safetyWord.show':'Show safety word',
     'v404.safetyWord.hide':'Hide safety word',
     'v404.safetyWord.body':'If you say this word during a verification call, the guardian must treat the situation as a real danger even if you say that everything is fine. Choose a word you do not normally use.',
-    'v404.sound.title':'Sounds & haptics','v404.sound.subtitle':'Safety feedback policy','v404.sound.sos':'SOS activation','v404.sound.silentHaptic':'Silent + haptic','v404.sound.guardian':'Guardian alert','v404.sound.audible':'High-intensity siren','v404.sound.test':'Test guardian alarm sound','v404.sound.note':'SOS activation stays silent on the protected person’s phone to avoid drawing attention. Guardian alerts use sound when iOS notification permissions allow it.'
+    'v404.sound.title':'Sounds & haptics','v404.sound.subtitle':'Safety feedback policy','v404.sound.sos':'SOS activation','v404.sound.silentHaptic':'Silent + haptic','v404.sound.guardian':'Guardian alert','v404.sound.audible':'High-intensity siren','v404.sound.test':'Test guardian alarm sound','v404.sound.note':'SOS activation stays silent on the protected person’s phone to avoid drawing attention. Guardian alerts use sound when iOS notification permissions allow it. For vibration in Silent mode, choose Settings > Sounds & Haptics > Haptics > Always Play. With the app closed, iOS controls notification sound and vibration.'
   },
   it: {
     'v404.safetyWord.title':'Parola d’ordine',
@@ -547,7 +547,7 @@ const v404Translations = {
     'v404.safetyWord.show':'Mostra parola d’ordine',
     'v404.safetyWord.hide':'Nascondi parola d’ordine',
     'v404.safetyWord.body':'Se pronunci questa parola durante una chiamata di verifica, il guardiano deve considerare la situazione un pericolo reale anche se affermi che va tutto bene. Scegli una parola che non usi normalmente.',
-    'v404.sound.title':'Suoni e feedback aptico','v404.sound.subtitle':'Comportamento degli avvisi di sicurezza','v404.sound.sos':'Attivazione SOS','v404.sound.silentHaptic':'Silenziosa + vibrazione','v404.sound.guardian':'Allarme guardiano','v404.sound.audible':'Sirena ad alta intensità','v404.sound.test':'Prova suono allarme guardiano','v404.sound.note':'L’attivazione SOS resta silenziosa sul telefono della persona protetta per non attirare attenzione. Gli avvisi ai guardiani usano la sirena Wallaa ad alta intensità quando i permessi iOS lo consentono.'
+    'v404.sound.title':'Suoni e feedback aptico','v404.sound.subtitle':'Comportamento degli avvisi di sicurezza','v404.sound.sos':'Attivazione SOS','v404.sound.silentHaptic':'Silenziosa + vibrazione','v404.sound.guardian':'Allarme guardiano','v404.sound.audible':'Sirena ad alta intensità','v404.sound.test':'Prova suono allarme guardiano','v404.sound.note':'L’attivazione SOS resta silenziosa sul telefono della persona protetta per non attirare attenzione. Gli avvisi ai guardiani usano la sirena Wallaa ad alta intensità quando i permessi iOS lo consentono. Per la vibrazione in silenzioso, scegli Impostazioni > Suoni e feedback aptico > Feedback aptico > Riproduci sempre. Con l’app chiusa, iOS gestisce suono e vibrazione delle notifiche.'
   },
   es: {
     'v404.safetyWord.title':'Palabra de seguridad',
@@ -557,7 +557,7 @@ const v404Translations = {
     'v404.safetyWord.show':'Mostrar palabra de seguridad',
     'v404.safetyWord.hide':'Ocultar palabra de seguridad',
     'v404.safetyWord.body':'Si dices esta palabra durante una llamada de verificación, el guardián debe considerar que existe un peligro real aunque afirmes que todo está bien. Elige una palabra que no uses normalmente.',
-    'v404.sound.title':'Sonidos y respuesta háptica','v404.sound.subtitle':'Comportamiento de las alertas de seguridad','v404.sound.sos':'Activación SOS','v404.sound.silentHaptic':'Silenciosa + vibración','v404.sound.guardian':'Alerta del guardián','v404.sound.audible':'Sirena de alta intensidad','v404.sound.test':'Probar sonido de alerta','v404.sound.note':'La activación SOS permanece silenciosa en el teléfono de la persona protegida para no llamar la atención. Las alertas al guardián usan la sirena Wallaa de alta intensidad cuando iOS lo permite.'
+    'v404.sound.title':'Sonidos y respuesta háptica','v404.sound.subtitle':'Comportamiento de las alertas de seguridad','v404.sound.sos':'Activación SOS','v404.sound.silentHaptic':'Silenciosa + vibración','v404.sound.guardian':'Alerta del guardián','v404.sound.audible':'Sirena de alta intensidad','v404.sound.test':'Probar sonido de alerta','v404.sound.note':'La activación SOS permanece silenciosa en el teléfono de la persona protegida para no llamar la atención. Las alertas al guardián usan la sirena Wallaa de alta intensidad cuando iOS lo permite. Para vibrar en silencio, selecciona Ajustes > Sonidos y vibraciones > Vibraciones > Reproducir siempre. Con la app cerrada, iOS controla el sonido y la vibración de las notificaciones.'
   },
   fr: {
     'v404.safetyWord.title':'Mot de sécurité',
@@ -567,7 +567,7 @@ const v404Translations = {
     'v404.safetyWord.show':'Afficher le mot de sécurité',
     'v404.safetyWord.hide':'Masquer le mot de sécurité',
     'v404.safetyWord.body':'Si vous prononcez ce mot pendant un appel de vérification, le gardien doit considérer la situation comme un danger réel même si vous dites que tout va bien. Choisissez un mot que vous utilisez rarement.',
-    'v404.sound.title':'Sons et retour haptique','v404.sound.subtitle':'Comportement des alertes de sécurité','v404.sound.sos':'Activation SOS','v404.sound.silentHaptic':'Silencieuse + vibration','v404.sound.guardian':'Alerte du gardien','v404.sound.audible':'Sirène haute intensité','v404.sound.test':'Tester le son d’alerte','v404.sound.note':'L’activation SOS reste silencieuse sur le téléphone de la personne protégée afin de ne pas attirer l’attention. Les alertes gardien utilisent la sirène Wallaa haute intensité lorsque iOS l’autorise.'
+    'v404.sound.title':'Sons et retour haptique','v404.sound.subtitle':'Comportement des alertes de sécurité','v404.sound.sos':'Activation SOS','v404.sound.silentHaptic':'Silencieuse + vibration','v404.sound.guardian':'Alerte du gardien','v404.sound.audible':'Sirène haute intensité','v404.sound.test':'Tester le son d’alerte','v404.sound.note':'L’activation SOS reste silencieuse sur le téléphone de la personne protégée afin de ne pas attirer l’attention. Les alertes gardien utilisent la sirène Wallaa haute intensité lorsque iOS l’autorise. Pour vibrer en mode silencieux, choisis Réglages > Sons et vibrations > Vibrations > Toujours actives. Lorsque l’app est fermée, iOS gère les sons et vibrations des notifications.'
   },
   de: {
     'v404.safetyWord.title':'Sicherheitswort',
@@ -577,7 +577,7 @@ const v404Translations = {
     'v404.safetyWord.show':'Sicherheitswort anzeigen',
     'v404.safetyWord.hide':'Sicherheitswort ausblenden',
     'v404.safetyWord.body':'Wenn du dieses Wort während eines Kontrollanrufs sagst, muss der Guardian von einer realen Gefahr ausgehen, auch wenn du behauptest, dass alles in Ordnung ist. Wähle ein Wort, das du normalerweise nicht verwendest.',
-    'v404.sound.title':'Töne & Haptik','v404.sound.subtitle':'Verhalten der Sicherheitswarnungen','v404.sound.sos':'SOS-Aktivierung','v404.sound.silentHaptic':'Lautlos + Haptik','v404.sound.guardian':'Guardian-Alarm','v404.sound.audible':'Hochintensive Sirene','v404.sound.test':'Guardian-Alarmton testen','v404.sound.note':'Die SOS-Aktivierung bleibt auf dem Telefon der geschützten Person lautlos, um keine Aufmerksamkeit zu erregen. Guardian-Warnungen verwenden die hochintensive Wallaa-Sirene, wenn iOS dies zulässt.'
+    'v404.sound.title':'Töne & Haptik','v404.sound.subtitle':'Verhalten der Sicherheitswarnungen','v404.sound.sos':'SOS-Aktivierung','v404.sound.silentHaptic':'Lautlos + Haptik','v404.sound.guardian':'Guardian-Alarm','v404.sound.audible':'Hochintensive Sirene','v404.sound.test':'Guardian-Alarmton testen','v404.sound.note':'Die SOS-Aktivierung bleibt auf dem Telefon der geschützten Person lautlos, um keine Aufmerksamkeit zu erregen. Guardian-Warnungen verwenden die hochintensive Wallaa-Sirene, wenn iOS dies zulässt. Für Vibration im Stummmodus wähle Einstellungen > Töne & Haptik > Haptik > Immer wiedergeben. Bei geschlossener App steuert iOS Ton und Vibration der Mitteilungen.'
   },
   pt: {
     'v404.safetyWord.title':'Palavra de segurança',
@@ -587,7 +587,7 @@ const v404Translations = {
     'v404.safetyWord.show':'Mostrar palavra de segurança',
     'v404.safetyWord.hide':'Ocultar palavra de segurança',
     'v404.safetyWord.body':'Se disseres esta palavra durante uma chamada de verificação, o guardião deve considerar a situação um perigo real mesmo que digas que está tudo bem. Escolhe uma palavra que não uses normalmente.',
-    'v404.sound.title':'Sons e feedback tátil','v404.sound.subtitle':'Comportamento dos alertas de segurança','v404.sound.sos':'Ativação SOS','v404.sound.silentHaptic':'Silenciosa + vibração','v404.sound.guardian':'Alerta do guardião','v404.sound.audible':'Sirene de alta intensidade','v404.sound.test':'Testar som do alerta','v404.sound.note':'A ativação SOS permanece silenciosa no telefone da pessoa protegida para não chamar atenção. Os alertas ao guardião usam a sirene Wallaa de alta intensidade quando o iOS o permite.'
+    'v404.sound.title':'Sons e feedback tátil','v404.sound.subtitle':'Comportamento dos alertas de segurança','v404.sound.sos':'Ativação SOS','v404.sound.silentHaptic':'Silenciosa + vibração','v404.sound.guardian':'Alerta do guardião','v404.sound.audible':'Sirene de alta intensidade','v404.sound.test':'Testar som do alerta','v404.sound.note':'A ativação SOS permanece silenciosa no telefone da pessoa protegida para não chamar atenção. Os alertas ao guardião usam a sirene Wallaa de alta intensidade quando o iOS o permite. Para vibrar no modo silencioso, escolhe Definições > Sons e háptica > Háptica > Reproduzir sempre. Com a app fechada, o iOS controla o som e a vibração das notificações.'
   }
 };
 
