@@ -1,3 +1,4 @@
+import StoreKit
 import UIKit
 import Capacitor
 import CoreBluetooth
@@ -2258,7 +2259,95 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
     }
 }
 
+@objc(WallaaStorePlugin)
+public class WallaaStorePlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "WallaaStorePlugin"
+    public let jsName = "WallaaStore"
+    public let pluginMethods: [CAPPluginMethod] = ["product", "purchase", "restore", "pending", "finish", "manage"].map { CAPPluginMethod(name: $0, returnType: CAPPluginReturnPromise) }
+    private let proProductID = "it.wallaa.safebutton.pro.monthly"
+    private var transactions: [UInt64: StoreKit.Transaction] = [:]
+    private var updates: Task<Void, Never>?
+
+    public override func load() {
+        updates = Task { @MainActor [weak self] in
+            for await result in StoreKit.Transaction.updates {
+                guard let self, let payload = self.receipt(result) else { continue }
+                self.notifyListeners("transaction", data: payload)
+            }
+        }
+    }
+    deinit { updates?.cancel() }
+
+    private func receipt(_ result: VerificationResult<StoreKit.Transaction>) -> [String: Any]? {
+        guard case .verified(let transaction) = result, transaction.productID == proProductID else { return nil }
+        transactions[transaction.id] = transaction
+        return ["status": "verified", "transactionId": String(transaction.id), "signedTransaction": result.jwsRepresentation]
+    }
+    private func requestedProduct(_ call: CAPPluginCall) async throws -> Product {
+        guard call.getString("productId") == proProductID,
+              let product = try await Product.products(for: [proProductID]).first,
+              product.type == .autoRenewable,
+              product.subscription?.subscriptionPeriod.unit == .month,
+              product.subscription?.subscriptionPeriod.value == 1 else {
+            throw NSError(domain: "WallaaStore", code: 1, userInfo: [NSLocalizedDescriptionKey: "Wallaa Pro is not available in the App Store yet."])
+        }
+        return product
+    }
+    @objc func product(_ call: CAPPluginCall) {
+        Task { @MainActor in
+            do { let product = try await requestedProduct(call)
+                call.resolve(["productId": product.id, "displayName": product.displayName, "displayPrice": product.displayPrice, "periodMonths": 1])
+            } catch { call.reject(error.localizedDescription) }
+        }
+    }
+    @objc func purchase(_ call: CAPPluginCall) {
+        Task { @MainActor in
+            do {
+                guard let token = call.getString("appAccountToken").flatMap(UUID.init(uuidString:)) else { call.reject("Wallaa account missing."); return }
+                let product = try await requestedProduct(call)
+                switch try await product.purchase(options: [.appAccountToken(token)]) {
+                case .success(let result):
+                    guard let payload = receipt(result) else { call.reject("Apple purchase verification failed."); return }
+                    call.resolve(payload)
+                case .pending: call.resolve(["status": "pending"])
+                case .userCancelled: call.resolve(["status": "cancelled"])
+                @unknown default: call.reject("Apple purchase status unavailable.")
+                }
+            } catch { call.reject(error.localizedDescription) }
+        }
+    }
+    private func collect(_ call: CAPPluginCall, restore: Bool) {
+        Task { @MainActor in
+            do {
+                if restore { try await AppStore.sync() }
+                var receipts: [String: [String: Any]] = [:]
+                for await result in StoreKit.Transaction.currentEntitlements {
+                    if let payload = receipt(result), let id = payload["transactionId"] as? String { receipts[id] = payload }
+                }
+                for await result in StoreKit.Transaction.unfinished {
+                    if let payload = receipt(result), let id = payload["transactionId"] as? String { receipts[id] = payload }
+                }
+                call.resolve(["transactions": Array(receipts.values)])
+            } catch { call.reject(error.localizedDescription) }
+        }
+    }
+    @objc func restore(_ call: CAPPluginCall) { collect(call, restore: true) }
+    @objc func pending(_ call: CAPPluginCall) { collect(call, restore: false) }
+    @objc func finish(_ call: CAPPluginCall) {
+        Task { @MainActor in
+            guard let raw = call.getString("transactionId"), let id = UInt64(raw), let transaction = transactions[id] else { call.reject("Apple transaction unavailable."); return }
+            await transaction.finish(); transactions.removeValue(forKey: id); call.resolve()
+        }
+    }
+    @objc func manage(_ call: CAPPluginCall) {
+        Task { @MainActor in
+            guard let scene = self.bridge?.viewController?.view.window?.windowScene else { call.reject("Apple subscription settings unavailable."); return }
+            do { try await AppStore.showManageSubscriptions(in: scene); call.resolve() } catch { call.reject(error.localizedDescription) }
+        }
+    }
+}
+
 @objc(WallaaBridgeViewController)
 class WallaaBridgeViewController: CAPBridgeViewController {
-    override func capacitorDidLoad() { bridge?.registerPluginInstance(WallaaMokoPlugin()) }
+    override func capacitorDidLoad() { bridge?.registerPluginInstance(WallaaMokoPlugin()); bridge?.registerPluginInstance(WallaaStorePlugin()) }
 }

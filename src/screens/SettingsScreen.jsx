@@ -1,3 +1,4 @@
+import AppleProSubscription from '../components/AppleProSubscription';
 import {uiText,uiLocale} from '../uiText.js';
 import {
   Bluetooth, CheckCircle2, CircleAlert, Database, Globe2, Mail, MapPin, QrCode,
@@ -24,7 +25,7 @@ function formatDateOfBirth(value) {
 
 export default function SettingsScreen({ networkReceiverStatus={},connectionGuard={enabled:true,delaySeconds:60},onConnectionGuard,device, networkDevice, onNetworkTracking, onNetworkObserver,
   profile, onSaveProfile, armed, onArmed, onReset, appearance, onAppearance, onDeleteAccount, onSignOut,
-  networkState, systemHealth, onRefreshSystemHealth, onTestEmail, onTestAlarmSound, onNavigate, connectionStatus, t
+  networkIdentity, onSubscriptionChanged, networkState, systemHealth, onRefreshSystemHealth, onTestEmail, onTestAlarmSound, onNavigate, connectionStatus, t
 }) {
   const [showSafetyWord, setShowSafetyWord] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
@@ -206,7 +207,7 @@ export default function SettingsScreen({ networkReceiverStatus={},connectionGuar
           <div className="v412-feature-row"><Server size={18}/><span><strong>{"" + uiText("Wallaa Operating Center") + ""}</strong><small>{t('v412.pro.centerBody')}</small></span><i className={`v412-feature-state ${isPro?'':'locked'}`}>{isPro ? t('v412.pro.activeShort') : 'PRO'}</i></div>
           <div className="v412-feature-row"><Navigation size={18}/><span><strong>{t('v412.pro.liveTitle')}</strong><small>{isPro ? t('v412.pro.livePro') : t('v412.pro.liveBasic')}</small></span><i className={`v412-feature-state ${isPro?'':'locked'}`}>{isPro ? t('v412.pro.activeShort') : 'PRO'}</i></div>
         </div>
-        {!isPro && <p className="v404-sound-note">{t('v412.pro.futureBilling')}</p>}
+        <AppleProSubscription identity={networkIdentity} isPro={isPro} language={profile.language} refresh={onSubscriptionChanged}/>
       </section>
       <section className={`v4-settings-card settings-switch-row v419-live-protection ${!isPro ? 'locked' : ''}`}>
         <div className="settings-row-title"><Navigation size={19}/><div><strong>Guardian Mode</strong><span>{isPro ? uiText("I Guardian ricevono la tua posizione solo durante un SOS attivo. iOS può sospendere gli aggiornamenti in background.") : uiText("Disponibile con Wallaa Pro.")}</span></div></div>
