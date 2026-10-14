@@ -8,7 +8,7 @@ import { setNetworkParticipation, getOwnedNetworkDevices, reportNetworkObservati
 import { prepareMokoButton } from '../services/mokoSetup';
 import { MOKO_FACTORY_PASSWORD, MOKO_PROFILE_VERSION } from '../services/mokoSetupProtocol';
 import { BleClient } from '@capacitor-community/bluetooth-le';
-import { configureMokoConnection, getMokoConnectionStatus, supportsMokoConnection, beginMokoSetup, endMokoSetup, isMokoDiagnosticRun, getSafetyPermissions, requestSafetyLocation, openSafetySettings } from '../services/mokoConnection';
+import { configureMokoConnection, getMokoConnectionStatus, supportsMokoConnection, beginMokoSetup, endMokoSetup, authorizeMokoAccessory, cancelMokoAccessory, isMokoDiagnosticRun, getSafetyPermissions, requestSafetyLocation, openSafetySettings } from '../services/mokoConnection';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { storage } from '../services/storage';
@@ -1453,7 +1453,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
 
   }, [refreshNetwork]);
 
-  const cancelPairing=useCallback(()=>{pairingControllerRef.current?.abort(new Error('Associazione annullata.'));pairingChoiceRef.current?.reject(new Error('Associazione annullata.'));},[]);
+  const cancelPairing=useCallback(()=>{cancelMokoAccessory().catch(()=>{});pairingControllerRef.current?.abort(new Error('Associazione annullata.'));pairingChoiceRef.current?.reject(new Error('Associazione annullata.'));},[]);
   const selectPairingCandidate=useCallback(candidate=>{const choice=pairingChoiceRef.current;if(!choice){setPairingError('La selezione è terminata. Ripeti il collegamento.');setPairingCandidates([]);return;}setPairingCandidates([]);setPairingState('connecting');choice.resolve(candidate);},[]);
   const pairDevice = useCallback(async ({password=MOKO_FACTORY_PASSWORD,existingDevice=null,upgrade=false}={}) => {
     if(pairingInProgressRef.current)return;
@@ -1467,7 +1467,11 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     };
     try {
       await beginMokoSetup();await stopBleScan();
-      target=(existingDevice?.hardwareId?.startsWith('MOKO:')?existingDevice:null)||await pairWallaaButton({signal:controller.signal,onProgress:state=>setPairingState(state),selectMokoDevice:async(candidates,signal)=>{
+      if(controller.signal.aborted)throw controller.signal.reason;
+      setPairingState('authorizing');
+      const authorization=await authorizeMokoAccessory({...(existingDevice?.id?{deviceId:existingDevice.id}:{})});
+      if(controller.signal.aborted)throw controller.signal.reason;
+      target=(existingDevice?.hardwareId?.startsWith('MOKO:')?existingDevice:null)||await pairWallaaButton({authorizedDeviceId:authorization?.deviceId,signal:controller.signal,onProgress:state=>setPairingState(state),selectMokoDevice:async(candidates,signal)=>{
         setPairingState('checking');
         const available=[];
         for(const candidate of candidates){if(signal.aborted)throw signal.reason;const eligibility=await checkWallaaDeviceClaim(networkIdentityRef.current,candidate).catch(error=>{if(error.code==='DEVICE_ALREADY_OWNED')return {allowed:false};throw error;});if(eligibility.allowed)available.push(candidate);}

@@ -19,15 +19,15 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>4.0.131</string>
+	<string>4.0.132</string>
 	<key>CFBundleVersion</key>
-	<string>131</string>
+	<string>132</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAccessorySetupKitSupports</key>
 	<array><string>Bluetooth</string></array>
 	<key>NSAccessorySetupBluetoothServices</key>
-	<array><string>AA00</string></array>
+	<array><string>AA00</string><string>EA00</string><string>FEE0</string></array>
 	<key>NSAccessorySetupBluetoothNames</key>
 	<array><string>MK Button</string></array>
 	<key>NSBluetoothAlwaysUsageDescription</key>
