@@ -704,5 +704,11 @@
   "Segnala questo messaggio": "Report this message",
   "Segnala utente": "Report user",
   "Descrivi cosa è successo": "Describe what happened",
-  "Invia segnalazione": "Send report"
+  "Invia segnalazione": "Send report",
+  "La richiesta non si è conclusa. Verifica lo stato o apri Impostazioni iPhone.": "The request did not complete. Check its status or open iPhone Settings.",
+  "Attendi la richiesta dell’iPhone. Puoi comunque verificare lo stato o completare dopo.": "Wait for the iPhone permission prompt. You can still check the status or finish later.",
+  "Bluetooth non risponde. Verifica il permesso per Wallaa nelle Impostazioni iPhone.": "Bluetooth is not responding. Check Wallaa’s permission in iPhone Settings.",
+  "Bluetooth non disponibile. Attivalo e autorizza Wallaa nelle Impostazioni iPhone.": "Bluetooth is unavailable. Turn it on and allow Wallaa in iPhone Settings.",
+  "La ricerca Bluetooth non si è avviata. Verifica Bluetooth e permessi, poi riprova.": "Bluetooth discovery did not start. Check Bluetooth and permissions, then try again.",
+  "Nessun pulsante compatibile rilevato. Controlla che Bluetooth sia attivo, Wallaa sia autorizzata e il pulsante sia acceso e libero da altri collegamenti. Poi riprova.": "No compatible button found. Check that Bluetooth is on, Wallaa is allowed, and the button is switched on and not connected elsewhere. Then try again."
 }
