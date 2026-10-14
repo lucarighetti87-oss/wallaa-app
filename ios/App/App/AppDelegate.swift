@@ -145,11 +145,13 @@ final class WallaaAccessoryPairing {
     private var selected:UUID?
     private var watchdog:DispatchWorkItem?
     private var requiredID:UUID?
+    private var removing=false
+    private var reuseAuthorized=true
     private func error(_ text:String)->NSError { NSError(domain:"WallaaAccessoryPairing",code:1,userInfo:[NSLocalizedDescriptionKey:text]) }
-    func authorize(existingID:String?,completion:@escaping(Result<String,Error>)->Void){
+    func authorize(existingID:String?,remove:Bool=false,reuse:Bool=true,completion:@escaping(Result<String,Error>)->Void){
         guard self.completion == nil else { completion(.failure(error("Una richiesta Apple è già aperta. Chiudila prima di riprovare.")));return }
         let previous=session;session=nil;previous?.invalidate()
-        self.completion=completion;selected=nil;requiredID=existingID.flatMap(UUID.init(uuidString:))
+        self.completion=completion;selected=nil;requiredID=existingID.flatMap(UUID.init(uuidString:));removing=remove;reuseAuthorized=reuse
         let session=ASAccessorySession();self.session=session
         let timeout=DispatchWorkItem{[weak self] in guard let self else{return};self.finish(.failure(self.error("La richiesta Apple non si è conclusa. Ripeti il collegamento.")));session.invalidate()}
         watchdog=timeout;DispatchQueue.main.asyncAfter(deadline:.now()+120,execute:timeout)
@@ -157,8 +159,20 @@ final class WallaaAccessoryPairing {
             guard let self,self.session === session,self.completion != nil else{return}
             switch event.eventType {
             case .activated:
+                if self.removing {
+                    guard let identifier=self.requiredID else {self.finish(.failure(self.error("Identificativo Apple del pulsante non disponibile.")));return}
+                    guard let accessory=session.accessories.first(where:{$0.bluetoothIdentifier==identifier}) else {self.finish(.success(identifier.uuidString));return}
+                    session.removeAccessory(accessory){[weak self] error in if let error{self?.finish(.failure(error))}else{self?.finish(.success(identifier.uuidString))}}
+                    return
+                }
                 if let identifier=self.requiredID,session.accessories.contains(where:{$0.bluetoothIdentifier==identifier && $0.state == .authorized}) {
                     self.finish(.success(identifier.uuidString));return
+                }
+                let authorized=session.accessories.filter{$0.state == .authorized && $0.bluetoothIdentifier != nil}
+                if self.requiredID == nil,self.reuseAuthorized,!authorized.isEmpty {
+                    // Resume an interrupted first setup. With several authorized buttons,
+                    // the existing physical-discovery UI still requires an explicit selection.
+                    self.finish(.success(authorized.count == 1 ? authorized[0].bluetoothIdentifier!.uuidString : ""));return
                 }
                 let image=Bundle.main.url(forResource:"wallaa-button",withExtension:"png",subdirectory:"public").flatMap{UIImage(contentsOfFile:$0.path)} ?? UIImage(systemName:"button.programmable")!
                 let items=["AA00","EA00","FEE0"].map{uuid->ASPickerDisplayItem in
@@ -425,12 +439,17 @@ private var scanRearmWorkItem: DispatchWorkItem?
         // This avoids touching Bluetooth while UIApplication/Capacitor is still bootstrapping.
     }
 
+    private var observedConfigurationValues:[String?]?
     @objc private func userDefaultsDidChange() {
         // Capacitor Preferences writes the active SOS alert into UserDefaults.
         // Refresh immediately so native CoreLocation starts while the app is still
         // foregrounded, before the user locks the phone or opens the Guardian link.
         DispatchQueue.main.async { [weak self] in
-            self?.refreshConfiguration()
+            guard let self else{return}
+            let values=[self.configDefaultsKey,self.activeAlertDefaultsKey,self.sentinelDefaultsKey].map{UserDefaults.standard.string(forKey:$0)}
+            guard values != self.observedConfigurationValues else{return}
+            self.observedConfigurationValues=values
+            self.refreshConfiguration()
         }
     }
 
@@ -626,6 +645,8 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private var mokoTelemetryTimeout: DispatchWorkItem?
     private var mokoConnectTimeout: DispatchWorkItem?
     private var mokoRetry: DispatchWorkItem?
+    private var mokoRetryAt=Date.distantPast
+    private var mokoRetryFailures=0
     private var mokoHandshakeTimeout: DispatchWorkItem?
     private var mokoLastRssiAt = Date.distantPast
     private var mokoRssi: Int?
@@ -671,7 +692,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     func configureMokoConnection(hardwareId: String, enabled: Bool) {
         UserDefaults.standard.set(enabled, forKey: "wallaa.moko.continuous.\(hardwareId)")
         mokoAuthenticationBlocked = false
-        mokoRetry?.cancel()
+        mokoRetry?.cancel();mokoRetryAt = .distantPast;mokoRetryFailures=0
         start()
         reconcileMokoConnection()
     }
@@ -863,15 +884,18 @@ private var scanRearmWorkItem: DispatchWorkItem?
             }
         }.resume()
     }
+    private let connectionGuardQueue=DispatchQueue(label:"it.wallaa.connection-notifications",qos:.utility)
     private func updateNativeConnectionGuard(){
         let center=UNUserNotificationCenter.current(),identifiers=["1746060","1746061","1746062"]
         let savedKey="wallaa.disconnect.reminder-plan"
         guard let config else { return }
         guard config.armed,config.connectionGuard?.enabled != false,mokoConnectionWanted,let detectedAt=mokoDisconnectedAt else {
-            center.removePendingNotificationRequests(withIdentifiers:identifiers)
-            guardScheduledKey=""
+            if guardScheduledKey != "inactive" {
+                guardScheduledKey="inactive"
+                connectionGuardQueue.async {center.removePendingNotificationRequests(withIdentifiers:identifiers)}
+            }
             // A verified reconnection or explicit opt-out ends this disconnect episode.
-            if mokoStatus == "ready" || !config.armed || config.connectionGuard?.enabled == false {
+            if (mokoStatus == "ready" || !config.armed || config.connectionGuard?.enabled == false),UserDefaults.standard.object(forKey:savedKey) != nil {
                 UserDefaults.standard.removeObject(forKey:savedKey)
             }
             return
@@ -887,7 +911,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
         // iOS retains scheduled notifications while the app is suspended/relaunched.
         // Do not restart an existing three-reminder sequence on every configuration refresh.
         if sameEpisode,saved?["key"] as? String == key { return }
-        center.removePendingNotificationRequests(withIdentifiers:identifiers)
+        var requests:[UNNotificationRequest]=[]
         let now=Date()
         for index in 0..<3 {
             let due=at.addingTimeInterval(Double(delay+index*300))
@@ -898,7 +922,12 @@ private var scanRearmWorkItem: DispatchWorkItem?
             content.sound=UNNotificationSound(named:UNNotificationSoundName("wallaa-soft-chime.wav"))
             content.userInfo=["type":"wallaa_disconnect","reminder":index+1,"hardwareId":hardwareId]
             let trigger=UNTimeIntervalNotificationTrigger(timeInterval:max(1,due.timeIntervalSince(now)),repeats:false)
-            center.add(UNNotificationRequest(identifier:identifiers[index],content:content,trigger:trigger))
+            requests.append(UNNotificationRequest(identifier:identifiers[index],content:content,trigger:trigger))
+        }
+        let pending=requests
+        connectionGuardQueue.async {
+            center.removePendingNotificationRequests(withIdentifiers:identifiers)
+            for request in pending {center.add(request)}
         }
         UserDefaults.standard.set(["hardwareId":hardwareId,"at":at.timeIntervalSince1970,"key":key],forKey:savedKey)
     }
@@ -927,6 +956,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
             mokoPeripheral = nil; mokoAuthenticated = false; mokoDisconnectedAt = nil; mokoStatus = "disabled"
             return
         }
+        guard Date() >= mokoRetryAt else {return}
         guard !mokoAuthenticationBlocked, let central, central.state == .poweredOn,
               let raw = config?.deviceId, let uuid = UUID(uuidString: raw) else { return }
         if let peripheral = mokoPeripheral, peripheral.identifier != uuid {
@@ -977,6 +1007,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
         mokoStreamReady?.cancel()
         mokoResetInFlight = false
         mokoPeripheral = peripheral; peripheral.delegate = self
+        mokoRetry?.cancel();mokoRetryAt = .distantPast
         mokoAuthenticated = false; mokoStatus = "authenticating"
         healthMotionAnchor=nil;healthPreviousAxes=nil;healthMotionSamples=[];healthMovementPending=false
         NSLog("[WALLAA][MOKO] connected, authenticating")
@@ -1154,6 +1185,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
             return
         }
         if synchronizing { synchronizeMokoEventStream(); return }
+        mokoRetryFailures=0;mokoRetryAt = .distantPast
         mokoStatus = "ready"; mokoHandshakeTimeout?.cancel(); mokoDisconnectedAt = nil;updateNativeConnectionGuard()
         NSLog("[WALLAA][MOKO] event count=\(count) previous=\(previous.map(String.init) ?? "none") setup=\(mokoSetupInProgress)")
         guard WallaaMokoGATT.shouldEmit(previous: previous, count: count, initialRead: false, quietGap: quietGap), mokoConnectionWanted,
@@ -1192,9 +1224,11 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private func scheduleMokoReconnect() {
         guard mokoConnectionWanted, !mokoAuthenticationBlocked else { return }
         mokoRetry?.cancel()
+        let delay=min(60.0,5.0*pow(2.0,Double(min(mokoRetryFailures,4))))
+        mokoRetryFailures+=1;mokoRetryAt=Date().addingTimeInterval(delay)
         let retry = DispatchWorkItem { [weak self] in self?.reconcileMokoConnection() }
         mokoRetry = retry
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: retry)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: retry)
     }
 
     private var nativeGuardianShouldTrack: Bool {
@@ -1928,16 +1962,22 @@ private var scanRearmWorkItem: DispatchWorkItem?
         nativeSentinelState = decoded
     }
 
+    private var locationTrackingMode=""
+    private var significantMonitoringActive=false
+    private func setSignificantMonitoring(_ enabled:Bool){
+        guard enabled != significantMonitoringActive,CLLocationManager.significantLocationChangeMonitoringAvailable() else{return}
+        significantMonitoringActive=enabled
+        if enabled {locationManager.startMonitoringSignificantLocationChanges()}
+        else {locationManager.stopMonitoringSignificantLocationChanges()}
+    }
     private func reconcileLocationTracking() {
         let sentinelTracking = nativeSentinelShouldTrack
         let guardianTracking = nativeGuardianShouldTrack
         let needsLocation = !liveAlertId.isEmpty || sentinelTracking || guardianTracking
 
         guard needsLocation else {
-            locationManager.stopUpdatingLocation()
-            if CLLocationManager.significantLocationChangeMonitoringAvailable() {
-                locationManager.stopMonitoringSignificantLocationChanges()
-            }
+            if locationTrackingMode != "off" {locationTrackingMode="off";locationManager.stopUpdatingLocation()}
+            setSignificantMonitoring(false)
             return
         }
 
@@ -1953,20 +1993,35 @@ private var scanRearmWorkItem: DispatchWorkItem?
         }
 
         guard status == .authorizedAlways || (!sentinelTracking && !guardianTracking && status == .authorizedWhenInUse) else {
-            locationManager.stopUpdatingLocation()
-            if CLLocationManager.significantLocationChangeMonitoringAvailable() {
-                locationManager.stopMonitoringSignificantLocationChanges()
-            }
+            if locationTrackingMode != "off" {locationTrackingMode="off";locationManager.stopUpdatingLocation()}
+            setSignificantMonitoring(false)
             return
         }
 
-        locationManager.startUpdatingLocation()
-
-        if (sentinelTracking || guardianTracking) && status == .authorizedAlways && CLLocationManager.significantLocationChangeMonitoringAvailable() {
-            locationManager.startMonitoringSignificantLocationChanges()
-        } else if CLLocationManager.significantLocationChangeMonitoringAvailable() {
-            locationManager.stopMonitoringSignificantLocationChanges()
+        let mode = !liveAlertId.isEmpty ? "emergency" : sentinelTracking ? "sentinel" : "passive"
+        if mode != locationTrackingMode {
+            locationTrackingMode=mode
+            locationManager.stopUpdatingLocation()
+            if mode == "emergency" {
+                locationManager.desiredAccuracy=kCLLocationAccuracyBest
+                locationManager.distanceFilter=kCLDistanceFilterNone
+                locationManager.pausesLocationUpdatesAutomatically=false
+                locationManager.startUpdatingLocation()
+            } else if mode == "sentinel" {
+                locationManager.desiredAccuracy=kCLLocationAccuracyHundredMeters
+                locationManager.distanceFilter=50
+                locationManager.pausesLocationUpdatesAutomatically=false
+                locationManager.startUpdatingLocation()
+            } else {
+                // Ordinary readiness does not need a continuously running high-accuracy GPS.
+                locationManager.desiredAccuracy=kCLLocationAccuracyHundredMeters
+                locationManager.distanceFilter=100
+                locationManager.pausesLocationUpdatesAutomatically=true
+                locationManager.requestLocation()
+            }
         }
+
+        setSignificantMonitoring((sentinelTracking || guardianTracking) && status == .authorizedAlways)
 
         if sentinelTracking,
            let recent = locationManager.location,
@@ -2230,6 +2285,7 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
         CAPPluginMethod(name: "beginSetup", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "authorizeAccessory", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "cancelAccessory", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "forgetAccessory", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endSetup", returnType: CAPPluginReturnPromise)
     ]
     @objc func clearIconBadge(_ call:CAPPluginCall) {
@@ -2293,10 +2349,17 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
     @objc func authorizeAccessory(_ call:CAPPluginCall){
         DispatchQueue.main.async {
             if #available(iOS 18.0, *) {
-                WallaaAccessoryPairing.shared.authorize(existingID:call.getString("deviceId")){result in
+                WallaaAccessoryPairing.shared.authorize(existingID:call.getString("deviceId"),reuse:call.getBool("reuseAuthorized") ?? true){result in
                     switch result {case .success(let identifier):call.resolve(["deviceId":identifier]);case .failure(let error):call.reject(error.localizedDescription)}
                 }
             } else {call.resolve(["supported":false])}
+        }
+    }
+    @objc func forgetAccessory(_ call:CAPPluginCall){
+        guard let identifier=call.getString("deviceId"),UUID(uuidString:identifier) != nil else{call.reject("Identificativo del pulsante non valido.");return}
+        DispatchQueue.main.async{
+            if #available(iOS 18.0, *){WallaaAccessoryPairing.shared.authorize(existingID:identifier,remove:true){result in switch result{case .success:call.resolve();case .failure(let error):call.reject(error.localizedDescription)}}}
+            else{call.resolve()}
         }
     }
     @objc func cancelAccessory(_ call:CAPPluginCall){DispatchQueue.main.async{if #available(iOS 18.0, *){WallaaAccessoryPairing.shared.cancel()};call.resolve()}}

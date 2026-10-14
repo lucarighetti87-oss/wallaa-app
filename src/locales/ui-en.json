@@ -711,5 +711,9 @@
   "Bluetooth non disponibile. Attivalo e autorizza Wallaa nelle Impostazioni iPhone.": "Bluetooth is unavailable. Turn it on and allow Wallaa in iPhone Settings.",
   "La ricerca Bluetooth non si è avviata. Verifica Bluetooth e permessi, poi riprova.": "Bluetooth discovery did not start. Check Bluetooth and permissions, then try again.",
   "Nessun pulsante compatibile rilevato. Controlla che Bluetooth sia attivo, Wallaa sia autorizzata e il pulsante sia acceso e libero da altri collegamenti. Poi riprova.": "No compatible button found. Check that Bluetooth is on, Wallaa is allowed, and the button is switched on and not connected elsewhere. Then try again.",
-  "Seleziona il Wallaa Button nella richiesta Apple per autorizzare il collegamento.": "Select your Wallaa Button in the Apple prompt to authorize the connection."
+  "Seleziona il Wallaa Button nella richiesta Apple per autorizzare il collegamento.": "Select your Wallaa Button in the Apple prompt to authorize the connection.",
+  "Preparazione del collegamento Bluetooth…": "Preparing the Bluetooth connection…",
+  "Lettura dei servizi del pulsante…": "Reading the button services…",
+  "Rimuovi da questo iPhone": "Remove from this iPhone",
+  "Rimuovere il collegamento da questo iPhone? Il pulsante resterà del tuo account. Solo l’admin può consentire il trasferimento a un altro utente.": "Remove the connection from this iPhone? The button will remain owned by your account. Only an admin can allow transfer to another user."
 }

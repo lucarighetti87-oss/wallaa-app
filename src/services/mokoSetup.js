@@ -1,6 +1,6 @@
 import {MOKO_FACTORY_PASSWORD,MOKO_PROFILE_VERSION,MOKO_GATT,mokoUuid,mokoBytes,mokoPacket,mokoAuthentication,mokoConnectionCounter,mokoRead,mokoWrite,MOKO_SINGLE_CLICK_PROFILE,equalMokoBytes} from './mokoSetupProtocol.js';
 
-export async function prepareMokoButton({device,ble,password=MOKO_FACTORY_PASSWORD,onProgress=()=>{},checkOwnership,claim,onClaim=async()=>{},onCounter=()=>{},signal,allowVerifiedUpgrade=false,commandTimeout=5000,pressTimeout=30000,settleMs=600}){
+export async function prepareMokoButton({device,ble,password=MOKO_FACTORY_PASSWORD,onProgress=()=>{},checkOwnership,claim,onClaim=async()=>{},onCounter=()=>{},signal,allowVerifiedUpgrade=false,commandTimeout=5000,pressTimeout=30000,settleMs=600,initializeBle,connectTimeout=20000}){
  if(!/^MOKO:[0-9A-F]{12}$/.test(device?.hardwareId||''))throw new Error('Identità del pulsante non verificata.');
  const controller=new AbortController();
  const cancel=()=>controller.abort(signal?.reason||new Error('Associazione annullata.'));
@@ -15,7 +15,7 @@ export async function prepareMokoButton({device,ble,password=MOKO_FACTORY_PASSWO
    let done=false;
    const finish=(fn,value)=>{if(done)return;done=true;clearTimeout(timer);controller.signal.removeEventListener('abort',onAbort);fn(value);};
    const onAbort=()=>finish(reject,controller.signal.reason||new Error('Associazione interrotta.'));
-   const timer=setTimeout(()=>finish(reject,new Error('Operazione non completata. Ripeti il collegamento.')),timeout);
+   const timer=setTimeout(()=>finish(reject,new Error(`Operazione non completata (${stage}). Ripeti il collegamento.`)),timeout);
    controller.signal.addEventListener('abort',onAbort,{once:true});
    Promise.resolve(operation).then(value=>finish(resolve,value),error=>finish(reject,error));
    if(controller.signal.aborted)onAbort();
@@ -37,10 +37,13 @@ export async function prepareMokoButton({device,ble,password=MOKO_FACTORY_PASSWO
  async function read(command,data=[]){return exchange(MOKO_GATT.custom,mokoRead(command,data),0,command);}
  try{
   ensure();onProgress('checking');const eligibility=await bounded(checkOwnership(device),15000);if(eligibility?.allowed!==true)throw new Error('Non ho confermato la disponibilità del pulsante per il tuo account.');ensure();onProgress('connecting');
-  if(ble.initialize)await bounded(ble.initialize({androidNeverForLocation:false}));
+  if(initializeBle)await bounded(initializeBle());
+  else if(ble.initialize)await bounded(ble.initialize({androidNeverForLocation:false}));
+  stage='registrazione Bluetooth';onProgress('registering');
   if(ble.getDevices)await bounded(ble.getDevices([device.id]));
-  await bounded(ble.connect(device.id,()=>{if(!ending)controller.abort(new Error('Pulsante scollegato durante la configurazione.'));},{timeout:commandTimeout}));
-  ensure();
+  stage='collegamento Bluetooth';onProgress('connecting');
+  await bounded(ble.connect(device.id,()=>{if(!ending)controller.abort(new Error('Pulsante scollegato durante la configurazione.'));},{timeout:connectTimeout,skipDescriptorDiscovery:true}),connectTimeout+1000);
+  ensure();stage='lettura servizi';onProgress('services');
   if(ble.discoverServices)await bounded(ble.discoverServices(device.id));
   const services=await bounded(ble.getServices(device.id));
   const match=(value,expected)=>{const v=String(value||'').toLowerCase();return v===expected||(/^[0-9a-f]{4}$/.test(v)&&mokoUuid(v)===expected);};

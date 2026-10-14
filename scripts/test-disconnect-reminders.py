@@ -12,35 +12,39 @@ class UNMutableNotificationContent { var title="",body=""; var sound:UNNotificat
 struct UNTimeIntervalNotificationTrigger { let timeInterval:Double; let repeats:Bool }
 struct UNNotificationRequest { let identifier:String; let content:UNMutableNotificationContent; let trigger:UNTimeIntervalNotificationTrigger }
 class UNUserNotificationCenter {
- static let shared=UNUserNotificationCenter(); var requests:[String:UNNotificationRequest]=[:]; var adds=0
+ static let shared=UNUserNotificationCenter(); var requests:[String:UNNotificationRequest]=[:]; var adds=0;var removals=0
  static func current()->UNUserNotificationCenter { shared }
- func removePendingNotificationRequests(withIdentifiers ids:[String]) { for id in ids { requests.removeValue(forKey:id) } }
+ func removePendingNotificationRequests(withIdentifiers ids:[String]) { removals+=1;for id in ids { requests.removeValue(forKey:id) } }
  func add(_ request:UNNotificationRequest) { requests[request.identifier]=request;adds+=1 }
 }
 struct Guard { var enabled:Bool?=true; var delaySeconds:Int?=60 }
 struct Profile { var language:String?="en" }
 struct Config { var armed=true;var connectionGuard:Guard?=Guard();var hardwareId:String?="MOKO:TEST";var profile=Profile() }
 class Manager {
+ let connectionGuardQueue=DispatchQueue(label:"test.guard")
  var config:Config?=Config(),mokoConnectionWanted=true,mokoDisconnectedAt:Date?=Date(),guardScheduledKey="",mokoStatus="disconnected"
  let defaults=UserDefaults(suiteName:UUID().uuidString)!
 """ + method + r"""
 }
 let manager=Manager(),center=UNUserNotificationCenter.current()
-manager.updateNativeConnectionGuard()
+manager.updateNativeConnectionGuard();manager.connectionGuardQueue.sync{}
 assert(center.requests.count==3)
 let sequence=center.requests.values.sorted{$0.trigger.timeInterval<$1.trigger.timeInterval}
 assert(abs(sequence[0].trigger.timeInterval-60)<1)
 assert(abs(sequence[1].trigger.timeInterval-sequence[0].trigger.timeInterval-300)<0.01)
 assert(abs(sequence[2].trigger.timeInterval-sequence[1].trigger.timeInterval-300)<0.01)
 assert(sequence.allSatisfy{!$0.trigger.repeats})
-manager.updateNativeConnectionGuard();assert(center.adds==3)
-manager.guardScheduledKey="";manager.updateNativeConnectionGuard();assert(center.adds==3)
-manager.mokoStatus="ready";manager.mokoDisconnectedAt=nil;manager.updateNativeConnectionGuard()
+manager.updateNativeConnectionGuard();manager.connectionGuardQueue.sync{};assert(center.adds==3)
+manager.guardScheduledKey="";manager.updateNativeConnectionGuard();manager.connectionGuardQueue.sync{};assert(center.adds==3)
+manager.mokoStatus="ready";manager.mokoDisconnectedAt=nil;manager.updateNativeConnectionGuard();manager.connectionGuardQueue.sync{}
 assert(center.requests.isEmpty)
+let removalCount=center.removals
+for _ in 0..<100 {manager.updateNativeConnectionGuard();manager.connectionGuardQueue.sync{}}
+assert(center.removals==removalCount)
 assert(manager.defaults.dictionary(forKey:"wallaa.disconnect.reminder-plan")==nil)
-manager.mokoStatus="disconnected";manager.mokoDisconnectedAt=Date();manager.updateNativeConnectionGuard()
+manager.mokoStatus="disconnected";manager.mokoDisconnectedAt=Date();manager.updateNativeConnectionGuard();manager.connectionGuardQueue.sync{}
 assert(center.requests.count==3);assert(center.adds==6)
-manager.config?.connectionGuard?.enabled=false;manager.updateNativeConnectionGuard();assert(center.requests.isEmpty)
+manager.config?.connectionGuard?.enabled=false;manager.updateNativeConnectionGuard();manager.connectionGuardQueue.sync{};assert(center.requests.isEmpty)
 print("PASS: three reminders, five-minute spacing, no duplicate scheduling, reconnect cancellation, new episode and opt-out")
 """
 with tempfile.TemporaryDirectory(prefix='wallaa-disconnect-') as directory:
