@@ -19,3 +19,6 @@ export async function getSafetyPermissions(){return supportsMokoConnection()?nat
 export async function requestSafetyLocation(){if(supportsMokoConnection())return native.requestLocation();}
 export async function openSafetySettings(){if(supportsMokoConnection())return native.openSettings();}
 export async function clearMokoHealthNotices(options={}){if(supportsMokoConnection())return native.clearHealthNotices(options);}
+
+export async function authorizeMokoAccessory(options={}){return supportsMokoConnection()?native.authorizeAccessory(options):{};}
+export async function cancelMokoAccessory(){if(supportsMokoConnection())return native.cancelAccessory();}

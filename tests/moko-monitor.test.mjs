@@ -48,3 +48,13 @@ test('fresh pairing accepts verified device-info with no advertised service list
  assert.equal(device.button,null);
  await ble.stopBleScan();
 });
+
+
+test('pairing ignores other visible buttons after an Apple selection',async()=>{
+ let offered=[];
+ const pending=ble.pairWallaaButton({authorizedDeviceId:'test-peripheral',selectMokoDevice:async candidates=>{offered=candidates;return candidates[0];}});
+ await tick();
+ const other=advertisement(0,1);other.device.deviceId='other-peripheral';await callback(other);
+ const selected=advertisement(0,1);await callback(selected);
+ await pending;assert.equal(offered.length,1);assert.equal(offered[0].id,'test-peripheral');await ble.stopBleScan();
+});

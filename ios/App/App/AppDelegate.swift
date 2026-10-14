@@ -136,6 +136,56 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 }
 
+// New installations must select an accessory in Apple's picker before CoreBluetooth can use it.
+@available(iOS 18.0, *)
+final class WallaaAccessoryPairing {
+    static let shared=WallaaAccessoryPairing()
+    private var session:ASAccessorySession?
+    private var completion:((Result<String,Error>)->Void)?
+    private var selected:UUID?
+    private var watchdog:DispatchWorkItem?
+    private var requiredID:UUID?
+    private func error(_ text:String)->NSError { NSError(domain:"WallaaAccessoryPairing",code:1,userInfo:[NSLocalizedDescriptionKey:text]) }
+    func authorize(existingID:String?,completion:@escaping(Result<String,Error>)->Void){
+        guard self.completion == nil else { completion(.failure(error("Una richiesta Apple è già aperta. Chiudila prima di riprovare.")));return }
+        let previous=session;session=nil;previous?.invalidate()
+        self.completion=completion;selected=nil;requiredID=existingID.flatMap(UUID.init(uuidString:))
+        let session=ASAccessorySession();self.session=session
+        let timeout=DispatchWorkItem{[weak self] in guard let self else{return};self.finish(.failure(self.error("La richiesta Apple non si è conclusa. Ripeti il collegamento.")));session.invalidate()}
+        watchdog=timeout;DispatchQueue.main.asyncAfter(deadline:.now()+120,execute:timeout)
+        session.activate(on:.main){[weak self] event in
+            guard let self,self.session === session,self.completion != nil else{return}
+            switch event.eventType {
+            case .activated:
+                if let identifier=self.requiredID,session.accessories.contains(where:{$0.bluetoothIdentifier==identifier && $0.state == .authorized}) {
+                    self.finish(.success(identifier.uuidString));return
+                }
+                let image=Bundle.main.url(forResource:"wallaa-button",withExtension:"png",subdirectory:"public").flatMap{UIImage(contentsOfFile:$0.path)} ?? UIImage(systemName:"button.programmable")!
+                let items=["AA00","EA00","FEE0"].map{uuid->ASPickerDisplayItem in
+                    let descriptor=ASDiscoveryDescriptor();descriptor.bluetoothServiceUUID=CBUUID(string:uuid)
+                    return ASPickerDisplayItem(name:"Wallaa Button WB-001",productImage:image,descriptor:descriptor)
+                }
+                session.showPicker(for:items){[weak self] error in if let error {self?.finish(.failure(error))}}
+            case .accessoryAdded:
+                self.selected=event.accessory?.bluetoothIdentifier
+            case .pickerDidDismiss:
+                guard let identifier=self.selected,session.accessories.contains(where:{$0.bluetoothIdentifier==identifier && $0.state == .authorized}) else {
+                    self.finish(.failure(self.error("Collegamento Apple annullato. Seleziona il tuo Wallaa Button per continuare.")));return
+                }
+                if let expected=self.requiredID,expected != identifier {
+                    self.finish(.failure(self.error("Hai selezionato un altro pulsante. Ripeti il collegamento scegliendo il tuo WB-001.")));return
+                }
+                self.finish(.success(identifier.uuidString))
+            case .invalidated:
+                self.finish(.failure(event.error ?? self.error("Autorizzazione Apple interrotta. Ripeti il collegamento.")))
+            default:break
+            }
+        }
+    }
+    func cancel(){let old=session;finish(.failure(error("Associazione annullata.")));old?.invalidate();session=nil}
+    private func finish(_ result:Result<String,Error>){watchdog?.cancel();watchdog=nil;let callback=completion;completion=nil;callback?(result)}
+}
+
 // Migration must finish before *any* CoreBluetooth central is created, including
 // the web plugins. SceneDelegate keeps the web bridge unloaded during this step.
 final class WallaaAccessoryBootstrap {
@@ -2178,6 +2228,8 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
         CAPPluginMethod(name: "requestLocation", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openSettings", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "beginSetup", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "authorizeAccessory", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cancelAccessory", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endSetup", returnType: CAPPluginReturnPromise)
     ]
     @objc func clearIconBadge(_ call:CAPPluginCall) {
@@ -2238,6 +2290,16 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
             call.resolve(["enabled": enabled])
         }
     }
+    @objc func authorizeAccessory(_ call:CAPPluginCall){
+        DispatchQueue.main.async {
+            if #available(iOS 18.0, *) {
+                WallaaAccessoryPairing.shared.authorize(existingID:call.getString("deviceId")){result in
+                    switch result {case .success(let identifier):call.resolve(["deviceId":identifier]);case .failure(let error):call.reject(error.localizedDescription)}
+                }
+            } else {call.resolve(["supported":false])}
+        }
+    }
+    @objc func cancelAccessory(_ call:CAPPluginCall){DispatchQueue.main.async{if #available(iOS 18.0, *){WallaaAccessoryPairing.shared.cancel()};call.resolve()}}
     @objc func beginSetup(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
             guard WallaaBackgroundBLEManager.shared.canStartMokoSetup else {

@@ -168,14 +168,16 @@ export async function stopBleScan() {
   finally { scanning = false; }
 }
 
-export async function pairWallaaButton({ onProgress, selectMokoDevice, signal } = {}) {
+export async function pairWallaaButton({ onProgress, selectMokoDevice, signal, authorizedDeviceId } = {}) {
   if (!Capacitor.isNativePlatform() && !navigator.bluetooth) {
     throw new Error('Bluetooth non disponibile in questo browser. Usa l’app su iPhone/Android.');
   }
 
   await withDeadline(ensureBle,12000,'Bluetooth non risponde. Verifica il permesso per Wallaa nelle Impostazioni iPhone.');
   if(signal?.aborted)throw signal.reason||new Error('Associazione annullata.');
-  if(!await BleClient.isEnabled())throw new Error('Bluetooth non disponibile. Attivalo e autorizza Wallaa nelle Impostazioni iPhone.');
+  let enabled=false;const bluetoothReadyBy=Date.now()+3000;
+  do{enabled=await withDeadline(()=>BleClient.isEnabled(),3000,'Bluetooth non risponde. Verifica il permesso per Wallaa nelle Impostazioni iPhone.');if(enabled)break;if(signal?.aborted)throw signal.reason;await new Promise(resolve=>setTimeout(resolve,100));}while(Date.now()<bluetoothReadyBy);
+  if(!enabled)throw new Error('Bluetooth non disponibile. Attivalo e autorizza Wallaa nelle Impostazioni iPhone.');
   await stopBleScan();
 
   return new Promise(async (resolve, reject) => {
@@ -196,7 +198,7 @@ export async function pairWallaaButton({ onProgress, selectMokoDevice, signal } 
         { allowDuplicates: true },
         async (result) => {
           const decoded = decodeResult(result);
-          if (!decoded?.id || finishing) return;
+          if (!decoded?.id || finishing || (authorizedDeviceId && decoded.id.toLowerCase()!==authorizedDeviceId.toLowerCase())) return;
           onProgress?.('found', decoded);
 
           if(decoded.protocol==='moko-button' && decoded.hardwareId?.startsWith('MOKO:') && selectMokoDevice){
