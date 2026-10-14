@@ -44,3 +44,19 @@ test('chat safety blocks sending, can unblock and submits a report without delet
  await dialog.getByRole('button',{name:'Chiudi',exact:true}).click();
  await expect(page.locator('.wallaa-chat-composer textarea')).toBeEnabled();
 });
+
+
+test('stalled permission request recovers and finish later remains visibly actionable',async({page})=>{
+ await page.clock.install();
+ await page.goto('/tests/ui/index.html?screen=guide&mode=stalled');
+ const later=page.getByRole('button',{name:'Completerò dopo · alcune funzioni saranno limitate'});
+ await expect(later).toBeVisible();
+ const style=await later.evaluate(el=>({height:el.getBoundingClientRect().height,border:getComputedStyle(el).borderTopWidth}));
+ expect(style.height).toBeGreaterThanOrEqual(48);expect(style.border).not.toBe('0px');
+ await page.getByRole('button',{name:'Attiva i permessi'}).click();
+ await expect(page.getByRole('button',{name:'Richiesta in corso…'})).toBeDisabled();
+ await expect(later).toBeEnabled();
+ await page.clock.fastForward(45001);
+ await expect(page.getByRole('alert')).toContainText('La richiesta non si è conclusa');
+ await expect(page.getByRole('button',{name:'Attiva i permessi'})).toBeEnabled();
+});
