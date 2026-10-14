@@ -7,16 +7,18 @@ import { BTHOME_UUID } from '../config';
 import { findBTHomeData, parseBTHomeServiceData } from './bthome';
 
 let initialized = false;
+let initializationPromise=null;
 let scanning = false;
 let lastFingerprint = '';
 const mokoIdentities = new Map();
 const SCAN_SERVICES = [BTHOME_UUID, ...MOKO_SERVICE_UUIDS];
 
 async function ensureBle() {
-  if (initialized) return;
-  await BleClient.initialize({ androidNeverForLocation: false });
-  initialized = true;
+  if(initialized)return;
+  if(!initializationPromise)initializationPromise=BleClient.initialize({androidNeverForLocation:false}).then(()=>{initialized=true;}).finally(()=>{initializationPromise=null;});
+  return initializationPromise;
 }
+export const initializeWallaaBle=ensureBle;
 
 function normalizeAdvertisedName(result) {
   return String(result?.localName || result?.device?.name || '').trim();

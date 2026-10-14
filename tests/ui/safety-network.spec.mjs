@@ -27,15 +27,15 @@ test('Sentinel sweep matches the active Sentinel user logo, including Basic, and
  await page.screenshot({path:'artifacts/sentinel-home-mobile.png',fullPage:true});
 });
 
-test('Sentinel glow covers the visible phone screen at the top and after scrolling',async({page})=>{
+test('Sentinel glow remains anchored to Home while scrolling without changing its size',async({page})=>{
  await page.goto('/tests/ui/index.html?screen=home&sentinel&basic');
  const aura=page.locator('.sentinel-mode-sweep');await expect(aura).toHaveCount(1);
- const original=await aura.boundingBox();expect(original.height).toBeCloseTo(844,1);expect(original.y).toBeCloseTo(0,1);
+ const original=await aura.boundingBox();const home=await page.locator(".w37-home").boundingBox();expect(original.height).toBeCloseTo(home.height,1);expect(original.y).toBeCloseTo(home.y,1);expect(await aura.evaluate(el=>getComputedStyle(el).position)).toBe("absolute");
  const before=await aura.evaluate(el=>getComputedStyle(el,'::before').transform);
  await page.waitForTimeout(1300);
  const after=await aura.evaluate(el=>getComputedStyle(el,'::before').transform);expect(after).not.toBe(before);
  await page.screenshot({path:'artifacts/sentinel-aura-top-build105.png'});
- await page.locator('.app-main-v4').evaluate(el=>{el.scrollTop=500;});expect(await page.locator('.app-main-v4').evaluate(el=>el.scrollTop)).toBeGreaterThan(0);const scrolled=await aura.boundingBox();expect(scrolled.y).toBeCloseTo(0,1);expect(scrolled.height).toBeCloseTo(844,1);
+ await page.locator('.app-main-v4').evaluate(el=>{el.scrollTop=500;});expect(await page.locator('.app-main-v4').evaluate(el=>el.scrollTop)).toBeGreaterThan(0);const scrolled=await aura.boundingBox();expect(scrolled.y).toBeCloseTo((await page.locator(".w37-home").boundingBox()).y,1);expect(scrolled.height).toBeCloseTo(original.height,1);
  await page.screenshot({path:'artifacts/sentinel-aura-scrolled-build105.png'});
 });
 

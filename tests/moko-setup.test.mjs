@@ -82,3 +82,13 @@ test('verified profile upgrade needs a valid existing ownership token and disabl
 test('a claimed-looking device without a valid token cannot bypass physical proof',async()=>{const f=fixture({noPress:true});f.args.device={...device,mokoSetupVerified:true};f.args.allowVerifiedUpgrade=true;await assert.rejects(prepareMokoButton(f.args),/pressione/);assert.equal(f.claims,0);});
 
 test('alarm uses a faster high-power burst while standby remains at its normal interval',()=>{const alarm=MOKO_SINGLE_CLICK_PROFILE.find(s=>s.command===0x35&&s.read[0]===0),normal=MOKO_SINGLE_CLICK_PROFILE.find(s=>s.command===0x34&&s.read[0]===0);assert.equal((alarm.data[3]<<8)|alarm.data[4],200);assert.equal(alarm.data[5],4);assert.equal((alarm.data[6]<<8)|alarm.data[7],30);assert.equal((normal.data[3]<<8)|normal.data[4],1000);assert.equal(normal.data[5],0);assert.deepEqual(alarm.data,alarm.expected);});
+
+
+test('setup reuses an existing Bluetooth central instead of recreating it after discovery',async()=>{
+ const f=fixture();let reused=0;
+ f.args.initializeBle=async()=>{reused++;};
+ f.args.ble.initialize=async()=>{throw new Error('central was recreated');};
+ const original=f.args.ble.connect;
+ f.args.ble.connect=async(id,onDisconnect,options)=>{assert.equal(options.skipDescriptorDiscovery,true);assert.equal(options.timeout,20000);return original(id,onDisconnect,options);};
+ await prepareMokoButton(f.args);assert.equal(reused,1);assert.equal(f.claims,1);
+});

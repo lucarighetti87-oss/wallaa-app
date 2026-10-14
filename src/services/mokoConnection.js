@@ -22,3 +22,5 @@ export async function clearMokoHealthNotices(options={}){if(supportsMokoConnecti
 
 export async function authorizeMokoAccessory(options={}){return supportsMokoConnection()?native.authorizeAccessory(options):{};}
 export async function cancelMokoAccessory(){if(supportsMokoConnection())return native.cancelAccessory();}
+
+export async function forgetMokoAccessory(deviceId){if(supportsMokoConnection())return native.forgetAccessory({deviceId});}

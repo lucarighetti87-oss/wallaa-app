@@ -20,6 +20,7 @@ class ASAccessorySession {
  init(){Self.latest=self}
  func activate(on:DispatchQueue,eventHandler:@escaping(Event)->Void){handler=eventHandler}
  func showPicker(for items:[ASPickerDisplayItem],completionHandler:(Error?)->Void){picker=items;completionHandler(nil)}
+ func removeAccessory(_ accessory:Accessory,completionHandler:(Error?)->Void){accessories=[];completionHandler(nil)}
  func invalidate(){handler?(Event(eventType:.invalidated))}
  func fire(_ event:Event){handler?(event)}
 }
@@ -40,6 +41,9 @@ assert(results.count==3);assert(existing.picker.isEmpty)
 manager.authorize(existingID:id.uuidString){results.append($0)};let wrong=ASAccessorySession.latest!;wrong.fire(Event(eventType:.activated))
 let other=Accessory(bluetoothIdentifier:UUID(),state:.authorized);wrong.accessories=[other];wrong.fire(Event(eventType:.accessoryAdded,accessory:other));wrong.fire(Event(eventType:.pickerDidDismiss))
 assert(results.count==4);if case .success=results.last! {fatalError("wrong accessory accepted")}
+manager.authorize(existingID:id.uuidString,remove:true){results.append($0)};let removing=ASAccessorySession.latest!;removing.accessories=[accessory];removing.fire(Event(eventType:.activated));assert(removing.accessories.isEmpty);assert(removing.picker.isEmpty);assert(results.count==5)
+manager.authorize(existingID:nil){results.append($0)};let resumed=ASAccessorySession.latest!;resumed.accessories=[accessory];resumed.fire(Event(eventType:.activated));assert(resumed.picker.isEmpty);assert(results.count==6)
+manager.authorize(existingID:nil,reuse:false){results.append($0)};let fresh=ASAccessorySession.latest!;fresh.accessories=[accessory];fresh.fire(Event(eventType:.activated));assert(fresh.picker.count==3);manager.cancel()
 print("PASS: new-install picker, wait for authorization, cancel, stale-session isolation, existing accessory and wrong-device rejection")
 """
 with tempfile.TemporaryDirectory(prefix='wallaa-accessory-') as directory:

@@ -21,3 +21,12 @@ test('WB cards have consistent gaps and typography',async({page})=>{await page.g
 test('network finding lives in Settings',async({page})=>{await page.goto('/tests/ui/index.html?screen=settings');await expect(page.getByText('Ritrova con la rete Wallaa',{exact:true})).toBeVisible();await expect(page.getByRole('checkbox',{name:'Attiva ritrovamento WB-001'})).toBeChecked();});
 
 test('disconnected device uses red connection icons, keeps numbers and exposes accessible state',async({page})=>{await page.goto('/tests/ui/index.html?screen=device&readings&disconnected');await expect(page.locator('.aa-device-metrics svg').nth(1)).toHaveCSS('stroke','rgb(255, 98, 123)');await expect(page.locator('.aa-device-metrics svg').nth(0)).toHaveCSS('stroke','rgb(32, 222, 160)');await expect(page.locator('.aa-connection')).toHaveAttribute('aria-label','Disconnesso');await expect(page.locator('.aa-connection')).toHaveText('');await page.screenshot({path:'artifacts/device-icons-build119.png',fullPage:true});});
+
+
+test('local unlink requires confirmation and explains that only admin can allow a transfer',async({page})=>{
+ await page.goto('/tests/ui/index.html?screen=device');
+ let prompt='';page.once('dialog',async dialog=>{prompt=dialog.message();await dialog.accept()});
+ await page.getByRole('button',{name:'Rimuovi da questo iPhone'}).click();
+ expect(prompt).toContain('Solo l’admin');expect(prompt).toContain('resterà del tuo account');
+ expect(await page.evaluate(()=>window.deviceRemoved)).toBe(true);
+});
