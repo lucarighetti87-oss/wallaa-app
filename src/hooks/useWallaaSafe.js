@@ -1,3 +1,4 @@
+import {withDeadline} from '../services/operationDeadline.mjs';
 import {useHealthCheck} from './useHealthCheck';
 import {observationDue} from '../services/observationCadence';
 import {mergeMokoTelemetry} from '../services/radioTelemetry';
@@ -1551,7 +1552,18 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     return()=>{active=false;};
   },[loaded,networkIdentity?.authToken,profile?.onboardingComplete]);
   const refreshSafetyPermissions=useCallback(async()=>{const status=await getSafetyPermissions();setSafetyPermissions(status);return status;},[]);
-  const activateSafetyPermissions=useCallback(async()=>{await requestLocationPermission();await ensureLocalNotificationPermission();await requestSafetyLocation();await refreshSafetyPermissions();await initializeAccountServices();},[refreshSafetyPermissions,initializeAccountServices]);
+  const activateSafetyPermissions=useCallback(async()=>{
+    const bounded=operation=>withDeadline(operation,12000,'La richiesta non si è conclusa. Verifica lo stato o apri Impostazioni iPhone.');
+    // Native location requests return immediately; the status refresh follows Apple's authorization callbacks.
+    // Do not wait for a GPS fix or cloud synchronization before enabling the other permissions.
+    const errors=[];
+    for(const operation of [supportsMokoConnection()?requestSafetyLocation:requestLocationPermission,()=>BleClient.initialize({androidNeverForLocation:false}),ensureLocalNotificationPermission]){
+      try{await bounded(operation);}catch(error){errors.push(error);}
+    }
+    await bounded(refreshSafetyPermissions);
+    initializeAccountServices().catch(()=>{});
+    if(errors.length)throw errors[0];
+  },[refreshSafetyPermissions,initializeAccountServices]);
   useEffect(()=>{if(!showSafetyGuide)return;const timer=setInterval(()=>refreshSafetyPermissions().catch(()=>{}),2000);return()=>clearInterval(timer);},[showSafetyGuide,refreshSafetyPermissions]);
   const finishSafetyGuide=useCallback(async()=>{setShowSafetyGuide(false);await storage.setSafetyGuideSeen(true);},[]);
   useEffect(()=>{

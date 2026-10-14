@@ -1,3 +1,4 @@
+import {withDeadline} from './operationDeadline.mjs';
 import { Preferences } from '@capacitor/preferences';
 import { MOKO_SERVICE_UUIDS, findMokoData, parseMokoAlarm, parseMokoDeviceInfo, mokoCounterKey, consumeMokoFrame } from './mokoButton';
 import { Capacitor } from '@capacitor/core';
@@ -172,7 +173,9 @@ export async function pairWallaaButton({ onProgress, selectMokoDevice, signal } 
     throw new Error('Bluetooth non disponibile in questo browser. Usa l’app su iPhone/Android.');
   }
 
-  await ensureBle();
+  await withDeadline(ensureBle,12000,'Bluetooth non risponde. Verifica il permesso per Wallaa nelle Impostazioni iPhone.');
+  if(signal?.aborted)throw signal.reason||new Error('Associazione annullata.');
+  if(!await BleClient.isEnabled())throw new Error('Bluetooth non disponibile. Attivalo e autorizza Wallaa nelle Impostazioni iPhone.');
   await stopBleScan();
 
   return new Promise(async (resolve, reject) => {
@@ -180,14 +183,17 @@ export async function pairWallaaButton({ onProgress, selectMokoDevice, signal } 
     let candidateTimer;
     const candidates=new Map();
     let finishing = false;
-    const cancel=()=>{clearTimeout(timer);clearTimeout(candidateTimer);stopBleScan().catch(()=>{});reject(new Error('Associazione annullata.'));};
+    const cancel=()=>{finishing=true;clearTimeout(timer);clearTimeout(candidateTimer);stopBleScan().catch(()=>{});reject(new Error('Associazione annullata.'));};
     signal?.addEventListener('abort',cancel,{once:true});
     try {
       onProgress?.('scanning');
       scanning = true;
 
-      await BleClient.requestLEScan(
-        { services: SCAN_SERVICES, allowDuplicates: true },
+      // Foreground discovery: an H1 may expose its supported service-data frame
+      // without listing that UUID in the advertisement's service list. Decode and
+      // verify the actual frame before offering a candidate; never use the name as identity.
+      await withDeadline(()=>BleClient.requestLEScan(
+        { allowDuplicates: true },
         async (result) => {
           const decoded = decodeResult(result);
           if (!decoded?.id || finishing) return;
@@ -234,14 +240,17 @@ export async function pairWallaaButton({ onProgress, selectMokoDevice, signal } 
             pairedAt: new Date().toISOString()
           });
         }
-      );
+      ),10000,'La ricerca Bluetooth non si è avviata. Verifica Bluetooth e permessi, poi riprova.');
 
+      if(finishing||signal?.aborted)return;
       timer = setTimeout(async () => {
-        await stopBleScan();
+        finishing=true;
+        await stopBleScan().catch(()=>{});
         clearTimeout(candidateTimer);signal?.removeEventListener('abort',cancel);
-        reject(new Error('Nessun Wallaa Button rilevato. Premi il pulsante e riprova.'));
+        reject(new Error('Nessun pulsante compatibile rilevato. Controlla che Bluetooth sia attivo, Wallaa sia autorizzata e il pulsante sia acceso e libero da altri collegamenti. Poi riprova.'));
       }, 30000);
     } catch (error) {
+      finishing=true;
       clearTimeout(timer);clearTimeout(candidateTimer);signal?.removeEventListener('abort',cancel);
       await stopBleScan().catch(() => {});
       reject(error);
