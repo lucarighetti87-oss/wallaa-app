@@ -814,13 +814,43 @@ private var scanRearmWorkItem: DispatchWorkItem?
         }.resume()
     }
     private func updateNativeConnectionGuard(){
-        let center=UNUserNotificationCenter.current(),identifier="1746060"
-        guard let config,config.armed,config.connectionGuard?.enabled != false,mokoConnectionWanted,let at=mokoDisconnectedAt else{center.removePendingNotificationRequests(withIdentifiers:[identifier]);guardScheduledKey="";return}
+        let center=UNUserNotificationCenter.current(),identifiers=["1746060","1746061","1746062"]
+        let savedKey="wallaa.disconnect.reminder-plan"
+        guard let config else { return }
+        guard config.armed,config.connectionGuard?.enabled != false,mokoConnectionWanted,let detectedAt=mokoDisconnectedAt else {
+            center.removePendingNotificationRequests(withIdentifiers:identifiers)
+            guardScheduledKey=""
+            // A verified reconnection or explicit opt-out ends this disconnect episode.
+            if mokoStatus == "ready" || !config.armed || config.connectionGuard?.enabled == false {
+                UserDefaults.standard.removeObject(forKey:savedKey)
+            }
+            return
+        }
+        let hardwareId=config.hardwareId ?? ""
+        let saved=UserDefaults.standard.dictionary(forKey:savedKey)
+        let sameEpisode=saved?["hardwareId"] as? String == hardwareId
+        let at=sameEpisode ? Date(timeIntervalSince1970:saved?["at"] as? Double ?? detectedAt.timeIntervalSince1970) : detectedAt
+        mokoDisconnectedAt=at
         let delay=max(30,config.connectionGuard?.delaySeconds ?? 60),language=config.profile.language ?? "it"
-        let key="\(at.timeIntervalSince1970)-\(delay)-\(language)";guard key != guardScheduledKey else{return};guardScheduledKey=key
-        let content=UNMutableNotificationContent();content.title=language=="en" ? "Your Wallaa Button is no longer with you" : "Wallaa Button non è più con te";content.body=language=="en" ? "Check that you have it with you and that Bluetooth is on." : "Controlla di averlo con te e che il Bluetooth sia attivo.";content.sound=UNNotificationSound(named:UNNotificationSoundName("wallaa-soft-chime.wav"));content.userInfo=["type":"wallaa_disconnect"]
-        let trigger=UNTimeIntervalNotificationTrigger(timeInterval:max(1,Double(delay)-Date().timeIntervalSince(at)),repeats:false)
-        center.add(UNNotificationRequest(identifier:identifier,content:content,trigger:trigger))
+        let key="\(hardwareId)-\(at.timeIntervalSince1970)-\(delay)-\(language)"
+        guard key != guardScheduledKey else { return };guardScheduledKey=key
+        // iOS retains scheduled notifications while the app is suspended/relaunched.
+        // Do not restart an existing three-reminder sequence on every configuration refresh.
+        if sameEpisode,saved?["key"] as? String == key { return }
+        center.removePendingNotificationRequests(withIdentifiers:identifiers)
+        let now=Date()
+        for index in 0..<3 {
+            let due=at.addingTimeInterval(Double(delay+index*300))
+            if sameEpisode,due <= now { continue }
+            let content=UNMutableNotificationContent()
+            content.title=language=="en" ? "Your Wallaa Button is no longer with you" : "Wallaa Button non è più con te"
+            content.body=language=="en" ? "Check that you have it with you and that Bluetooth is on." : "Controlla di averlo con te e che il Bluetooth sia attivo."
+            content.sound=UNNotificationSound(named:UNNotificationSoundName("wallaa-soft-chime.wav"))
+            content.userInfo=["type":"wallaa_disconnect","reminder":index+1,"hardwareId":hardwareId]
+            let trigger=UNTimeIntervalNotificationTrigger(timeInterval:max(1,due.timeIntervalSince(now)),repeats:false)
+            center.add(UNNotificationRequest(identifier:identifiers[index],content:content,trigger:trigger))
+        }
+        UserDefaults.standard.set(["hardwareId":hardwareId,"at":at.timeIntervalSince1970,"key":key],forKey:savedKey)
     }
 
     func clearHealthNotifications(cycleId:String?=nil){
