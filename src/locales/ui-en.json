@@ -779,5 +779,14 @@
   "Verifica in corso…": "Checking…",
   "Wallaa lo sta cercando e verificando. Non premere ancora il pulsante.": "Wallaa is finding and checking it. Do not press the button yet.",
   "La tua posizione non è pubblica. I Guardian autorizzati possono seguirla solo durante un SOS attivo. La Centrale gestisce i dati secondo le impostazioni di sicurezza.": "Your location is not public. Authorized Guardians can follow it only during an active SOS. The control centre handles data according to your safety settings.",
-  "Consenti posizione Sempre": "Allow Always location"
+  "Consenti posizione Sempre": "Allow Always location",
+  "Ultimo invio non riuscito": "Last upload unsuccessful",
+  "Ultimo tentativo non riuscito:": "Last unsuccessful attempt:",
+  "Rilevamenti della rete Wallaa, distinti dal collegamento SOS del tuo pulsante.": "Wallaa network detections are separate from your button’s SOS connection.",
+  "Il telefono non ha ottenuto una posizione recente entro il tempo previsto. Invio da riprovare.": "The phone did not obtain a recent location in time. Upload will be retried.",
+  "Il servizio non ha risposto al tentativo di invio. Il telefono riproverà.": "The service did not respond to the upload attempt. The phone will retry.",
+  "La sessione Wallaa deve essere ripristinata. Apri nuovamente il tuo account.": "Your Wallaa session needs to be restored. Sign in to your account again.",
+  "Il servizio non ha autorizzato la partecipazione alla rete. Verifica lo stato dell’account.": "The service did not authorize network participation. Check your account status.",
+  "Il servizio ha richiesto una pausa tra gli invii. Il telefono riproverà.": "The service requested a pause between uploads. The phone will retry.",
+  "Il servizio Wallaa ha restituito un errore temporaneo. Il telefono riproverà.": "The Wallaa service returned a temporary error. The phone will retry."
 }

@@ -8393,3 +8393,11 @@ html.ios-keyboard-open .wallaa-new-chat-backdrop .wallaa-new-chat-results {
 .app-shell-v4.screen-device .screen-transition:has(>.wb-pair-guide),.app-shell-v4.screen-device .screen-transition>.wb-pair-guide{animation:none!important;transform:none!important;filter:none!important;opacity:1!important}.wb-pair-guide{position:relative;z-index:1}
 
 .wb-pair-guide{padding-top:max(18px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom))}
+
+/* Keep receiver diagnostics on the same typography scale as adjacent settings. */
+.app-shell-v4.screen-settings .wb-network-receiver .wb-receiver-details{display:grid;gap:12px;margin:16px 0 0;font:inherit;font-size:12px;line-height:1.5;color:var(--v4-muted)}
+.app-shell-v4.screen-settings .wb-receiver-details>div{display:grid;gap:2px;min-width:0}
+.app-shell-v4.screen-settings .wb-receiver-details dt{font-size:11px;font-weight:500}
+.app-shell-v4.screen-settings .wb-receiver-details dd{margin:0;font-size:12px;font-weight:650;color:var(--v4-text);overflow-wrap:anywhere}
+.app-shell-v4.screen-settings .wb-network-receiver p.wb-receiver-error,.app-shell-v4.screen-settings .wb-network-receiver p.wb-receiver-note{margin:14px 0 0;font:inherit;font-size:11px;line-height:1.55;color:var(--v4-muted)}
+.app-shell-v4.screen-settings .wb-network-receiver p.wb-receiver-error{color:#ffc97a}

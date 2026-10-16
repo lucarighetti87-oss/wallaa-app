@@ -93,3 +93,23 @@ print("4 verifiche filtro movimento iPhone superate")
 assert(WallaaMokoGATT.reconnectDelay(failures:0)==1)
 assert(WallaaMokoGATT.reconnectDelay(failures:1)==2)
 assert(WallaaMokoGATT.reconnectDelay(failures:10)==60)
+
+// Morning notification eligibility uses physical sensor samples and local time.
+var morningCalendar=Calendar(identifier:.gregorian);morningCalendar.timeZone=TimeZone(identifier:"Europe/Rome")!
+let morningDate=morningCalendar.date(from:DateComponents(year:2026,month:10,day:16,hour:6))!
+let stillAxes=["x":0,"y":0,"z":1000],movedAxes=["x":100,"y":0,"z":1000]
+private var morningDetector=WallaaMorningMotion()
+for i in 0..<10 {assert(!morningDetector.observe(stillAxes,at:morningDate.addingTimeInterval(Double(i)),calendar:morningCalendar))}
+// One noisy spike must not count.
+assert(!morningDetector.observe(movedAxes,at:morningDate.addingTimeInterval(10),calendar:morningCalendar))
+for i in 11..<16 {assert(!morningDetector.observe(stillAxes,at:morningDate.addingTimeInterval(Double(i)),calendar:morningCalendar))}
+var morningDetected=false
+for i in 16..<21 {morningDetected=morningDetector.observe(movedAxes,at:morningDate.addingTimeInterval(Double(i)),calendar:morningCalendar) || morningDetected}
+assert(morningDetected)
+// A gap/reconnection cannot turn a different first orientation into movement.
+assert(!morningDetector.observe(stillAxes,at:morningDate.addingTimeInterval(60),calendar:morningCalendar))
+private var earlyDetector=WallaaMorningMotion()
+for i in 0..<5 {assert(!earlyDetector.observe(stillAxes,at:morningDate.addingTimeInterval(Double(i-30)),calendar:morningCalendar))}
+for i in 5..<10 {assert(!earlyDetector.observe(movedAxes,at:morningDate.addingTimeInterval(Double(i-30)),calendar:morningCalendar))}
+assert(WallaaMorningMotion.day(at:morningDate,calendar:morningCalendar)=="2026-10-16")
+print("PASS: local 06:00 boundary, stationary sensor, spike rejection, real movement and reconnect baseline")

@@ -1,3 +1,4 @@
+import {receiverErrorText} from '../services/networkReceiver.js';
 import AppleProSubscription from '../components/AppleProSubscription';
 import {uiText,uiLocale} from '../uiText.js';
 import {
@@ -153,7 +154,16 @@ export default function SettingsScreen({onPermissions, networkReceiverStatus={},
         <div className="settings-row-title"><UsersRound size={19}/><div><strong>{"" + uiText("Partecipa alla rete Wallaa") + ""}</strong><span>{"" + uiText("Aiuta a ritrovare i pulsanti degli altri partecipanti. Quando il telefono ne rileva uno, invia al servizio Wallaa la propria posizione e il segnale rilevato. Il proprietario vede una zona approssimativa, senza la tua identità. Per i rilevamenti in background serve il permesso di posizione Sempre.") + ""}</span></div></div>
         <label className="v4-switch"><input type="checkbox" checked={profile.networkObserverEnabled === true} onChange={e=>onNetworkObserver?.(e.target.checked)}/><span/></label>
       </section>
-      {profile.networkObserverEnabled&&<section className="v4-settings-card wb-network-receiver" aria-label={uiText('Stato ricevitore Wallaa')}><div className="settings-row-title"><Radio size={19}/><div><strong>{uiText('Stato ricevitore Wallaa')}</strong><span>{networkReceiverStatus.paused?uiText('Sessione da ripristinare'):networkReceiverStatus.error?uiText('Invio da riprovare'):networkReceiverStatus.lastReportAt?uiText('Dati inviati al servizio'):networkReceiverStatus.lastDetectedAt?uiText('Pulsante rilevato · invio in preparazione'):uiText('In attesa di un pulsante nelle vicinanze')}</span></div></div><p>{uiText('Ultimo rilevamento Bluetooth:')} {networkReceiverStatus.lastDetectedAt?new Date(networkReceiverStatus.lastDetectedAt).toLocaleString(uiLocale()):uiText('Non ancora rilevato')}</p><p>{uiText('Ultimo invio al servizio:')} {networkReceiverStatus.lastReportAt?new Date(networkReceiverStatus.lastReportAt).toLocaleString(uiLocale()):uiText('Non ancora inviato')}</p>{networkReceiverStatus.error&&<p role="status">{uiText(networkReceiverStatus.error==='HTTP 403'?'Verifica account e partecipazione alla rete. Il telefono riproverà.':networkReceiverStatus.error.startsWith('HTTP')?'Invio non riuscito. Controlla Internet e i permessi.':networkReceiverStatus.error)}</p>}<p>{uiText('Questo stato conferma il lavoro del telefono ricevente. Il proprietario verifica il risultato in Ultimo rilevamento del proprio WB-001.')}</p></section>}
+      {profile.networkObserverEnabled&&<section className="v4-settings-card wb-network-receiver" aria-label={uiText('Stato ricevitore Wallaa')}>
+        <div className="settings-row-title"><Radio size={19}/><div><strong>{uiText('Stato ricevitore Wallaa')}</strong><span>{networkReceiverStatus.paused?uiText('Sessione da ripristinare'):networkReceiverStatus.error?uiText('Ultimo invio non riuscito'):networkReceiverStatus.lastReportAt?uiText('Dati inviati al servizio'):networkReceiverStatus.lastDetectedAt?uiText('Pulsante rilevato · invio in preparazione'):uiText('In attesa di un pulsante nelle vicinanze')}</span></div></div>
+        <dl className="wb-receiver-details">
+          <div><dt>{uiText('Ultimo rilevamento Bluetooth:')}</dt><dd>{networkReceiverStatus.lastDetectedAt?new Date(networkReceiverStatus.lastDetectedAt).toLocaleString(uiLocale()):uiText('Non ancora rilevato')}</dd></div>
+          <div><dt>{uiText('Ultimo invio al servizio:')}</dt><dd>{networkReceiverStatus.lastReportAt?new Date(networkReceiverStatus.lastReportAt).toLocaleString(uiLocale()):uiText('Non ancora inviato')}</dd></div>
+          {networkReceiverStatus.error&&networkReceiverStatus.lastFailureAt&&<div><dt>{uiText('Ultimo tentativo non riuscito:')}</dt><dd>{new Date(networkReceiverStatus.lastFailureAt).toLocaleString(uiLocale())}</dd></div>}
+        </dl>
+        {networkReceiverStatus.error&&<p className="wb-receiver-error" role="status">{uiText(receiverErrorText(networkReceiverStatus.error))}</p>}
+        <p className="wb-receiver-note">{uiText('Rilevamenti della rete Wallaa, distinti dal collegamento SOS del tuo pulsante.')}</p>
+      </section>}
       <div className="v412-settings-section-label">{t('v412.settings.systemSection')}</div>
       <section className="v404-sound-card">
         <div className="settings-row-title"><Volume2 size={19}/><div><strong>{t('v404.sound.title')}</strong><span>{t('v404.sound.subtitle')}</span></div></div>
