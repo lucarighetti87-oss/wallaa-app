@@ -3,3 +3,15 @@ test('language selection updates settings and navigation without restarting',asy
 for(const screen of ['device','chat','central','guide','notifications','incoming','sentinel','map'])test(`English UI is applied to ${screen}`,async({page},testInfo)=>{await page.goto(`/tests/ui/index.html?screen=${screen}&language=en&readings=1`);const body=await page.locator('body').innerText();expect(body).not.toMatch(/Il tuo WB|Il mio Wallaa|Prepariamo|Ho visto l’allarme|Parli con|Posizione anche in background|Rete Sentinel|Avvisi, SOS|Caricamento messaggi/);if(screen==='device'){await page.getByRole('button',{name:'Open WB-001 details'}).click();await expect(page.getByText('Manufacturer model',{exact:true})).toBeVisible();await expect(page.getByText('MOKO H1 Keychain Beacon',{exact:true})).toBeVisible();}await page.screenshot({path:testInfo.outputPath(`english-${screen}.png`)});});
 
 test('receiver distinguishes enabled participation from a successfully sent report',async({page})=>{await page.goto('/tests/ui/index.html?screen=settings&language=en&receiver=1');const panel=page.getByRole('region',{name:'Wallaa receiver status'});await expect(panel).toContainText('Not detected yet');await expect(panel).toContainText('Not sent yet');await expect(page.getByText('Finding enabled · no detection received')).toBeVisible();await page.goto('/tests/ui/index.html?screen=settings&language=en&receiver=1&reportSent=1');await expect(page.getByRole('region',{name:'Wallaa receiver status'})).toContainText('Data sent to the service');});
+
+for(const width of [320,390])test(`receiver diagnostics use compact settings typography at ${width}px`,async({page},testInfo)=>{
+ await page.setViewportSize({width,height:844});
+ await page.goto('/tests/ui/index.html?screen=settings&language=it&receiver=1&receiverError=1');
+ const panel=page.getByRole('region',{name:'Stato ricevitore Wallaa'});await panel.scrollIntoViewIfNeeded();
+ await expect(panel).toContainText('Il servizio Wallaa ha restituito un errore temporaneo');
+ await expect(panel).not.toContainText('Controlla Internet e i permessi');
+ const sizes=await panel.locator('dd,p').evaluateAll(nodes=>nodes.map(node=>parseFloat(getComputedStyle(node).fontSize)));
+ expect(sizes.every(size=>size<=13)).toBeTruthy();
+ expect(await panel.evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBeTruthy();
+ await panel.screenshot({path:testInfo.outputPath('receiver-details.png')});
+});

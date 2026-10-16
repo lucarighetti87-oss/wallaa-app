@@ -32,6 +32,8 @@ async function setJson(key, value) {
 }
 
 export const storage = {
+  getMorningNoticeImported:()=>getJson('wallaa.safe.morning.imported',''),
+  setMorningNoticeImported:value=>setJson('wallaa.safe.morning.imported',value),
   getSafetyGuideSeen:()=>getJson('wallaa.safe.permissions.guide',false),
   setSafetyGuideSeen:value=>setJson('wallaa.safe.permissions.guide',value),
   getProfile: () => getJson(KEYS.profile, { name: '', firstName: '', lastName: '', email: '', phone: '', countryCode: '+39', birthCountry: '', birthPlace: '', safetyWord: '', plan: 'basic', networkObserverEnabled:true, sosLocationEnabled: true, onboardingComplete: false }),

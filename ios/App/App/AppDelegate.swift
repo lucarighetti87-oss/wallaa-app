@@ -499,6 +499,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private var communityLastDetectedAt:Date?
     private var communityLastReportAt:Date?
     private var communityLastResponseCode:Int?
+    private var communityLastError=""
     private var communityLastFailureAt:Date?
     private var communityNextAttempt = Date.distantPast
     private var communityRequestedAlways = false
@@ -548,7 +549,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
             communityLocationTimeout?.cancel()
             let timeout=DispatchWorkItem {[weak self] in
                 self?.communityNextAttempt=Date().addingTimeInterval(30)
-                self?.communityLastFailureAt=Date();self?.communityLastResponseCode = -1
+                self?.communityLastFailureAt=Date();self?.communityLastResponseCode = -1;self?.communityLastError="Il telefono non ha ottenuto una posizione recente entro il tempo previsto. Invio da riprovare."
                 self?.communityPending.removeAll();self?.endCommunityTask()
             }
             communityLocationTimeout=timeout
@@ -561,7 +562,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
               abs(location.timestamp.timeIntervalSinceNow)<15, let config,
               let token=config.identity.authToken, !token.isEmpty, var base=URL(string:config.apiUrl) else {return}
         let now=Date()
-        communityPending=communityPending.filter {now.timeIntervalSince($0.value.at)<60}
+        communityPending=communityPending.filter {now.timeIntervalSince($0.value.at)<60 && abs(location.timestamp.timeIntervalSince($0.value.at))<=15}
         let items=Array(communityPending.prefix(10))
         guard !items.isEmpty else {return}
         base.deleteLastPathComponent()
@@ -579,17 +580,19 @@ private var scanRearmWorkItem: DispatchWorkItem?
         request.setValue(token,forHTTPHeaderField:"x-wallaa-install-token")
         communityLocationTimeout?.cancel();communityLocationTimeout=nil
         communityPublishing=true
-        URLSession.shared.dataTask(with:request) {[weak self] _,response,_ in
+        URLSession.shared.dataTask(with:request) {[weak self] data,response,error in
+            let serviceError=data.flatMap{try? JSONSerialization.jsonObject(with:$0) as? [String:Any]}?["error"] as? String
             DispatchQueue.main.async {
                 guard let self else {return}
                 self.communityPublishing=false
                 self.endCommunityTask()
                 let code=(response as? HTTPURLResponse)?.statusCode ?? 0
                 self.communityLastResponseCode=code
+                self.communityLastError=serviceError ?? (error == nil ? "HTTP \(code)" : "Il servizio non ha risposto al tentativo di invio. Il telefono riproverà.")
                 if WallaaMokoGATT.shouldPauseCommunity(statusCode:code) {self.communityPaused=true;self.communityLastFailureAt=Date();self.communityPending.removeAll();return}
                 if code==403 {self.communityLastFailureAt=Date();self.communityNextAttempt=Date().addingTimeInterval(WallaaMokoGATT.communityRetryDelay(statusCode:code));return}
                 if (200..<300).contains(code) {
-                    self.communityLastReportAt=Date();self.communityLastFailureAt=nil
+                    self.communityLastReportAt=Date();self.communityLastFailureAt=nil;self.communityLastError=""
                     for item in items {
                         self.communityLastSent[item.key]=now
                         if self.communityPending[item.key]?.at==item.value.at {self.communityPending.removeValue(forKey:item.key)}
@@ -630,6 +633,18 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private var healthLastPublish=Date.distantPast
     private var healthSampleHardware=""
     private var guardScheduledKey=""
+    private var disconnectFirstCheckAt:Date?
+    private var disconnectCheckKey=""
+    private var disconnectConfirmed=false
+    private var disconnectCheckedAt:Date?
+    private var disconnectCheckWork:DispatchWorkItem?
+    private var disconnectCheckTask:UIBackgroundTaskIdentifier = .invalid
+    private var morningMotion=WallaaMorningMotion()
+    private var morningMotionHardware=""
+    private var motionTelemetrySavedAt=Date.distantPast
+    // Use existing BLE sensor notifications: no GPS requests or movement polling.
+    private var nativeMorningEnabled:Bool { mokoConnectionWanted && !mokoSetupInProgress }
+
     private var nativeHealthEnabled:Bool { config?.healthCheck?.enabled == true && config?.armed == true && config?.profile.plan == "pro" }
 
     private var mokoMotionWantedUntil=Date.distantPast
@@ -725,12 +740,13 @@ private var scanRearmWorkItem: DispatchWorkItem?
         }
         refreshMokoTelemetryIfNeeded()
         requestMokoMotionSample()
-        var network:[String:Any]=["paused":communityPaused,"lastStatusCode":communityLastResponseCode ?? 0,"waiting":communityPending.count]
+        var network:[String:Any]=["paused":communityPaused,"lastStatusCode":communityLastResponseCode ?? 0,"error":communityLastError,"waiting":communityPending.count]
         if let at=communityLastDetectedAt {network["lastDetectedAt"]=ISO8601DateFormatter().string(from:at)}
         if let at=communityLastReportAt {network["lastReportAt"]=ISO8601DateFormatter().string(from:at)}
         if let at=communityLastFailureAt {network["lastFailureAt"]=ISO8601DateFormatter().string(from:at)}
         var result: [String: Any] = ["network":network,"telemetry":mokoTelemetry,"state": mokoStatus,
             "connected": mokoAuthenticated && mokoPeripheral?.state == .connected && mokoEventsCharacteristic?.isNotifying == true && mokoStatus == "ready",
+            "morningNotice":UserDefaults.standard.dictionary(forKey:morningNoticeKey) ?? [:], "disconnectConfirmed":disconnectConfirmed, "disconnectCheckedAt":disconnectCheckedAt.map{ISO8601DateFormatter().string(from:$0)} ?? "",
             "ready": mokoStatus == "ready", "disconnectReason":mokoDisconnectReason,"rssi": NSNull(), "disconnectedAt": NSNull()]
         #if DEBUG
         result["diagnostic"] = true
@@ -769,13 +785,42 @@ private var scanRearmWorkItem: DispatchWorkItem?
     }
 
     private func requestMokoMotionSample(){
-        guard mokoAuthenticated,mokoStatus=="ready",(Date()<mokoMotionWantedUntil || nativeHealthEnabled),mokoTelemetry["threeAxisAvailable"] as? Bool == true,let peripheral=mokoPeripheral,let characteristic=mokoMotionCharacteristic,characteristic.properties.contains(.notify),!characteristic.isNotifying else{return}
+        guard mokoAuthenticated,mokoStatus=="ready",(Date()<mokoMotionWantedUntil || nativeHealthEnabled || nativeMorningEnabled),mokoTelemetry["threeAxisAvailable"] as? Bool == true,let peripheral=mokoPeripheral,let characteristic=mokoMotionCharacteristic,characteristic.properties.contains(.notify),!characteristic.isNotifying else{return}
         mokoMotionSampleCount=0;mokoMotionPrevious=nil;mokoMotionPeakDelta=0;mokoMotionCaptureAt=Date()
         peripheral.setNotifyValue(true,for:characteristic)
         mokoMotionTimeout?.cancel()
-        if nativeHealthEnabled { return }
+        if nativeHealthEnabled || nativeMorningEnabled { return }
         let timeout=DispatchWorkItem{[weak self,weak peripheral] in guard let self,let peripheral else{return};if characteristic.isNotifying {peripheral.setNotifyValue(false,for:characteristic)}}
         mokoMotionTimeout=timeout;DispatchQueue.main.asyncAfter(deadline:.now()+8,execute:timeout)
+    }
+
+    private var morningNoticeKey:String {
+        let identity=config?.identity.authToken ?? ""
+        let scope=SHA256.hash(data:Data(identity.utf8)).map{String(format:"%02x",$0)}.joined()
+        return "wallaa.morning.notice.\(scope)"
+    }
+
+    private func observeMorningMotion(_ axes:[String:Int]) {
+        guard nativeMorningEnabled,mokoAuthenticated,mokoStatus == "ready",mokoPeripheral?.state == .connected,
+              mokoEventsCharacteristic?.isNotifying == true,let config,let hardwareId=config.hardwareId else{return}
+        if morningMotionHardware != hardwareId {morningMotionHardware=hardwareId;morningMotion=WallaaMorningMotion()}
+        let now=Date()
+        guard morningMotion.observe(axes,at:now) else{return}
+        let day=WallaaMorningMotion.day(at:now)
+        let noticeKey=morningNoticeKey
+        guard (UserDefaults.standard.dictionary(forKey:noticeKey)?["day"] as? String) != day else{return}
+        let name=(config.profile.firstName ?? config.profile.name ?? "").trimmingCharacters(in:.whitespacesAndNewlines)
+        let english=config.profile.language == "en"
+        let title=(english ? "Good morning" : "Buongiorno") + (name.isEmpty ? "" : " \(name)")
+        let body=english ? "Safety system activated" : "Sistema di sicurezza attivato"
+        let notice:[String:Any]=["id":"morning-\(noticeKey.suffix(16))-\(day)","day":day,"at":ISO8601DateFormatter().string(from:now),"title":title,"detail":body,"hardwareId":hardwareId]
+        UserDefaults.standard.set(notice,forKey:noticeKey)
+        let content=UNMutableNotificationContent();content.title=title;content.body=body
+        content.sound=UNNotificationSound(named:UNNotificationSoundName("wallaa-soft-chime.wav"))
+        content.userInfo=["type":"wallaa_morning","hardwareId":hardwareId]
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier:"wallaa-morning-\(day)",content:content,trigger:UNTimeIntervalNotificationTrigger(timeInterval:1,repeats:false))){error in
+            if error != nil,UserDefaults.standard.dictionary(forKey:noticeKey)?["day"] as? String == day {UserDefaults.standard.removeObject(forKey:noticeKey)}
+        }
     }
 
     private func observeHealthMotion(_ axes:[String:Int]) {
@@ -892,14 +937,36 @@ private var scanRearmWorkItem: DispatchWorkItem?
         }.resume()
     }
     private let connectionGuardQueue=DispatchQueue(label:"it.wallaa.connection-notifications",qos:.utility)
+    private func finishDisconnectCheck(){
+        disconnectCheckWork?.cancel();disconnectCheckWork=nil
+        if disconnectCheckTask != .invalid {UIApplication.shared.endBackgroundTask(disconnectCheckTask);disconnectCheckTask = .invalid}
+    }
+
+    private func scheduleDisconnectConfirmation(){
+        if UIApplication.shared.applicationState != .active,disconnectCheckTask == .invalid {
+            disconnectCheckTask=UIApplication.shared.beginBackgroundTask(withName:"WallaaConfirmDisconnect"){[weak self] in self?.finishDisconnectCheck()}
+        }
+        guard disconnectCheckWork == nil else{return}
+        let work=DispatchWorkItem{[weak self] in
+            guard let self else{return}
+            self.disconnectCheckWork=nil
+            self.updateNativeConnectionGuard()
+            if self.disconnectConfirmed {self.finishDisconnectCheck()}
+        }
+        disconnectCheckWork=work;DispatchQueue.main.asyncAfter(deadline:.now()+5,execute:work)
+    }
+
     private func updateNativeConnectionGuard(){
         let center=UNUserNotificationCenter.current(),identifiers=["1746060","1746061","1746062"]
         let savedKey="wallaa.disconnect.reminder-plan"
-        guard let config else { return }
+        // Restored iOS subscriptions can become ready without the normal handshake callback.
+        if mokoAuthenticated,mokoStatus == "ready",mokoPeripheral?.state == .connected,mokoEventsCharacteristic?.isNotifying == true {mokoDisconnectedAt=nil}
+        guard let config else {finishDisconnectCheck();return}
         guard config.armed,config.connectionGuard?.enabled != false,mokoConnectionWanted,let detectedAt=mokoDisconnectedAt else {
+            disconnectFirstCheckAt=nil;disconnectCheckKey="";disconnectConfirmed=false;disconnectCheckedAt=nil;finishDisconnectCheck()
             if guardScheduledKey != "inactive" {
                 guardScheduledKey="inactive"
-                connectionGuardQueue.async {center.removePendingNotificationRequests(withIdentifiers:identifiers)}
+                connectionGuardQueue.async {center.removePendingNotificationRequests(withIdentifiers:identifiers);center.removeDeliveredNotifications(withIdentifiers:identifiers)}
             }
             // A verified reconnection or explicit opt-out ends this disconnect episode.
             if (mokoStatus == "ready" || !config.armed || config.connectionGuard?.enabled == false),UserDefaults.standard.object(forKey:savedKey) != nil {
@@ -912,6 +979,15 @@ private var scanRearmWorkItem: DispatchWorkItem?
         let sameEpisode=saved?["hardwareId"] as? String == hardwareId
         let at=sameEpisode ? Date(timeIntervalSince1970:saved?["at"] as? Double ?? detectedAt.timeIntervalSince1970) : detectedAt
         mokoDisconnectedAt=at
+        let episode="\(hardwareId)-\(at.timeIntervalSince1970)"
+        if disconnectCheckKey != episode {
+            finishDisconnectCheck();disconnectCheckKey=episode;disconnectFirstCheckAt=Date();disconnectConfirmed=false
+        }
+        // Repeated config polls within five seconds are still the first check.
+        disconnectConfirmed=Date().timeIntervalSince(disconnectFirstCheckAt ?? Date()) >= 5
+        guard disconnectConfirmed else {scheduleDisconnectConfirmation();return}
+        disconnectCheckedAt=Date()
+        finishDisconnectCheck()
         let delay=max(30,config.connectionGuard?.delaySeconds ?? 60),language=config.profile.language ?? "it"
         let key="\(hardwareId)-\(at.timeIntervalSince1970)-\(delay)-\(language)"
         guard key != guardScheduledKey else { return };guardScheduledKey=key
@@ -1017,6 +1093,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
         mokoRetry?.cancel();mokoRetryAt = .distantPast
         mokoAuthenticated = false; mokoStatus = "authenticating"
         healthMotionAnchor=nil;healthPreviousAxes=nil;healthMotionSamples=[];healthMovementPending=false
+        morningMotion=WallaaMorningMotion()
         NSLog("[WALLAA][MOKO] connected, authenticating")
         mokoPasswordCharacteristic = nil; mokoEventsCharacteristic = nil; mokoControlCharacteristics = []; mokoAuthenticationSent = false
         peripheral.discoverServices([CBUUID(string: "AA00")])
@@ -1120,17 +1197,18 @@ private var scanRearmWorkItem: DispatchWorkItem?
             if let axes=WallaaMokoGATT.acceleration(value){
                 // Health Check keeps notifications open. A peak from hours ago
                 // must not leave the live diagnostic permanently marked moving.
-                if nativeHealthEnabled && Date().timeIntervalSince(mokoMotionCaptureAt)>=3 {
+                if (nativeHealthEnabled || nativeMorningEnabled) && Date().timeIntervalSince(mokoMotionCaptureAt)>=3 {
                     mokoMotionCaptureAt=Date();mokoMotionPeakDelta=0;mokoMotionSampleCount=0
                     mokoTelemetry["motionObserved"]=false
                 }
                 if let previous=mokoMotionPrevious {mokoMotionPeakDelta=max(mokoMotionPeakDelta,WallaaMokoGATT.accelerationDelta(previous,axes))}
                 mokoMotionPrevious=axes;mokoMotionSampleCount+=1;mokoTelemetry["acceleration"]=axes;mokoTelemetry["motionSampledAt"]=ISO8601DateFormatter().string(from:Date())
                 if mokoMotionSampleCount>=2 {mokoTelemetry["motionObserved"]=mokoMotionPeakDelta>=150}
-                UserDefaults.standard.set(mokoTelemetry,forKey:"wallaa.moko.telemetry")
+                if Date().timeIntervalSince(motionTelemetrySavedAt)>=3 {motionTelemetrySavedAt=Date();UserDefaults.standard.set(mokoTelemetry,forKey:"wallaa.moko.telemetry")}
+                observeMorningMotion(axes)
                 observeHealthMotion(axes)
             }
-            if !nativeHealthEnabled && (mokoMotionSampleCount>=6 || Date().timeIntervalSince(mokoMotionCaptureAt)>=3) {
+            if !nativeHealthEnabled && !nativeMorningEnabled && (mokoMotionSampleCount>=6 || Date().timeIntervalSince(mokoMotionCaptureAt)>=3) {
                 mokoMotionWantedUntil = .distantPast;mokoMotionTimeout?.cancel();peripheral.setNotifyValue(false,for:characteristic)
                 if mokoMotionPeakDelta>=150 {peripheral.readRSSI()}
             }
@@ -1285,8 +1363,8 @@ private var scanRearmWorkItem: DispatchWorkItem?
         config = decoded
         reconcileHealthPhoneMotion()
         updateNativeConnectionGuard()
-        if previousHealth && !nativeHealthEnabled,let characteristic=mokoMotionCharacteristic,characteristic.isNotifying {mokoPeripheral?.setNotifyValue(false,for:characteristic);healthMotionAnchor=nil;healthPreviousAxes=nil;healthMotionSamples=[];healthMovementPending=false}
-        if nativeHealthEnabled {requestMokoMotionSample()}
+        if previousHealth && !nativeHealthEnabled && !nativeMorningEnabled,let characteristic=mokoMotionCharacteristic,characteristic.isNotifying {mokoPeripheral?.setNotifyValue(false,for:characteristic);healthMotionAnchor=nil;healthPreviousAxes=nil;healthMotionSamples=[];healthMovementPending=false}
+        if nativeHealthEnabled || nativeMorningEnabled {requestMokoMotionSample()}
         if communityEnabled && !communityRequestedAlways && locationManager.authorizationStatus == .authorizedWhenInUse {
             communityRequestedAlways=true
             locationManager.requestAlwaysAuthorization()
@@ -2252,6 +2330,27 @@ private enum WallaaMokoGATT {
         guard !initialRead, (1...255).contains(count) else { return false }
         guard let previous, (0...255).contains(previous) else { return false }
         return previous != count
+    }
+}
+
+// A first sample is only a baseline, never evidence of movement. The median
+// rejects isolated spikes; require a fresh window after gaps or reconnects.
+private struct WallaaMorningMotion {
+    private var samples:[[String:Int]]=[]
+    private var anchor:[String:Int]?
+    private var lastAt:Date?
+    static func day(at:Date,calendar:Calendar = .current)->String {
+        let p=calendar.dateComponents([.year,.month,.day],from:at)
+        return "\(p.year ?? 0)-\(p.month ?? 0)-\(p.day ?? 0)"
+    }
+    mutating func observe(_ axes:[String:Int],at:Date,calendar:Calendar = .current)->Bool {
+        if let lastAt,at.timeIntervalSince(lastAt)>10 {samples=[];anchor=nil}
+        lastAt=at;samples.append(axes);if samples.count>5 {samples.removeFirst()}
+        guard let filtered=WallaaMokoGATT.medianAcceleration(samples) else{return false}
+        guard let baseline=anchor else {anchor=filtered;return false}
+        let moved=WallaaMokoGATT.accelerationDelta(baseline,filtered)>=60
+        if moved {anchor=filtered}
+        return moved && calendar.component(.hour,from:at)>=6
     }
 }
 

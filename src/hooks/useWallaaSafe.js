@@ -1,3 +1,5 @@
+import {receiverLocationUsable,receiverReportItems} from '../services/networkReceiver.js';
+import {confirmedNativeLoss,nativeLossEscalation} from '../services/disconnectPolicy.mjs';
 import {nativeButtonConnectionState} from '../services/buttonConnectionState.mjs';
 import {withDeadline} from '../services/operationDeadline.mjs';
 import {useHealthCheck} from './useHealthCheck';
@@ -1044,6 +1046,22 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     return () => { stopped = true; clearInterval(timer); };
   }, [loaded, networkIdentity?.authToken, device?.hardwareId, device?.mokoContinuousEnabled]);
 
+  const morningNoticeImportRef=useRef(new Set());
+  useEffect(()=>{
+    const notice=mokoConnection.morningNotice;
+    if(!loaded || !notice?.id || notice.hardwareId!==device?.hardwareId || morningNoticeImportRef.current.has(notice.id))return;
+    morningNoticeImportRef.current.add(notice.id);
+    (async()=>{
+      if(await storage.getMorningNoticeImported()===notice.id)return;
+      setActivities(current=>{
+        if(current.some(item=>item.id===notice.id))return current;
+        const next=pruneActivities([{...notice,type:'morning',status:'success'},...current]);
+        storage.setActivities(next).catch(()=>{});return next;
+      });
+      await storage.setMorningNoticeImported(notice.id);
+    })().catch(()=>morningNoticeImportRef.current.delete(notice.id));
+  },[loaded,mokoConnection.morningNotice,device?.hardwareId]);
+
   const refreshButtonStatus=useCallback(async()=>{
     const current=deviceRef.current;if(!current?.hardwareId?.startsWith('MOKO:'))return;
     const status=await getMokoConnectionStatus({refresh:true});setMokoConnection(status);
@@ -1070,12 +1088,13 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       const due=[...networkObservationBuffer.current.values()].filter(item=>observationDue(item,networkLastSent.current.get(item.hardwareId)));if(!due.length)return;
       publishing=true;
       try{
-        const location=getCachedLocation()||await getCurrentLocation();
+        const cached=getCachedLocation();
+        const location=receiverLocationUsable(cached)?cached:await getCurrentLocation();
         if(stopped)return;
-        const items=[...networkObservationBuffer.current.values()].filter(item=>observationDue(item,networkLastSent.current.get(item.hardwareId))).slice(0,10);
+        const items=receiverReportItems([...networkObservationBuffer.current.values()].filter(item=>observationDue(item,networkLastSent.current.get(item.hardwareId))),location).slice(0,10);
         if(items.length){await reportNetworkObservations(networkIdentityRef.current,location,items);if(stopped)return;for(const item of items)networkLastSent.current.set(item.hardwareId,Date.now());setReceiverLocal(value=>({...value,lastReportAt:new Date().toISOString(),error:''}));}
         for(const item of items)if(networkObservationBuffer.current.get(item.hardwareId)===item)networkObservationBuffer.current.delete(item.hardwareId);
-        for(const [key,item] of networkObservationBuffer.current)if(Date.now()-new Date(item.observedAt).getTime()>60000)networkObservationBuffer.current.delete(key);
+        for(const [key,item] of networkObservationBuffer.current)if(Date.now()-new Date(item.observedAt).getTime()>60000 || Date.parse(item.observedAt)<Date.parse(location.capturedAt)-15000)networkObservationBuffer.current.delete(key);
       }catch(error){if(!stopped)setReceiverLocal(value=>({...value,lastFailureAt:new Date().toISOString(),error:error.message||'Rilevamento non inviato.'}));}finally{publishing=false;}
     };
     networkPublish.current=publish;const timer=setInterval(publish,15000);
@@ -1142,10 +1161,10 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const guardExceeded = useMemo(() => Boolean(
     !pairingInProgressRef.current && device?.mokoSetupVerified!==false && device?.id && connectionGuard.enabled && (
       mokoConnection.disconnectedAt && connectionStatus === 'disconnected'
-        ? (clock - new Date(mokoConnection.disconnectedAt).getTime()) / 1000 >= connectionGuard.delaySeconds
-        : !eventOnlyButton && lastSignalAgeSeconds != null && lastSignalAgeSeconds >= connectionGuard.delaySeconds
+        ? confirmedNativeLoss(mokoConnection,clock,connectionGuard.delaySeconds)
+        : !device?.hardwareId?.startsWith('MOKO:') && !eventOnlyButton && lastSignalAgeSeconds != null && lastSignalAgeSeconds >= connectionGuard.delaySeconds
     )
-  ), [eventOnlyButton, device?.id, connectionGuard.enabled, connectionGuard.delaySeconds, lastSignalAgeSeconds, mokoConnection.disconnectedAt, connectionStatus, clock]);
+  ), [eventOnlyButton, device?.id, device?.hardwareId, mokoConnection, connectionGuard.enabled, connectionGuard.delaySeconds, lastSignalAgeSeconds, mokoConnection.disconnectedAt, connectionStatus, clock]);
 
   // Persist only state transitions. Advertising reception itself remains passive and is not polled.
   useEffect(() => {
@@ -1180,6 +1199,16 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     feedbackWarning();
     if(!device.hardwareId?.startsWith('MOKO:'))showLocalSafetyNotification({ title: guardTitle, body: guardBody, sound:'wallaa-soft-chime.wav',extra: { type: 'connection-guard', deviceId: device.id } }).catch(() => {});
     pushActivity({ type: 'disconnect', status: 'error', title: guardTitle, detail: `Connection Guard: ${delay}s` }).catch(() => {});
+  }, [loaded, device?.id, guardExceeded, connectionGuard.delaySeconds, pushActivity]);
+
+  const disconnectEscalatedRef=useRef('');
+  useEffect(()=>{
+    if(!loaded || !armed || !guardExceeded || pairingInProgressRef.current || device?.mokoSetupVerified===false)return;
+    const native=device?.hardwareId?.startsWith('MOKO:');
+    if(native && !nativeLossEscalation(mokoConnection,clock,connectionGuard.delaySeconds))return;
+    const episode=`${device?.hardwareId||device?.id}-${mokoConnection.disconnectedAt||''}`;
+    if(disconnectEscalatedRef.current===episode)return;
+    disconnectEscalatedRef.current=episode;
     const recipients = contactsRef.current
       .filter((c) => c.email?.trim() && c.permissions?.disconnectAlerts !== false)
       .map((c) => ({ name: c.name, email: c.email, phone: c.phone }));
@@ -1192,14 +1221,15 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       rssi: telemetryRef.current.rssi,
       lastSeenAt: telemetryRef.current.seenAt,
       notifyGuardians: true,
+      ...(native?{connectionGuard:{disconnectedAt:mokoConnection.disconnectedAt,confirmedAt:mokoConnection.disconnectCheckedAt,delaySeconds:connectionGuard.delaySeconds,reminders:3}}:{}),
       contacts: recipients
-    }).catch(() => {});
-  }, [loaded, device?.id, guardExceeded, connectionGuard.delaySeconds, pushActivity]);
+    }).catch(() => {if(disconnectEscalatedRef.current===episode)disconnectEscalatedRef.current='';});
+  },[loaded,armed,guardExceeded,device?.id,device?.hardwareId,device?.mokoSetupVerified,mokoConnection,clock,connectionGuard.delaySeconds]);
 
   useEffect(() => {
     if (!['connected', 'standby'].includes(connectionStatus) || !disconnectNotifiedRef.current) return;
     if(device?.hardwareId?.startsWith('MOKO:') && (!mokoConnection.ready||nativeReadySinceRef.current===null||clock-nativeReadySinceRef.current<30000))return;
-    disconnectNotifiedRef.current = false;
+    disconnectNotifiedRef.current = false;disconnectEscalatedRef.current='';
     const language = profileRef.current?.language || 'en';
     setToast({ type: 'success', text: translate(language, 'v4.guard.reconnectToast') });
     pushActivity({ type: 'reconnect', status: 'success', title: translate(language, 'v4.guard.reconnectActivity') }).catch(() => {});
