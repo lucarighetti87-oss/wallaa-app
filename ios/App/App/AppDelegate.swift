@@ -1197,7 +1197,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
             if let axes=WallaaMokoGATT.acceleration(value){
                 // Health Check keeps notifications open. A peak from hours ago
                 // must not leave the live diagnostic permanently marked moving.
-                if nativeHealthEnabled && Date().timeIntervalSince(mokoMotionCaptureAt)>=3 {
+                if (nativeHealthEnabled || nativeMorningEnabled) && Date().timeIntervalSince(mokoMotionCaptureAt)>=3 {
                     mokoMotionCaptureAt=Date();mokoMotionPeakDelta=0;mokoMotionSampleCount=0
                     mokoTelemetry["motionObserved"]=false
                 }
