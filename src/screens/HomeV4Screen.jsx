@@ -1,7 +1,8 @@
 import SentinelHomeAura from '../components/SentinelHomeAura';
 import {useSentinelMode} from '../hooks/useSentinelMode';
 import {uiText,uiLocale} from '../uiText.js';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import {greetingAt} from '../services/greeting.mjs';
 import {
   BatteryMedium,
   ChevronRight,
@@ -27,6 +28,8 @@ export default function HomeV4Screen({
   t
 }) {
   const sentinelActive=useSentinelMode();
+  const [greeting,setGreeting]=useState(()=>greetingAt());
+  useEffect(()=>{const refresh=()=>setGreeting(greetingAt());const timer=setInterval(refresh,60000);document.addEventListener("visibilitychange",refresh);return()=>{clearInterval(timer);document.removeEventListener("visibilitychange",refresh);};},[]);
   const sosPointerRef = useRef(null);
   const [isHolding, setIsHolding] = useState(false);
 
@@ -82,7 +85,7 @@ export default function HomeV4Screen({
         <section className="w37-user-hero-row">
           <div className="w37-user-copy">
             <span className="w37-eco-chip">Stay safe. Press Wallaa.</span>
-            <h1 className="w37-user-name">{"" + uiText("Buonasera,") + " "}{name}</h1>
+            <h1 className="w37-user-name">{"" + uiText(greeting) + " "}{name}</h1>
             <p className="w37-user-sub">{"" + uiText("Un mondo più sicuro inizia da te.") + ""}</p>
           </div>
           <div className="w37-tagline-col" aria-hidden="true">{"" + uiText("PERSONE") + ""}<br />{"" + uiText("PIÙ SICURE") + ""}<br />{"" + uiText("CITTÀ") + ""}<br />{"" + uiText("PIÙ VIVE") + " "}<div className="w37-tagline-bar" />

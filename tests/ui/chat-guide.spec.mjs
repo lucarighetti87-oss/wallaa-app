@@ -13,7 +13,7 @@ for(const screen of ['chat','central']){
   await page.goto(`/tests/ui/index.html?screen=${screen}&mode=closed`);await expect(page.locator('textarea')).toHaveCount(0);
  });
 }
-test('permission guide never claims Always granted for WhenInUse',async({page})=>{await page.goto('/tests/ui/index.html?screen=guide');await expect(page.getByText('La tua posizione non è pubblica.',{exact:false})).toBeVisible();await expect(page.getByText('solo durante un SOS attivo',{exact:false})).toBeVisible();await expect(page.getByRole('button',{name:'Attiva i permessi'})).toBeVisible();await expect(page.getByText('Protezione configurata',{exact:true})).toHaveCount(0);});
+test('permission guide never claims Always granted for WhenInUse',async({page})=>{await page.goto('/tests/ui/index.html?screen=guide');await expect(page.getByText('La tua posizione non è pubblica.',{exact:false})).toBeVisible();await expect(page.getByText('solo durante un SOS attivo',{exact:false})).toBeVisible();await expect(page.getByRole('button',{name:'Apri Impostazioni per la posizione'})).toBeVisible();await expect(page.getByText('Protezione configurata',{exact:true})).toHaveCount(0);});
 test('every notification opens readable details',async({page})=>{await page.goto('/tests/ui/index.html?screen=notifications');await page.getByRole('button',{name:'Apri notifica: WB-001 riconnesso'}).click();await expect(page.getByRole('dialog')).toContainText('Collegamento ripristinato');});
 test('acknowledging an incoming SOS leaves an accessible active card',async({page})=>{await page.goto('/tests/ui/index.html?screen=incoming');await page.getByRole('button',{name:'Ho visto l’allarme'}).click();await expect(page.getByRole('button',{name:'SOS ancora attivo · Marta Test'})).toBeVisible();await page.getByRole('button',{name:'SOS ancora attivo · Marta Test'}).click();await expect(page.getByRole('alertdialog')).toBeVisible();});
 
@@ -46,17 +46,17 @@ test('chat safety blocks sending, can unblock and submits a report without delet
 });
 
 
-test('stalled permission request recovers and finish later remains visibly actionable',async({page})=>{
- await page.clock.install();
- await page.goto('/tests/ui/index.html?screen=guide&mode=stalled');
- const later=page.getByRole('button',{name:'Completerò dopo · alcune funzioni saranno limitate'});
- await expect(later).toBeVisible();
- const style=await later.evaluate(el=>({height:el.getBoundingClientRect().height,border:getComputedStyle(el).borderTopWidth}));
- expect(style.height).toBeGreaterThanOrEqual(48);expect(style.border).not.toBe('0px');
- await page.getByRole('button',{name:'Attiva i permessi'}).click();
- await expect(page.getByRole('button',{name:'Richiesta in corso…'})).toBeDisabled();
- await expect(later).toBeEnabled();
- await page.clock.fastForward(45001);
- await expect(page.getByRole('alert')).toContainText('La richiesta non si è conclusa');
- await expect(page.getByRole('button',{name:'Attiva i permessi'})).toBeEnabled();
+test('permission actions do not block Continue and expose a stalled request',async({page})=>{
+ await page.clock.install();await page.goto('/tests/ui/index.html?screen=guide&mode=stalled');
+ await page.getByRole('button',{name:'Attiva posizione',exact:true}).click();await expect(page.getByRole('status')).toContainText('Richiesta in corso');await expect(page.getByRole('button',{name:'Continua per ora'})).toBeEnabled();
+ await page.clock.fastForward(15001);await expect(page.getByRole('alert')).toContainText('La richiesta non si è conclusa');await expect(page.getByRole('button',{name:'Attiva posizione',exact:true})).toBeEnabled();
+});
+test('reinstall permissions have specific actions, keep missing grants visible and open Settings',async({page})=>{
+ await page.goto('/tests/ui/index.html?screen=guide&mode=unchanged');await page.getByRole('button',{name:'Attiva posizione',exact:true}).click();expect(await page.evaluate(()=>window.requestedPermission)).toBe('location');await expect(page.getByRole('status')).toContainText('Se non compare');await expect(page.getByRole('button',{name:'Attiva posizione',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Impostazioni iPhone',exact:true}).click();expect(await page.evaluate(()=>window.settingsOpened)).toBe(true);await page.getByRole('button',{name:'Collega il pulsante',exact:true}).click();expect(await page.evaluate(()=>window.pairingOpened)).toBe(true);
+});
+
+test('security check offers an actual action for each unresolved item and never pretends backend recovery',async({page})=>{
+ await page.clock.install();await page.goto('/tests/ui/index.html?screen=security-check');await page.clock.runFor(3000);
+ await page.getByRole('button',{name:'Ricontrolla servizi'}).click();await expect(page.getByRole('alert')).toContainText('Servizi ancora non raggiungibili');await page.getByRole('button',{name:'Controlla i permessi'}).first().click();expect(await page.evaluate(()=>window.permissionsOpened)).toBe(true);await page.getByRole('button',{name:'Collega il pulsante'}).click();expect(await page.evaluate(()=>window.securityRoute)).toBe('device');
 });

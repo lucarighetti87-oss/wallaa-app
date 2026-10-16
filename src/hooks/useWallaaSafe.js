@@ -1,3 +1,4 @@
+import {nativeButtonConnectionState} from '../services/buttonConnectionState.mjs';
 import {withDeadline} from '../services/operationDeadline.mjs';
 import {useHealthCheck} from './useHealthCheck';
 import {observationDue} from '../services/observationCadence';
@@ -1123,9 +1124,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     if (!device?.id) return 'absent';
     if (device?.hardwareId?.startsWith('MOKO:') && device.mokoContinuousEnabled !== false && supportsMokoConnection() && ['press','any_press'].includes(trigger)) {
       if (mokoConnection.state==='disabled'&&!armed)return 'protection-off';
-      if (mokoConnection.connected) return 'connected';
-      if (mokoConnection.disconnectedAt) return 'disconnected';
-      return 'searching';
+      return nativeButtonConnectionState(mokoConnection,clock);
     }
     if (eventOnlyButton) {
       // Shelly BLU Button Tough is normally silent and advertises when an event occurs.
@@ -1137,7 +1136,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     if (lastSignalAgeSeconds <= 25) return 'connected';
     if (lastSignalAgeSeconds <= 60) return 'weak';
     return 'disconnected';
-  }, [device?.id, device?.hardwareId, device?.mokoContinuousEnabled, armed, trigger, mokoConnection, eventOnlyButton, lastSignalAgeSeconds, device?.mokoSetupVerified, pairingState, pairingActive]);
+  }, [device?.id, device?.hardwareId, device?.mokoContinuousEnabled, armed, trigger, mokoConnection, clock, eventOnlyButton, lastSignalAgeSeconds, device?.mokoSetupVerified, pairingState, pairingActive]);
 
   const guardExceeded = useMemo(() => Boolean(
     !pairingInProgressRef.current && device?.mokoSetupVerified!==false && device?.id && connectionGuard.enabled && (
@@ -1466,7 +1465,8 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       await storage.setBackgroundConfig({...previous,version:2,armed:armedRef.current && next.mokoSetupVerified!==false,trigger:next.hardwareId?.startsWith('MOKO:')?'press':triggerRef.current,apiUrl:CONFIG.apiUrl,deviceId:next.id,hardwareId:next.hardwareId,claimToken:next.claimToken,profile:profileRef.current,contacts:contactsRef.current,identity:networkIdentityRef.current});
     };
     try {
-      await beginMokoSetup();await stopBleScan();
+      await withDeadline(beginMokoSetup,8000,'Non è stato possibile preparare il Bluetooth. Riprova.');
+      await withDeadline(stopBleScan,5000,'La ricerca Bluetooth non si è arrestata. Riprova.');
       if(controller.signal.aborted)throw controller.signal.reason;
       setPairingState('authorizing');
       const authorization=await authorizeMokoAccessory({reuseAuthorized:Boolean(existingDevice)||!previousDevice,...(existingDevice?.id?{deviceId:existingDevice.id}:{})});
@@ -1527,9 +1527,9 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       setPairingState(error.code==='MOKO_PASSWORD_REQUIRED'?'password_error':claimed?'incomplete':'idle');
       setToast({type:'error',text:error.code==='DEVICE_ALREADY_OWNED'?'Questo pulsante è già associato a un altro account.':error.message||'Collegamento non riuscito.'});throw error;
     }finally{
-      await stopBleScan().catch(()=>{});
-      if(!completed&&target?.hardwareId?.startsWith('MOKO:')&&lastCounter!==null)await captureMokoSetupBaseline(target).catch(()=>{});
-      await endMokoSetup(!completed&&target?{hardwareId:target.hardwareId,baselineCount:lastCounter}:{}).catch(()=>{});
+      await withDeadline(stopBleScan,3000,'Chiusura ricerca Bluetooth non completata.').catch(()=>{});
+      if(!completed&&target?.hardwareId?.startsWith('MOKO:')&&lastCounter!==null)await withDeadline(()=>captureMokoSetupBaseline(target),3000,'Chiusura prova non completata.').catch(()=>{});
+      await withDeadline(()=>endMokoSetup(!completed&&target?{hardwareId:target.hardwareId,baselineCount:lastCounter}:{}),3000,'Chiusura collegamento non completata.').catch(()=>{});
       pairingInProgressRef.current=false;setPairingActive(false);pairingControllerRef.current=null;pairingChoiceRef.current=null;setPairingCandidates([]);
     }
   },[pushActivity]);
@@ -1556,18 +1556,12 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     return()=>{active=false;};
   },[loaded,networkIdentity?.authToken,profile?.onboardingComplete]);
   const refreshSafetyPermissions=useCallback(async()=>{const status=await getSafetyPermissions();setSafetyPermissions(status);return status;},[]);
-  const activateSafetyPermissions=useCallback(async()=>{
+  const activateSafetyPermissions=useCallback(async(kind)=>{
     const bounded=operation=>withDeadline(operation,12000,'La richiesta non si è conclusa. Verifica lo stato o apri Impostazioni iPhone.');
-    // Native location requests return immediately; the status refresh follows Apple's authorization callbacks.
-    // Do not wait for a GPS fix or cloud synchronization before enabling the other permissions.
-    const errors=[];
-    for(const operation of [supportsMokoConnection()?requestSafetyLocation:requestLocationPermission,initializeWallaaBle,ensureLocalNotificationPermission]){
-      try{await bounded(operation);}catch(error){errors.push(error);}
-    }
-    await bounded(refreshSafetyPermissions);
-    initializeAccountServices().catch(()=>{});
-    if(errors.length)throw errors[0];
-  },[refreshSafetyPermissions,initializeAccountServices]);
+    if(kind==='location')await bounded(supportsMokoConnection()?requestSafetyLocation:requestLocationPermission);
+    else if(kind==='notifications'){if(!await bounded(ensureLocalNotificationPermission))throw new Error('Notifiche non autorizzate. Apri Impostazioni iPhone → Wallaa → Notifiche.');}
+    return bounded(refreshSafetyPermissions);
+  },[refreshSafetyPermissions]);
   useEffect(()=>{if(!showSafetyGuide)return;const timer=setInterval(()=>refreshSafetyPermissions().catch(()=>{}),2000);return()=>clearInterval(timer);},[showSafetyGuide,refreshSafetyPermissions]);
   const finishSafetyGuide=useCallback(async()=>{setShowSafetyGuide(false);await storage.setSafetyGuideSeen(true);},[]);
   useEffect(()=>{
@@ -1721,7 +1715,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     networkIdentity, networkState, qrDataUrl, incomingAlert, incomingAlertMinimized, activeGuardianAlerts, acknowledgeIncomingAlert, openGuardianAlert, sentinelOffer, connectionGuard, appearance, connectionStatus, lastSignalAgeSeconds,
     messagePush,
     centralMessagePush,
-    healthCheck,showSafetyGuide,safetyPermissions,activateSafetyPermissions,refreshSafetyPermissions,finishSafetyGuide,openSafetySettings,refreshButtonStatus,pendingMokoDevice,resumeMokoSetup,pairingCandidates,selectPairingCandidate,cancelPairing,setupMokoDevice,networkOwnedDevices, networkDevice, networkReceiverStatus, setNetworkObserver, setDeviceNetworkTracking, mokoConnection, setMokoConnectionOptions, signalQuality, safetyLevel, activeAlert, resolvedAlert, systemHealth, currentLocation, locationStatus, authenticated: Boolean(networkIdentity?.authToken && profile?.onboardingComplete),
+    healthCheck,showSafetyGuide,openSafetyGuide:()=>setShowSafetyGuide(true),safetyPermissions,activateSafetyPermissions,refreshSafetyPermissions,finishSafetyGuide,openSafetySettings,refreshButtonStatus,pendingMokoDevice,resumeMokoSetup,pairingCandidates,selectPairingCandidate,cancelPairing,setupMokoDevice,networkOwnedDevices, networkDevice, networkReceiverStatus, setNetworkObserver, setDeviceNetworkTracking, mokoConnection, setMokoConnectionOptions, signalQuality, safetyLevel, activeAlert, resolvedAlert, systemHealth, currentLocation, locationStatus, authenticated: Boolean(networkIdentity?.authToken && profile?.onboardingComplete),
     legalStatus, legalChecked, legalRequired, legalGatePending, legalError,
     setToast, setArmed:setProtectionEnabled, setTrigger, saveProfile, setGuardianMode, dismissResolvedAlert, completeOnboarding, loginAccount, signOut, acceptLegalUpdate, refreshLegalStatus, addOrUpdateContact, removeContact, pairDevice, disconnectDevice,
     fireAlert, closeActiveAlert, clearActivities, clearData, deleteAccount, refreshNetwork, scanNetworkQr, rotateQr, removeNetworkLink,

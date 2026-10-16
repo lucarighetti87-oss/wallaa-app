@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {greetingAt} from '../src/services/greeting.mjs';
+test('greeting uses local time and changes at 05:00 and 18:00',()=>{for(const [h,m,expected] of [[4,59,'Buonasera,'],[5,0,'Buongiorno,'],[12,30,'Buongiorno,'],[17,59,'Buongiorno,'],[18,0,'Buonasera,'],[23,59,'Buonasera,']])assert.equal(greetingAt(new Date(2026,9,16,h,m)),expected);});

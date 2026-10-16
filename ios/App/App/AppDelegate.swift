@@ -484,6 +484,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
 
     func enterForegroundMode() {
         NSLog("[WALLAA][BLE] entering foreground mode")
+        if !mokoAuthenticated && !mokoAuthenticationBlocked {mokoRetry?.cancel();mokoRetryAt = .distantPast}
         refreshConfiguration()
         stopNativeScan(reason: "did-become-active")
     }
@@ -651,6 +652,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private var mokoLastRssiAt = Date.distantPast
     private var mokoRssi: Int?
     private var mokoRssiMeasuredAt:Date?
+    private var mokoDisconnectReason=""
     private var mokoDisconnectedAt: Date?
     private var guardianLastLocationAt = Date.distantPast
     private var guardianPublishing = false
@@ -700,7 +702,9 @@ private var scanRearmWorkItem: DispatchWorkItem?
     func safetyPermissionStatus()->[String:Any] {
         let location:String
         switch locationManager.authorizationStatus {case .authorizedAlways:location="always";case .authorizedWhenInUse:location="when-in-use";case .denied:location="denied";case .restricted:location="restricted";default:location="not-determined"}
-        return ["location":location,"bluetooth":CBManager.authorization == .allowedAlways,"backgroundRefresh":UIApplication.shared.backgroundRefreshStatus == .available,"lowPower":ProcessInfo.processInfo.isLowPowerModeEnabled]
+        let authorization:String
+        switch CBManager.authorization {case .allowedAlways:authorization="allowed";case .denied:authorization="denied";case .restricted:authorization="restricted";default:authorization="not-determined"}
+        return ["location":location,"bluetooth":central?.state == .poweredOn,"bluetoothPoweredOn":central?.state == .poweredOn,"bluetoothAuthorization":authorization,"backgroundRefresh":UIApplication.shared.backgroundRefreshStatus == .available,"lowPower":ProcessInfo.processInfo.isLowPowerModeEnabled]
     }
     func requestSafetyLocation() {
         guard UIApplication.shared.applicationState == .active else { return }
@@ -709,7 +713,10 @@ private var scanRearmWorkItem: DispatchWorkItem?
     }
 
     func mokoConnectionStatus(refresh:Bool=false) -> [String: Any] {
-        if refresh { mokoTelemetryAt = .distantPast;mokoLastRssiAt = .distantPast;mokoMotionWantedUntil=Date().addingTimeInterval(8) }
+        if refresh {
+            mokoTelemetryAt = .distantPast;mokoLastRssiAt = .distantPast;mokoMotionWantedUntil=Date().addingTimeInterval(8)
+            if !mokoAuthenticated && !mokoAuthenticationBlocked {mokoRetry?.cancel();mokoRetryAt = .distantPast;mokoRetryFailures=0}
+        }
         refreshConfiguration()
         if mokoAuthenticated, let peripheral = mokoPeripheral, peripheral.state == .connected,
            Date().timeIntervalSince(mokoLastRssiAt) >= 15 {
@@ -724,7 +731,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
         if let at=communityLastFailureAt {network["lastFailureAt"]=ISO8601DateFormatter().string(from:at)}
         var result: [String: Any] = ["network":network,"telemetry":mokoTelemetry,"state": mokoStatus,
             "connected": mokoAuthenticated && mokoPeripheral?.state == .connected && mokoEventsCharacteristic?.isNotifying == true && mokoStatus == "ready",
-            "ready": mokoStatus == "ready", "rssi": NSNull(), "disconnectedAt": NSNull()]
+            "ready": mokoStatus == "ready", "disconnectReason":mokoDisconnectReason,"rssi": NSNull(), "disconnectedAt": NSNull()]
         #if DEBUG
         result["diagnostic"] = true
         #endif
@@ -1177,6 +1184,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
         UserDefaults.standard.set(count, forKey: "wallaa.moko.gatt.counter.\(hardwareId)")
         if count == 0 {
             mokoResetInFlight = false
+            mokoRetryFailures=0;mokoRetryAt = .distantPast;mokoRetry?.cancel()
             mokoStatus = "ready"; mokoHandshakeTimeout?.cancel()
             mokoDisconnectedAt = nil; updateNativeConnectionGuard()
             requestMokoMotionSample()
@@ -1211,6 +1219,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         guard peripheral == mokoPeripheral else { return }
         mokoAuthenticated = false; mokoRssi=nil;mokoRssiMeasuredAt=nil;mokoHandshakeTimeout?.cancel()
+        mokoDisconnectReason=error?.localizedDescription ?? "Il collegamento Bluetooth è stato interrotto. Wallaa riprova automaticamente."
         healthPhoneMotionStreak=0
         mokoStreamReady?.cancel()
         NSLog("[WALLAA][MOKO] disconnected: \(error?.localizedDescription ?? "no error")")
@@ -1224,7 +1233,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private func scheduleMokoReconnect() {
         guard mokoConnectionWanted, !mokoAuthenticationBlocked else { return }
         mokoRetry?.cancel()
-        let delay=min(60.0,5.0*pow(2.0,Double(min(mokoRetryFailures,4))))
+        let delay=WallaaMokoGATT.reconnectDelay(failures:mokoRetryFailures)
         mokoRetryFailures+=1;mokoRetryAt=Date().addingTimeInterval(delay)
         let retry = DispatchWorkItem { [weak self] in self?.reconcileMokoConnection() }
         mokoRetry = retry
@@ -2192,6 +2201,7 @@ private enum WallaaMokoGATT {
 
     static func shouldPauseCommunity(statusCode:Int)->Bool{statusCode==401}
     static func communityRetryDelay(statusCode:Int)->TimeInterval{statusCode==403 ? 60 : 30}
+    static func reconnectDelay(failures:Int)->TimeInterval{min(60.0,pow(2.0,Double(min(max(0,failures),6))))}
     static func accelerationDelta(_ previous:[String:Int],_ current:[String:Int])->Int{["x","y","z"].map{abs((current[$0] ?? 0)-(previous[$0] ?? 0))}.max() ?? 0}
     static func acceleration(_ data:Data)->[String:Int]?{
         let b=[UInt8](data);guard b.count==10,b[0]==0xeb,b[3]==6 else{return nil}
@@ -2392,6 +2402,7 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
             let base=WallaaBackgroundBLEManager.shared.safetyPermissionStatus()
             UNUserNotificationCenter.current().getNotificationSettings { settings in
                 var result=base;result["notifications"]=settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
+                result["notificationAuthorization"]=settings.authorizationStatus == .denied ? "denied" : settings.authorizationStatus == .notDetermined ? "not-determined" : "authorized"
                 call.resolve(result)
             }
         }
@@ -2400,7 +2411,10 @@ public class WallaaMokoPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
         DispatchQueue.main.async { WallaaBackgroundBLEManager.shared.requestSafetyLocation();call.resolve() }
     }
     @objc func openSettings(_ call: CAPPluginCall) {
-        DispatchQueue.main.async { if let url=URL(string:UIApplication.openSettingsURLString){UIApplication.shared.open(url)};call.resolve() }
+        DispatchQueue.main.async {
+            guard let url=URL(string:UIApplication.openSettingsURLString) else{call.reject("Impostazioni iPhone non disponibili.");return}
+            UIApplication.shared.open(url,options:[:]){opened in if opened{call.resolve()}else{call.reject("Non è stato possibile aprire le Impostazioni iPhone.")}}
+        }
     }
     @objc func status(_ call: CAPPluginCall) {
         DispatchQueue.main.async { call.resolve(WallaaBackgroundBLEManager.shared.mokoConnectionStatus(refresh:call.getBool("refresh") ?? false)) }

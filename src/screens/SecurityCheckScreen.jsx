@@ -14,11 +14,17 @@ export default function SecurityCheckScreen({
   locationStatus,
   systemHealth,
   onRefreshSystemHealth,
-  onBack
+  onBack,
+  onPermissions,
+  onNavigate,
+  onProtection
 }) {
   const [phase, setPhase] = useState('running');
   const [completed, setCompleted] = useState(0);
   const [health, setHealth] = useState(systemHealth);
+  const [actionError,setActionError]=useState('');
+  const [checkingServices,setCheckingServices]=useState(false);
+  async function retryServices(){setCheckingServices(true);setActionError('');try{const result=await onRefreshSystemHealth?.();setHealth(result);if(!result||result.status!=='ready'||result.ok===false)setActionError(uiText('Servizi ancora non raggiungibili. Controlla la connessione Internet e riprova.'));}catch(e){setActionError(e.message);}finally{setCheckingServices(false);}}
 
   const checks = useMemo(() => {
     const deviceLinked = Boolean(device?.id);
@@ -92,7 +98,7 @@ export default function SecurityCheckScreen({
             return (
               <div key={item.title} className={`w49-security-row ${visible ? 'visible' : 'waiting'} ${visible && item.ok ? 'ok' : visible ? 'warn' : ''}`}>
                 <span className="w49-security-icon"><Icon size={20}/></span>
-                <span><strong>{item.title}</strong><small>{visible ? item.detail : uiText("In attesa…")}</small></span>
+                <span><strong>{item.title}</strong><small>{visible ? item.detail : uiText("In attesa…")}</small>{visible&&!item.ok&&phase==='done'&&<button type="button" className="w49-fix-action" disabled={index===1&&checkingServices} onClick={()=>{if(index===1)return retryServices();if(index===2||index===3)return onPermissions?.();if(index===4)return onNavigate?.('device');if(index===5)return onNavigate?.('network');if(authenticated)return onProtection?.(true);return onNavigate?.('settings');}}>{uiText(index===1?(checkingServices?'Verifica in corso…':'Ricontrolla servizi'):index===2||index===3?'Controlla i permessi':index===4?'Collega il pulsante':index===5?'Apri rete di sicurezza':authenticated?'Attiva protezione':'Apri impostazioni')}</button>}</span>
                 <i>{visible ? (item.ok ? <Check size={17}/> : '!') : <Radio size={16}/>}</i>
               </div>
             );
@@ -106,6 +112,7 @@ export default function SecurityCheckScreen({
           </div>
         )}
 
+        {actionError&&<p role="alert">{actionError}</p>}
         <button type="button" className="w49-back-home" onClick={onBack}><ArrowLeft size={20}/>{" " + uiText("Torna alla Home") + ""}</button>
       </div>
     </section>
