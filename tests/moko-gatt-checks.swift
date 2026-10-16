@@ -89,3 +89,7 @@ precondition(WallaaMokoGATT.phoneMoving(acceleration:[0.08,0,0],rotation:[0,0,0]
 precondition(WallaaMokoGATT.phoneMoving(acceleration:[0,0,0],rotation:[0,0.5,0]))
 precondition(!WallaaMokoGATT.phoneMoving(acceleration:[Double.nan,0,0],rotation:[0,0,0]))
 print("4 verifiche filtro movimento iPhone superate")
+
+assert(WallaaMokoGATT.reconnectDelay(failures:0)==1)
+assert(WallaaMokoGATT.reconnectDelay(failures:1)==2)
+assert(WallaaMokoGATT.reconnectDelay(failures:10)==60)

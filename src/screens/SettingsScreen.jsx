@@ -23,7 +23,7 @@ function formatDateOfBirth(value) {
   return `${match[3]}/${match[2]}/${match[1]}`;
 }
 
-export default function SettingsScreen({ networkReceiverStatus={},connectionGuard={enabled:true,delaySeconds:60},onConnectionGuard,device, networkDevice, onNetworkTracking, onNetworkObserver,
+export default function SettingsScreen({onPermissions, networkReceiverStatus={},connectionGuard={enabled:true,delaySeconds:60},onConnectionGuard,device, networkDevice, onNetworkTracking, onNetworkObserver,
   profile, onSaveProfile, armed, onArmed, onReset, appearance, onAppearance, onDeleteAccount, onSignOut,
   networkIdentity, onSubscriptionChanged, networkState, systemHealth, onRefreshSystemHealth, onTestEmail, onTestAlarmSound, onNavigate, connectionStatus, t
 }) {
@@ -52,6 +52,7 @@ export default function SettingsScreen({ networkReceiverStatus={},connectionGuar
       <div className="settings-tier settings-tier-included" role="region" aria-labelledby="settings-included-title">
       <header className="settings-tier-heading"><ShieldCheck size={21}/><div><h2 id="settings-included-title">{uiText('Funzioni incluse')}</h2><p>{uiText('Le impostazioni disponibili con ogni account Wallaa.')}</p></div></header>
       <div className="v412-settings-section-label">{t('v412.settings.accountSection')}</div>
+      <section className="v4-settings-card"><div className="settings-row-title"><div><strong>{uiText('Permessi iPhone')}</strong><span>{uiText('Posizione, Bluetooth, notifiche e attività in background.')}</span></div></div><button type="button" className="v4-primary" onClick={onPermissions}>{uiText('Controlla i permessi')}</button></section>
       <section className="v4-settings-card">
         <div className="settings-row-title"><UserRound size={19}/><div><strong>{t('v4.settings.profile')}</strong><span>{t('v412.settings.profileLocked')}</span></div></div>
         {!editingProfile ? (

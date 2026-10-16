@@ -1,0 +1,15 @@
+# Release 135 — pairing, permissions, connection recovery, greeting
+
+Button setup uses a compact three-step guide: Apple selection/discovery, explicit no-SOS physical proof, final configuration and verified native readiness. Technical intermediate states are grouped without skipping any hardware or server verification. Discovery, cancellation and cleanup are bounded. Setup instructions are immediately visible without decorative entrance transforms.
+
+The permission guide exposes individual location, notification and pairing actions. Denied permissions open iPhone Settings rather than repeatedly requesting an already-decided grant. It explains background refresh and never claims to change iOS settings itself. It is accessible again from Settings. Security diagnostics expose per-item actions and retain backend failure state when retry fails. Native permission status distinguishes Bluetooth radio and notification denial; opening Settings reports failure if iOS rejects it.
+
+Connection recovery resets retry failures when the actual zero-counter baseline confirms readiness, retries first at one second with bounded backoff, and retries promptly on return to foreground or explicit Reconnect. A brief real interruption is shown as reconnecting (not connected); persistent loss stays disconnected. RSSI is never used as proof that SOS is ready. Native disconnect reason is available in the device screen. Local-clock greeting changes at 05:00 and 18:00 and refreshes on foreground/time passage.
+
+Admin permanent deletion is implemented in backend 4.0.83 / portal 1.9.25. It requires authenticated admin, reason and matching hardware identifier; removes the registry and cascading network observations, revokes the old token, retains SOS history, and requires fresh physical pairing for reuse.
+
+Validation: app unit suite, WebKit interface checks, extracted native Swift protocol/pairing/notification/configuration/energy tests, signed Release compilation. Backend deletion integration test verifies rejection of an unauthorized admin, confirmation mismatch, deletion, network sighting removal, audit, stale-token rejection and legacy records. Portal interaction test verifies confirmation and visible errors.
+
+Physical QA limitation: all known iPhones were unavailable on 16 October. No physical pairing/disconnection test and no real SOS were performed. Software recovery improvements do not establish that the reported nearby-button disconnection has been reproduced or eliminated. First-install permissions, reinstall recovery, locked/background presses and extended power usage still require physical-device QA. No Android release, App Review submission or paid Sentinel features are included.
+
+The final build is 135: returning from iPhone Settings also retries push registration after notification access is granted, without overlapping recovery requests or blocking permission UI. Build 134 was an intermediate upload.
