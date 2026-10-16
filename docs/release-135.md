@@ -1,4 +1,4 @@
-# Release 134 — pairing, permissions, connection recovery, greeting
+# Release 135 — pairing, permissions, connection recovery, greeting
 
 Button setup uses a compact three-step guide: Apple selection/discovery, explicit no-SOS physical proof, final configuration and verified native readiness. Technical intermediate states are grouped without skipping any hardware or server verification. Discovery, cancellation and cleanup are bounded. Setup instructions are immediately visible without decorative entrance transforms.
 
@@ -11,3 +11,5 @@ Admin permanent deletion is implemented in backend 4.0.83 / portal 1.9.25. It re
 Validation: app unit suite, WebKit interface checks, extracted native Swift protocol/pairing/notification/configuration/energy tests, signed Release compilation. Backend deletion integration test verifies rejection of an unauthorized admin, confirmation mismatch, deletion, network sighting removal, audit, stale-token rejection and legacy records. Portal interaction test verifies confirmation and visible errors.
 
 Physical QA limitation: all known iPhones were unavailable on 16 October. No physical pairing/disconnection test and no real SOS were performed. Software recovery improvements do not establish that the reported nearby-button disconnection has been reproduced or eliminated. First-install permissions, reinstall recovery, locked/background presses and extended power usage still require physical-device QA. No Android release, App Review submission or paid Sentinel features are included.
+
+The final build is 135: returning from iPhone Settings also retries push registration after notification access is granted, without overlapping recovery requests or blocking permission UI. Build 134 was an intermediate upload.

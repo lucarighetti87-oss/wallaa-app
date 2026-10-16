@@ -111,6 +111,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const [centralMessagePush, setCentralMessagePush] = useState(null);
   const [connectionGuard, setConnectionGuardState] = useState({ enabled: true, delaySeconds: 60 });
   const [showSafetyGuide,setShowSafetyGuide]=useState(false);
+  const permissionPushRecoveryRef=useRef({running:false,attemptedAt:0});
   const [safetyPermissions,setSafetyPermissions]=useState({});
   const [appearance, setAppearanceState] = useState({ mode: 'dark' });
   const [systemHealth, setSystemHealth] = useState({ status: 'idle' });
@@ -1555,7 +1556,16 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     storage.getSafetyGuideSeen().then(async seen=>{const status=await getSafetyPermissions();if(active){setSafetyPermissions(status);if(!seen)setShowSafetyGuide(true);}}).catch(()=>{});
     return()=>{active=false;};
   },[loaded,networkIdentity?.authToken,profile?.onboardingComplete]);
-  const refreshSafetyPermissions=useCallback(async()=>{const status=await getSafetyPermissions();setSafetyPermissions(status);return status;},[]);
+  const refreshSafetyPermissions=useCallback(async()=>{
+    const status=await getSafetyPermissions();setSafetyPermissions(status);
+    const recovery=permissionPushRecoveryRef.current;
+    if(status.notifications&&networkIdentityRef.current?.authToken&&!pushInitializedRef.current&&!recovery.running&&Date.now()-recovery.attemptedAt>30000){
+      recovery.running=true;recovery.attemptedAt=Date.now();
+      initializeAccountServices().catch(()=>{}).finally(()=>{recovery.running=false;});
+    }
+    return status;
+  },[initializeAccountServices]);
+  useEffect(()=>{if(loaded&&appVisible&&networkIdentity?.authToken)refreshSafetyPermissions().catch(()=>{});},[loaded,appVisible,networkIdentity?.authToken,refreshSafetyPermissions]);
   const activateSafetyPermissions=useCallback(async(kind)=>{
     const bounded=operation=>withDeadline(operation,12000,'La richiesta non si è conclusa. Verifica lo stato o apri Impostazioni iPhone.');
     if(kind==='location')await bounded(supportsMokoConnection()?requestSafetyLocation:requestLocationPermission);
