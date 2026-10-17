@@ -1,3 +1,5 @@
+import {pollSentinelMembership} from '../services/sentinelHeartbeat.mjs';
+import {getSentinelLocation} from '../services/location';
 import {receiverLocationUsable,receiverReportItems} from '../services/networkReceiver.js';
 import {confirmedNativeLoss,nativeLossEscalation} from '../services/disconnectPolicy.mjs';
 import {nativeButtonConnectionState} from '../services/buttonConnectionState.mjs';
@@ -515,19 +517,17 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   }, [pushActivity, tx]);
 
   // WALLAA_V4_0_65_RELIABLE_SENTINEL_HEARTBEAT
-  // Heartbeat universale: il backend decide se questo account è una Sentinel attiva.
-  // Non dipende dalla pagina Sentinel o da un GET preliminare: riduce i punti di guasto.
+  // Membership discovery is location-free; iOS native tracking owns background presence.
+  // Only visible UI performs this account check; ordinary accounts never poll precise GPS.
   useEffect(() => {
     if (!loaded || !networkIdentity?.authToken) return undefined;
     let stopped=false; let running=false;
     const ping=async()=>{
-      if(stopped||running) return; running=true;
+      if(stopped||running||document.visibilityState!=='visible') return; running=true;
       try {
-        let location=null;
-        try { location=await getCurrentLocation(); if(!stopped&&location) setCurrentLocation(location); } catch {}
+        const heartbeat=await pollSentinelMembership({identity:networkIdentityRef.current,native:supportsMokoConnection(),
+          send:sendUniversalSentinelHeartbeat,cached:getCachedLocation(60000),locate:getSentinelLocation});
         if(!stopped) {
-          const heartbeat = await sendUniversalSentinelHeartbeat(networkIdentityRef.current,location);
-          if(!stopped) {
             const activeSentinel = heartbeat?.ignored !== true;
             const status = String(heartbeat?.status || 'offline').toLowerCase();
             await storage.setNativeSentinel({
@@ -536,13 +536,12 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
               status,
               syncedAt: new Date().toISOString()
             });
-          }
         }
       } catch(error) { console.warn('[WALLAA][SENTINEL] heartbeat',error?.message||error); }
       finally { running=false; }
     };
     ping();
-    const timer=setInterval(ping,30000);
+    const timer=setInterval(ping,60000);
     const wake=()=>ping();
     const visible=()=>{if(document.visibilityState==='visible')ping();};
     document.addEventListener('visibilitychange',visible);

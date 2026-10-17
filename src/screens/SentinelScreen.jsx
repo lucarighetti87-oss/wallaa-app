@@ -269,7 +269,7 @@ export default function SentinelScreen({ networkIdentity, profile, currentLocati
 
   // WALLAA_SENTINEL_ACTIVE_INTERVENTION_TRACKING
   // Durante un intervento accettato aggiorna più rapidamente la posizione
-  // della Sentinel. Il heartbeat universale a 30s resta invariato.
+  // della Sentinel. Il controllo account a 60s non richiede GPS preciso; la presenza iOS è nativa.
   useEffect(() => {
     if (!incident || !networkIdentity?.authToken) return undefined;
 

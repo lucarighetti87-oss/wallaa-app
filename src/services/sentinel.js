@@ -118,6 +118,7 @@ export const sendSentinelPresence = (identity, location) => request('/api/sentin
     latitude: location?.latitude,
     longitude: location?.longitude,
     accuracy: location?.accuracy,
+    capturedAt: location?.capturedAt,
     heading: location?.heading ?? null
   }
 });
@@ -125,8 +126,8 @@ export async function getNearbySentinels(identity, location) {
   const lat = finiteNumber(location?.latitude);
   const lng = finiteNumber(location?.longitude);
   const qs = lat !== null && lng !== null
-    ? `?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}&latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lng)}`
-    : '';
+    ? `?presenceDetails=1&lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}&latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lng)}`
+    : '?presenceDetails=1';
   return normalizeNearbyPayload(await request(`/api/sentinel/nearby${qs}`, { identity }));
 }
 export const acceptSentinelOffer = (identity, offerId) => request(`/api/sentinel/dispatch/offers/${encodeURIComponent(offerId)}/accept`, { method: 'POST', identity, body: {} });

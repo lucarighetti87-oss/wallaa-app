@@ -788,5 +788,10 @@
   "La sessione Wallaa deve essere ripristinata. Apri nuovamente il tuo account.": "Your Wallaa session needs to be restored. Sign in to your account again.",
   "Il servizio non ha autorizzato la partecipazione alla rete. Verifica lo stato dell’account.": "The service did not authorize network participation. Check your account status.",
   "Il servizio ha richiesto una pausa tra gli invii. Il telefono riproverà.": "The service requested a pause between uploads. The phone will retry.",
-  "Il servizio Wallaa ha restituito un errore temporaneo. Il telefono riproverà.": "The Wallaa service returned a temporary error. The phone will retry."
+  "Il servizio Wallaa ha restituito un errore temporaneo. Il telefono riproverà.": "The Wallaa service returned a temporary error. The phone will retry.",
+  "da aggiornare": "awaiting update",
+  "Sentinel da aggiornare": "Sentinels awaiting an update",
+  "Ultimo riferimento noto: disponibilità da confermare.": "Last known reference: availability needs confirmation.",
+  "{available} disponibili · {stale} da aggiornare · {missing} senza posizione": "{available} available · {stale} awaiting update · {missing} without location",
+  "{enabled} abilitate · {offline} offline · {busy} in intervento": "{enabled} enabled · {offline} offline · {busy} responding"
 }
