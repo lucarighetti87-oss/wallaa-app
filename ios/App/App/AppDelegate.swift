@@ -411,6 +411,7 @@ private var central: CBCentralManager?
     private var sentinelLastAttemptAt = Date.distantPast
     private var sentinelLastLocationRequestAt = Date.distantPast
     private var sentinelHeartbeatTimer:DispatchSourceTimer?
+    private var sentinelRefreshTimeout:DispatchWorkItem?
     private var sentinelTask:UIBackgroundTaskIdentifier = .invalid
 private var scanRearmWorkItem: DispatchWorkItem?
     private var lastScanStartedAt = Date.distantPast
@@ -2057,7 +2058,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     }
     private func reconcileSentinelHeartbeat(){
         guard nativeSentinelShouldTrack,locationManager.authorizationStatus == .authorizedAlways else {
-            sentinelHeartbeatTimer?.cancel();sentinelHeartbeatTimer=nil;finishSentinelTask();return
+            sentinelHeartbeatTimer?.cancel();sentinelHeartbeatTimer=nil;sentinelRefreshTimeout?.cancel();sentinelRefreshTimeout=nil;finishSentinelTask();return
         }
         guard sentinelHeartbeatTimer == nil else{return}
         let timer=DispatchSource.makeTimerSource(queue:.main)
@@ -2067,14 +2068,24 @@ private var scanRearmWorkItem: DispatchWorkItem?
     }
     private func sentinelHeartbeatTick(){
         guard nativeSentinelShouldTrack,locationManager.authorizationStatus == .authorizedAlways else {reconcileSentinelHeartbeat();return}
+        guard sentinelRefreshTimeout == nil else{return}
         let now=Date(),location=locationManager.location
-        // A cached coordinate keeps its original timestamp; a heartbeat is not a GPS fix.
-        publishNativeSentinelHeartbeat(location)
         let fresh=location.map{$0.horizontalAccuracy>=0 && abs($0.timestamp.timeIntervalSince(now))<=60} ?? false
         if !fresh,liveAlertId.isEmpty,now.timeIntervalSince(sentinelLastLocationRequestAt)>=120 {
+            // Coalesce contact and the requested fix into one upload. Sending contact
+            // first would rate-limit the fresh fix that arrives a few seconds later.
             sentinelLastLocationRequestAt=now
+            if UIApplication.shared.applicationState != .active,sentinelTask == .invalid {
+                sentinelTask=UIApplication.shared.beginBackgroundTask(withName:"WallaaSentinelRefresh"){[weak self] in self?.finishSentinelTask()}
+            }
+            let fallback=DispatchWorkItem{[weak self] in
+                guard let self else{return};self.sentinelRefreshTimeout=nil
+                self.publishNativeSentinelHeartbeat(nil)
+            }
+            sentinelRefreshTimeout=fallback
+            DispatchQueue.main.asyncAfter(deadline:.now()+8,execute:fallback)
             locationManager.requestLocation()
-        }
+        } else {publishNativeSentinelHeartbeat(location)}
     }
 
     private var locationTrackingMode=""
@@ -2182,6 +2193,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
             return
         }
 
+        sentinelRefreshTimeout?.cancel();sentinelRefreshTimeout=nil
         sentinelPublishing = true;sentinelLastAttemptAt=now
         if UIApplication.shared.applicationState != .active,sentinelTask == .invalid {
             sentinelTask=UIApplication.shared.beginBackgroundTask(withName:"WallaaSentinelPresence"){[weak self] in self?.finishSentinelTask()}
