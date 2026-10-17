@@ -63,7 +63,7 @@ window.fetch=async(input,options={})=>{
   data={users:[{userId:'ui-user',displayName:newer?'Marta Latest':'More Test',email:'more@example.invalid'}]};
  }
  else if(url.pathname==='/api/sentinel/me')data={enabled:true,profile:{verified:true,available:true,status:'available'}};
- else if(url.pathname==='/api/sentinel/nearby')data={sentinels:parameters.get('screen')==='map'?[0,90,180,270].map((bearingDeg,index)=>({id:`direction-${index}`,bearingDeg,edgeOnly:true,status:'available'})):[]};
+ else if(url.pathname==='/api/sentinel/nearby')data={...(parameters.has('staleSentinels')?{summary:{enabled:5,available:2,stale:2,unlocated:1,offline:0,busy:0}}:{}),sentinels:parameters.get('screen')==='map'?[0,90,180,270].map((bearingDeg,index)=>({id:`direction-${index}`,bearingDeg,edgeOnly:true,status:parameters.has('staleSentinels')&&index<2?'stale':'available',lastPositionAt:'2026-10-17T09:00:00Z'})):[]};
  else if(url.pathname==='/api/sentinel/dispatch/current-incident')data={incident:null};
  else if(url.pathname==='/api/sentinel/dispatch/current-offer')data={offer:Date.parse(expiresAt)>Date.now()&&mode!=='closed'?offer:null,serverTime:new Date().toISOString()};
  else if(url.pathname==='/api/sentinel/dispatch/offers/ui-offer')data={offer:{...offer,actionable:false,reason:mode==='closed'?'sos_closed':'expired'},serverTime:new Date().toISOString()};

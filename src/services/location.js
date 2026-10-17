@@ -78,3 +78,10 @@ function makeLocation(latitude, longitude, accuracy, extra = {}) {
     capturedAt: extra.capturedAt || new Date().toISOString()
   };
 }
+
+// Membership checks must never enable precise GPS for every account.
+export async function getSentinelLocation(){
+ if(Capacitor.isNativePlatform())return normalizePosition(await Geolocation.getCurrentPosition({enableHighAccuracy:false,timeout:8000,maximumAge:60000}));
+ if(!navigator.geolocation)throw new Error('Posizione non disponibile.');
+ return normalizePosition(await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:false,timeout:8000,maximumAge:60000})));
+}

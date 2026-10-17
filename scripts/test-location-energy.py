@@ -25,6 +25,7 @@ class CLLocationManager {
 class Manager {
  var nativeSentinelShouldTrack=false,nativeGuardianShouldTrack=false,liveAlertId="",communityRequestedAlways=false
  func publishNativeSentinelHeartbeat(_ location:CLLocation){}
+ func reconcileSentinelHeartbeat(){}
  let locationManager=CLLocationManager()
 """+method+r"""
 }

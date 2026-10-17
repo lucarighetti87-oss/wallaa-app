@@ -8401,3 +8401,7 @@ html.ios-keyboard-open .wallaa-new-chat-backdrop .wallaa-new-chat-results {
 .app-shell-v4.screen-settings .wb-receiver-details dd{margin:0;font-size:12px;font-weight:650;color:var(--v4-text);overflow-wrap:anywhere}
 .app-shell-v4.screen-settings .wb-network-receiver p.wb-receiver-error,.app-shell-v4.screen-settings .wb-network-receiver p.wb-receiver-note{margin:14px 0 0;font:inherit;font-size:11px;line-height:1.55;color:var(--v4-muted)}
 .app-shell-v4.screen-settings .wb-network-receiver p.wb-receiver-error{color:#ffc97a}
+
+.v454-sentinel-marker:has(.state-stale) img{filter:grayscale(1);opacity:.55}
+.v454-sentinel-marker .state-stale{background:#8b9ca6!important;box-shadow:none!important}
+.sentinel-map-detail .sentinel-last-known{font-size:11px;color:#bbc9d1}

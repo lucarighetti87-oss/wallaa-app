@@ -408,6 +408,10 @@ private var central: CBCentralManager?
     private var nativeSentinelState: WallaaNativeSentinelState?
     private var sentinelPublishing = false
     private var sentinelLastSentAt = Date.distantPast
+    private var sentinelLastAttemptAt = Date.distantPast
+    private var sentinelLastLocationRequestAt = Date.distantPast
+    private var sentinelHeartbeatTimer:DispatchSourceTimer?
+    private var sentinelTask:UIBackgroundTaskIdentifier = .invalid
 private var scanRearmWorkItem: DispatchWorkItem?
     private var lastScanStartedAt = Date.distantPast
     private var lastTargetDiscoveryAt = Date.distantPast
@@ -1723,7 +1727,6 @@ private var scanRearmWorkItem: DispatchWorkItem?
 
     private func publishAdminLocationSnapshot(_ location: CLLocation) {
         guard adminLocationRequestPending,
-              location.horizontalAccuracy >= 0,
               let config,
               let token = config.identity.authToken,
               !token.isEmpty,
@@ -2049,6 +2052,31 @@ private var scanRearmWorkItem: DispatchWorkItem?
         nativeSentinelState = decoded
     }
 
+    private func finishSentinelTask(){
+        if sentinelTask != .invalid {UIApplication.shared.endBackgroundTask(sentinelTask);sentinelTask = .invalid}
+    }
+    private func reconcileSentinelHeartbeat(){
+        guard nativeSentinelShouldTrack,locationManager.authorizationStatus == .authorizedAlways else {
+            sentinelHeartbeatTimer?.cancel();sentinelHeartbeatTimer=nil;finishSentinelTask();return
+        }
+        guard sentinelHeartbeatTimer == nil else{return}
+        let timer=DispatchSource.makeTimerSource(queue:.main)
+        timer.schedule(deadline:.now(),repeating:60,leeway:.seconds(10))
+        timer.setEventHandler{[weak self] in self?.sentinelHeartbeatTick()}
+        sentinelHeartbeatTimer=timer;timer.resume()
+    }
+    private func sentinelHeartbeatTick(){
+        guard nativeSentinelShouldTrack,locationManager.authorizationStatus == .authorizedAlways else {reconcileSentinelHeartbeat();return}
+        let now=Date(),location=locationManager.location
+        // A cached coordinate keeps its original timestamp; a heartbeat is not a GPS fix.
+        publishNativeSentinelHeartbeat(location)
+        let fresh=location.map{$0.horizontalAccuracy>=0 && abs($0.timestamp.timeIntervalSince(now))<=60} ?? false
+        if !fresh,liveAlertId.isEmpty,now.timeIntervalSince(sentinelLastLocationRequestAt)>=120 {
+            sentinelLastLocationRequestAt=now
+            locationManager.requestLocation()
+        }
+    }
+
     private var locationTrackingMode=""
     private var significantMonitoringActive=false
     private func setSignificantMonitoring(_ enabled:Bool){
@@ -2058,6 +2086,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
         else {locationManager.stopMonitoringSignificantLocationChanges()}
     }
     private func reconcileLocationTracking() {
+        reconcileSentinelHeartbeat()
         let sentinelTracking = nativeSentinelShouldTrack
         let guardianTracking = nativeGuardianShouldTrack
         let needsLocation = !liveAlertId.isEmpty || sentinelTracking || guardianTracking
@@ -2118,10 +2147,9 @@ private var scanRearmWorkItem: DispatchWorkItem?
         }
     }
 
-    private func publishNativeSentinelHeartbeat(_ location: CLLocation, force: Bool = false) {
+    private func publishNativeSentinelHeartbeat(_ location: CLLocation?, force: Bool = false) {
         guard nativeSentinelShouldTrack,
               !sentinelPublishing,
-              location.horizontalAccuracy >= 0,
               let config,
               let token = config.identity.authToken,
               !token.isEmpty else {
@@ -2130,7 +2158,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
 
         let now = Date()
 
-        if !force && now.timeIntervalSince(sentinelLastSentAt) < 60 {
+        if !force && now.timeIntervalSince(sentinelLastAttemptAt) < 60 {
             return
         }
 
@@ -2143,22 +2171,21 @@ private var scanRearmWorkItem: DispatchWorkItem?
             .appendingPathComponent("sentinel")
             .appendingPathComponent("heartbeat")
 
-        let payload: [String: Any] = [
-            "location": [
-                "latitude": location.coordinate.latitude,
-                "longitude": location.coordinate.longitude,
-                "accuracy": NSNumber(value: Int(location.horizontalAccuracy.rounded())),
-                "heading": location.course >= 0
-                    ? NSNumber(value: location.course)
-                    : NSNull()
-            ]
-        ]
+        var payload:[String:Any]=[:]
+        if let location,location.horizontalAccuracy>=0,abs(location.timestamp.timeIntervalSince(now))<=60 {
+            payload["location"]=["latitude":location.coordinate.latitude,"longitude":location.coordinate.longitude,
+                "accuracy":location.horizontalAccuracy,"capturedAt":ISO8601DateFormatter().string(from:location.timestamp),
+                "heading":location.course>=0 ? NSNumber(value:location.course) : NSNull()]
+        }
 
         guard let body = try? JSONSerialization.data(withJSONObject: payload) else {
             return
         }
 
-        sentinelPublishing = true
+        sentinelPublishing = true;sentinelLastAttemptAt=now
+        if UIApplication.shared.applicationState != .active,sentinelTask == .invalid {
+            sentinelTask=UIApplication.shared.beginBackgroundTask(withName:"WallaaSentinelPresence"){[weak self] in self?.finishSentinelTask()}
+        }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -2182,7 +2209,8 @@ private var scanRearmWorkItem: DispatchWorkItem?
             guard let self else { return }
 
             DispatchQueue.main.async {
-                self.sentinelPublishing = false
+                self.sentinelPublishing = false;self.finishSentinelTask()
+                guard self.config?.identity.authToken == token else{return}
 
                 if let error {
                     NSLog(
@@ -2197,6 +2225,11 @@ private var scanRearmWorkItem: DispatchWorkItem?
                 }
 
                 guard (200..<300).contains(http.statusCode) else {
+                    if [401,403].contains(http.statusCode) {
+                        self.nativeSentinelState=nil
+                        UserDefaults.standard.removeObject(forKey:self.sentinelDefaultsKey)
+                        self.reconcileLocationTracking()
+                    }
                     NSLog(
                         "[WALLAA][SENTINEL][NATIVE] heartbeat HTTP=\(http.statusCode)"
                     )
@@ -2210,6 +2243,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
 
                     if json["ignored"] as? Bool == true {
                         self.nativeSentinelState = nil
+                        UserDefaults.standard.removeObject(forKey:self.sentinelDefaultsKey)
                         self.reconcileLocationTracking()
                         NSLog(
                             "[WALLAA][SENTINEL][NATIVE] backend ignored Sentinel; tracking stopped"
@@ -2220,6 +2254,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
                     if let status = json["status"] as? String,
                        status.lowercased() == "offline" {
                         self.nativeSentinelState = nil
+                        UserDefaults.standard.removeObject(forKey:self.sentinelDefaultsKey)
                         self.reconcileLocationTracking()
                         NSLog(
                             "[WALLAA][SENTINEL][NATIVE] Sentinel offline; tracking stopped"
@@ -2229,7 +2264,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
                 }
 
                 NSLog(
-                    "[WALLAA][SENTINEL][NATIVE] heartbeat uploaded accuracy=\(Int(location.horizontalAccuracy.rounded()))"
+                    "[WALLAA][SENTINEL][NATIVE] heartbeat uploaded withGPS=\(payload["location"] != nil)"
                 )
             }
         }.resume()
