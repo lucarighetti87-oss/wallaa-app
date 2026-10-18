@@ -1,3 +1,4 @@
+import HelpScreen from './screens/HelpScreen';
 import {appleDeletionNotice} from './components/AppleProSubscription';
 import {observeApplePurchases,applePurchasesSupported} from './services/appleSubscriptions';
 import HealthCheckScreen from './screens/HealthCheckScreen';
@@ -365,6 +366,7 @@ export default function App() {
           t={t}
           language={language}
         />}
+        {screen === 'help' && <HelpScreen onNavigate={navigateTo} onBack={()=>navigateTo('home')}/>}
         {screen === 'privacy' && <PrivacyCenterScreen profile={safe.profile} onNavigate={navigateTo} onDeleteAccount={deleteAccount} t={t} />}
         {screen === 'settings' && <SettingsScreen onPermissions={safe.openSafetyGuide} networkIdentity={safe.networkIdentity} onSubscriptionChanged={safe.refreshNetwork} networkReceiverStatus={safe.networkReceiverStatus} device={safe.device} networkDevice={safe.networkDevice} onNetworkTracking={safe.setDeviceNetworkTracking} onNetworkObserver={safe.setNetworkObserver} profile={safe.profile} onSaveProfile={safe.saveProfile} armed={safe.armed} onArmed={safe.setArmed} onReset={resetAll} appearance={safe.appearance} onAppearance={safe.setAppearance} onDeleteAccount={deleteAccount} onSignOut={safe.signOut} networkState={safe.networkState} systemHealth={safe.systemHealth} onRefreshSystemHealth={safe.refreshSystemHealth} onTestEmail={safe.sendTestEmail} onTestAlarmSound={safe.testAlarmSound} onNavigate={navigateTo} connectionGuard={safe.connectionGuard} onConnectionGuard={safe.setConnectionGuard} connectionStatus={safe.connectionStatus} t={t} />}
       </div></main>
