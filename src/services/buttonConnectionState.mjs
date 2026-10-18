@@ -9,3 +9,6 @@ export function nativeButtonConnectionState(status,now=Date.now()){
  }
  return 'searching';
 }
+
+// SOS gesture selection must not change which transport owns readiness or loss detection.
+export function usesNativeMokoConnection(device,native){return Boolean(native&&device?.hardwareId?.startsWith('MOKO:')&&device.mokoContinuousEnabled!==false);}

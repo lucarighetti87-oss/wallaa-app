@@ -2,7 +2,7 @@ import {pollSentinelMembership} from '../services/sentinelHeartbeat.mjs';
 import {getSentinelLocation} from '../services/location';
 import {receiverLocationUsable,receiverReportItems} from '../services/networkReceiver.js';
 import {confirmedNativeLoss,nativeLossEscalation} from '../services/disconnectPolicy.mjs';
-import {nativeButtonConnectionState} from '../services/buttonConnectionState.mjs';
+import {nativeButtonConnectionState,usesNativeMokoConnection} from '../services/buttonConnectionState.mjs';
 import {withDeadline} from '../services/operationDeadline.mjs';
 import {useHealthCheck} from './useHealthCheck';
 import {observationDue} from '../services/observationCadence';
@@ -1142,7 +1142,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const connectionStatus = useMemo(() => {
     if(pairingActive||device?.mokoSetupVerified===false)return 'setup-required';
     if (!device?.id) return 'absent';
-    if (device?.hardwareId?.startsWith('MOKO:') && device.mokoContinuousEnabled !== false && supportsMokoConnection() && ['press','any_press'].includes(trigger)) {
+    if (usesNativeMokoConnection(device,supportsMokoConnection())) {
       if (mokoConnection.state==='disabled'&&!armed)return 'protection-off';
       return nativeButtonConnectionState(mokoConnection,clock);
     }
@@ -1249,7 +1249,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const ready = useMemo(() => {
     const hasEmail = contacts.some((c) => c.email?.trim() && c.permissions?.sosAlerts !== false);
     const hasWallaaGuardian = (networkState.guardians?.length || 0) > 0;
-    const continuous = device?.hardwareId?.startsWith('MOKO:') && device.mokoContinuousEnabled !== false && supportsMokoConnection() && ['press','any_press'].includes(trigger);
+    const continuous = usesNativeMokoConnection(device,supportsMokoConnection());
     return Boolean(armed && device?.mokoSetupVerified!==false && !pairingInProgressRef.current && device?.id && (hasEmail || hasWallaaGuardian) && (!continuous || mokoConnection.ready));
   }, [armed, device, contacts, networkState.guardians, trigger, mokoConnection.ready]);
 
