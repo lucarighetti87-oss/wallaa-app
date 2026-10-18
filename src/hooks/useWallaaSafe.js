@@ -2,7 +2,7 @@ import {pollSentinelMembership} from '../services/sentinelHeartbeat.mjs';
 import {getSentinelLocation} from '../services/location';
 import {receiverLocationUsable,receiverReportItems} from '../services/networkReceiver.js';
 import {confirmedNativeLoss,nativeLossEscalation} from '../services/disconnectPolicy.mjs';
-import {nativeButtonConnectionState} from '../services/buttonConnectionState.mjs';
+import {nativeButtonConnectionState,usesNativeMokoConnection} from '../services/buttonConnectionState.mjs';
 import {withDeadline} from '../services/operationDeadline.mjs';
 import {useHealthCheck} from './useHealthCheck';
 import {observationDue} from '../services/observationCadence';
@@ -521,12 +521,12 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   // Only visible UI performs this account check; ordinary accounts never poll precise GPS.
   useEffect(() => {
     if (!loaded || !networkIdentity?.authToken) return undefined;
-    let stopped=false; let running=false;
+    let stopped=false; let running=false; let nextLocationAttempt=0;
     const ping=async()=>{
       if(stopped||running||document.visibilityState!=='visible') return; running=true;
       try {
         const heartbeat=await pollSentinelMembership({identity:networkIdentityRef.current,native:supportsMokoConnection(),
-          send:sendUniversalSentinelHeartbeat,cached:getCachedLocation(60000),locate:getSentinelLocation});
+          send:sendUniversalSentinelHeartbeat,cached:getCachedLocation(60000),locate:async()=>{if(Date.now()<nextLocationAttempt)return null;nextLocationAttempt=Date.now()+120000;return getSentinelLocation();}});
         if(!stopped) {
             const activeSentinel = heartbeat?.ignored !== true;
             const status = String(heartbeat?.status || 'offline').toLowerCase();
@@ -924,7 +924,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       setDevice(restoredDevice);deviceRef.current=restoredDevice;
       if(restoredDevice?.mokoSetupVerified===false)await storage.setDevice(restoredDevice);
       setArmedState(savedArmed);
-      const restoredTrigger='press';
+      const restoredTrigger=savedTrigger==='double_press'?'double_press':'press';
       setTriggerState(restoredTrigger);triggerRef.current=restoredTrigger;
       if(restoredTrigger!==savedTrigger)await storage.setTrigger(restoredTrigger);
       const retainedActivities = pruneActivities(savedActivities);
@@ -975,7 +975,6 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
         if(current && data.protocol==='moko-button' && (!current.hardwareId?.startsWith('MOKO:')||current.protocol!=='moko-button')){
           const recognized={...current,protocol:'moko-button',...(current.hardwareId?.startsWith('MOKO:')?{}:{mokoSetupVerified:false})};
           deviceRef.current=recognized;setDevice(recognized);storage.setDevice(recognized).catch(()=>{});
-          triggerRef.current='press';setTriggerState('press');storage.setTrigger('press').catch(()=>{});
           return;
         }
         if (!deviceClaimMigrationRef.current && current?.id && !current?.claimToken && data?.portableIdentity && data?.hardwareId && identity?.authToken) {
@@ -1011,6 +1010,8 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       },
       onEvent: async (evt) => {
         const currentDevice = deviceRef.current;
+        // Native AA08 owns H1 SOS in foreground and background. Advertising is telemetry only.
+        if(currentDevice?.hardwareId?.startsWith('MOKO:') && supportsMokoConnection())return;
         const pairedAtMs = currentDevice?.pairedAt ? new Date(currentDevice.pairedAt).getTime() : 0;
         const isPairingPacket = currentDevice?.pairingPacketId != null && evt.packetId != null && Number(currentDevice.pairingPacketId) === Number(evt.packetId);
         // The physical press used to pair the button is often advertised repeatedly for a few seconds.
@@ -1141,7 +1142,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const connectionStatus = useMemo(() => {
     if(pairingActive||device?.mokoSetupVerified===false)return 'setup-required';
     if (!device?.id) return 'absent';
-    if (device?.hardwareId?.startsWith('MOKO:') && device.mokoContinuousEnabled !== false && supportsMokoConnection() && ['press','any_press'].includes(trigger)) {
+    if (usesNativeMokoConnection(device,supportsMokoConnection())) {
       if (mokoConnection.state==='disabled'&&!armed)return 'protection-off';
       return nativeButtonConnectionState(mokoConnection,clock);
     }
@@ -1248,7 +1249,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const ready = useMemo(() => {
     const hasEmail = contacts.some((c) => c.email?.trim() && c.permissions?.sosAlerts !== false);
     const hasWallaaGuardian = (networkState.guardians?.length || 0) > 0;
-    const continuous = device?.hardwareId?.startsWith('MOKO:') && device.mokoContinuousEnabled !== false && supportsMokoConnection() && ['press','any_press'].includes(trigger);
+    const continuous = usesNativeMokoConnection(device,supportsMokoConnection());
     return Boolean(armed && device?.mokoSetupVerified!==false && !pairingInProgressRef.current && device?.id && (hasEmail || hasWallaaGuardian) && (!continuous || mokoConnection.ready));
   }, [armed, device, contacts, networkState.guardians, trigger, mokoConnection.ready]);
 
@@ -1277,7 +1278,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   }, [armed, device?.id, connectionStatus, telemetry.battery, contacts, networkState.guardians, networkState.status, networkState.pushPermission]);
 
   const setArmed = useCallback(async (value) => { setArmedState(value); await storage.setArmed(value); }, []);
-  const setTrigger = useCallback(async (value) => {value='press';setTriggerState(value);triggerRef.current=value;await storage.setTrigger(value);}, []);
+  const setTrigger = useCallback(async (value) => {if(!['press','double_press'].includes(value))return;await storage.setTrigger(value);triggerRef.current=value;setTriggerState(value);}, []);
 
   const saveProfile = useCallback(async (next) => {
     const normalized = { ...next, name: profileName(next) || next.name || '' };
@@ -1492,7 +1493,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
     setPairingError('');setPairingCandidates([]);setPairingState('scanning');let target=null,lastCounter=null,claimed=null,completed=false;
     const nativeSnapshot=async next=>{
       const previous=await storage.getBackgroundConfig();
-      await storage.setBackgroundConfig({...previous,version:2,armed:armedRef.current && next.mokoSetupVerified!==false,trigger:next.hardwareId?.startsWith('MOKO:')?'press':triggerRef.current,apiUrl:CONFIG.apiUrl,deviceId:next.id,hardwareId:next.hardwareId,claimToken:next.claimToken,profile:profileRef.current,contacts:contactsRef.current,identity:networkIdentityRef.current});
+      await storage.setBackgroundConfig({...previous,version:2,armed:armedRef.current && next.mokoSetupVerified!==false,trigger:triggerRef.current,apiUrl:CONFIG.apiUrl,deviceId:next.id,hardwareId:next.hardwareId,claimToken:next.claimToken,profile:profileRef.current,contacts:contactsRef.current,identity:networkIdentityRef.current});
     };
     try {
       await withDeadline(beginMokoSetup,8000,'Non è stato possibile preparare il Bluetooth. Riprova.');
@@ -1525,7 +1526,6 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
         setPairingState('checking_signal');await captureMokoSetupBaseline(prepared);
         if(controller.signal.aborted)throw controller.signal.reason;
         const next={...prepared,mokoSetupVerified:true,mokoContinuousEnabled:true};
-        setTriggerState('press');triggerRef.current='press';await storage.setTrigger('press');
         setDevice(next);deviceRef.current=next;await storage.setDevice(next);await nativeSnapshot(next);
         await configureMokoConnection({hardwareId:next.hardwareId,enabled:true,password,useExistingPassword:false});
         setPairingState('restoring');
