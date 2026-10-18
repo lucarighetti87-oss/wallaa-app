@@ -179,6 +179,12 @@ export default function App() {
   useEffect(() => {
     setDrawer(false);
   }, [screen]);
+  useEffect(()=>{
+    const open=event=>{if(event.detail?.opened&&!safe.activeAlert?.active&&!safe.incomingAlert?.remote)setScreen('notifications');};
+    window.addEventListener('wallaa:guardian-disconnect',open);
+    return()=>window.removeEventListener('wallaa:guardian-disconnect',open);
+  },[safe.activeAlert?.active,safe.incomingAlert?.remote]);
+
 
   useEffect(() => {
     const timer = setTimeout(() => setSplashMinDone(true), 1450);

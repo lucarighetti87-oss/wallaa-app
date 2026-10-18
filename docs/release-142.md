@@ -1,0 +1,9 @@
+# Wallaa 4.0.142 — avvisi Connection Guard per Guardian
+
+Problema: il backend inviava email e tentava push di disconnessione, ma non li salvava nella cronologia della campanella. Il callback push onDisconnect non era agganciato dall’app e la cronologia remota veniva letta soltanto all’avvio. Un invio SMTP lento precedeva inoltre i tentativi push.
+
+Server 4.0.87: tabella separata per eventi di disconnessione Guardian, senza modificare i vincoli della cronologia SOS. Registrazione e claim dell’episodio atomici; un evento per destinatario e episodio, indipendente da presenza del token e riuscita del push. Destinatari ricavati da collegamenti o contatti salvati autorizzati, esclusi proprietario, account disabilitati e permessi esplicitamente negati. Un contatto email può corrispondere all’account con email verificata. Push avviati indipendentemente dall’attesa SMTP. Cronologia unificata con finestra di 30 giorni e cancellazione persistente; nessuna coordinata o azione SOS negli avvisi di disconnessione.
+
+App 142: callback push collegato a feedback dentro l’app e aggiornamento della campanella; apertura dal push porta alle notifiche senza interrompere SOS attivi. Rilettura quando l’app torna visibile, su push, focus/rete e ogni 30 secondi soltanto in primo piano. Identificativi remoti deduplicati e protezione dalle risposte in corso durante la cancellazione. Niente riproduzione audio aggiuntiva rispetto alla presentazione push già configurata da iOS. Dettaglio con persona e orario corretti, distinto dal proprio pulsante e da un SOS.
+
+Verifica: 86 test app, 88 test backend, un test WebKit mirato e archivio iPhone Release firmato superati. I test PostgreSQL coprono assenza token, destinatari autorizzati/negati, contatti email, duplicati, cancellazione, riconnessione, SMTP bloccato e push rifiutato. Nessun invio reale. Gli avvisi email precedenti alla correzione non vengono importati automaticamente nella cronologia.
