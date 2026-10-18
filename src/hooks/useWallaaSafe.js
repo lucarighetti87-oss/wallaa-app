@@ -1,3 +1,4 @@
+import {mergeGuardianNotifications} from '../services/guardianNotifications.mjs';
 import {pollSentinelMembership} from '../services/sentinelHeartbeat.mjs';
 import {getSentinelLocation} from '../services/location';
 import {receiverLocationUsable,receiverReportItems} from '../services/networkReceiver.js';
@@ -398,6 +399,11 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
           setIncomingAlert({...alert,status:'active'});
           pushActivity({ type: 'network-alert', status: 'error', titleKey: 'activity.networkSos', titleVars: { name: alert.ownerName }, alertId:alert.id, location: alert.location }).catch(() => {});
         },
+        onDisconnect: event=>{
+          const ownerName=event.ownerName||'un tuo contatto';
+          setToast({type:'warning',text:`Il pulsante di ${ownerName} risulta disconnesso. Apri la campanella per i dettagli.`});
+          window.dispatchEvent(new CustomEvent('wallaa:guardian-disconnect',{detail:{opened:event.opened===true}}));
+        },
         onSentinelOffer: (offer) => setSentinelOffer(offer),
         onMessage: (message) => {
           setMessagePush({
@@ -652,11 +658,24 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   const activeGuardianAlerts=[...guardianAlerts];
   if(incomingAlert?.status!=='closed'&&incomingAlert?.remote&& !activeGuardianAlerts.some(item=>item.id===incomingAlert.id))activeGuardianAlerts.unshift(incomingAlert);
 
+  const notificationFeedGeneration=useRef(0);
+  const notificationFeedClearing=useRef(false);
   useEffect(()=>{
     if(!loaded||!networkIdentity?.authToken)return;
-    let stopped=false;
-    getWallaaNotificationHistory(networkIdentityRef.current).then(result=>{if(stopped)return;const rows=(result.notifications||[]).map(item=>({id:`remote-${item.id}`,at:item.createdAt,type:item.type==='sos'?'network-alert':'network-event',status:item.type==='sos'?'error':'success',title:item.title,detail:item.body,alertId:item.alertId,location:item.location}));setActivities(current=>{const ids=new Set(current.map(item=>item.id));const next=pruneActivities([...rows.filter(item=>!ids.has(item.id)),...current]);storage.setActivities(next).catch(()=>{});return next;});}).catch(()=>{});
-    return()=>{stopped=true;};
+    let stopped=false,busy=false;
+    const refresh=async()=>{
+      if(stopped||busy||notificationFeedClearing.current||document.visibilityState==='hidden')return;
+      busy=true;const generation=notificationFeedGeneration.current;
+      try{
+        const result=await getWallaaNotificationHistory(networkIdentityRef.current);
+        if(stopped||generation!==notificationFeedGeneration.current)return;
+        setActivities(current=>{const next=pruneActivities(mergeGuardianNotifications(current,result.notifications||[]));storage.setActivities(next).catch(()=>{});return next;});
+      }catch{}finally{busy=false;}
+    };
+    refresh();const timer=setInterval(refresh,30000);
+    for(const event of ['focus','online','wallaa:guardian-disconnect'])window.addEventListener(event,refresh);
+    document.addEventListener('visibilitychange',refresh);
+    return()=>{stopped=true;clearInterval(timer);for(const event of ['focus','online','wallaa:guardian-disconnect'])window.removeEventListener(event,refresh);document.removeEventListener('visibilitychange',refresh);};
   },[loaded,networkIdentity?.authToken]);
 
   const nightFeedGeneration=useRef(0);
@@ -1680,14 +1699,15 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   }, [refreshNetwork]);
 
   const clearActivities = useCallback(async () => {
-    nightFeedGeneration.current++;
-    // WALLAA_V4_0_59_CLEAR_REMOTE_NOTIFICATIONS
-    const identity=networkIdentityRef.current;
-    const result=identity?.authToken?await clearWallaaNotificationHistory(identity):{};
-    if(identity?.authToken!==networkIdentityRef.current?.authToken)return;
-    await healthCheck.clearNotificationFeed(result.healthNotificationsClearedAt);
-    setActivities([]);
-    await storage.setActivities([]);
+    nightFeedGeneration.current++;notificationFeedGeneration.current++;
+    notificationFeedClearing.current=true;
+    try{
+      const identity=networkIdentityRef.current;
+      const result=identity?.authToken?await clearWallaaNotificationHistory(identity):{};
+      if(identity?.authToken!==networkIdentityRef.current?.authToken)return;
+      await healthCheck.clearNotificationFeed(result.healthNotificationsClearedAt);
+      setActivities([]);await storage.setActivities([]);
+    }finally{notificationFeedClearing.current=false;}
   }, [healthCheck.clearNotificationFeed]);
 
   const clearData = useCallback(async () => {

@@ -137,7 +137,6 @@ export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentin
     }
 
     if (notification?.data?.type === 'wallaa_disconnect') {
-      if(document.visibilityState==='visible'&&Capacitor.getPlatform()==='ios')wallaaAudio.alarmAudio({soft:true,loop:false}).catch(()=>{});
       const d=notification?.data||{};
       feedbackWarning();
       onDisconnect?.({

@@ -1,0 +1,4 @@
+import {test,expect} from '@playwright/test';
+test('Guardian connection alert names the other person, remains a saved event and never offers an SOS action',async({page},testInfo)=>{
+ await page.goto('/tests/ui/index.html?screen=notifications&guardianDisconnect');await page.getByRole('button',{name:'Apri notifica: Pulsante di Waqar disconnesso'}).click();const detail=page.getByRole('dialog');await expect(detail).toContainText('Waqar');await expect(detail).toContainText('Questo avviso non è un SOS.');await expect(detail.getByRole('button',{name:'Apri richiesta SOS'})).toHaveCount(0);await page.screenshot({path:testInfo.outputPath('guardian-disconnect.png')});await detail.getByRole('button',{name:'Torna alle notifiche'}).click();await expect(page.getByRole('button',{name:'Apri notifica: Pulsante di Waqar disconnesso'})).toBeVisible();
+});

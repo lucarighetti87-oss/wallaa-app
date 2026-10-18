@@ -6,6 +6,7 @@ import {activityTitle,triggerLabel} from '../utils/format';
 
 function explanation(entry){
  if(entry.healthCycleId)return uiText('Health Check ha richiesto una conferma. Apri il controllo per vedere promemoria, risposte ed eventuali email ai Guardian Pro.');
+ if(entry.type==='guardian-disconnect')return uiText('È stata segnalata una disconnessione del pulsante di una persona della tua rete. Il nome e l’orario si riferiscono all’evento registrato, non allo stato attuale del tuo pulsante. Questo avviso non è un SOS.');
  if(entry.type==='disconnect')return uiText('Wallaa non riceve il collegamento Bluetooth del WB-001. Controlla che il pulsante sia vicino e che il Bluetooth sia attivo. L’associazione al tuo account rimane valida.');
  if(entry.type==='reconnect')return uiText('Il collegamento Bluetooth con il WB-001 è stato ristabilito.');
  if(['alert-closed','alert-closed-remote','network-alert-closed'].includes(entry.type))return uiText('La richiesta SOS è stata chiusa. Questo avviso registra la conclusione dell’allarme.');

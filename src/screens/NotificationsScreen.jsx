@@ -5,7 +5,7 @@ import { ArrowLeft, BellRing, CheckCircle2, MapPin, ShieldCheck, Trash2, Triangl
 import { activityTitle, formatDateTime } from '../utils/format';
 
 function IconFor({ entry }) {
-  if (entry?.status === 'error') return <TriangleAlert size={18}/>;
+  if (entry?.status === 'error' || entry?.type === 'guardian-disconnect') return <TriangleAlert size={18}/>;
   if (entry?.type === 'alert' || entry?.type === 'network-alert') return <BellRing size={18}/>;
   return <CheckCircle2 size={18}/>;
 }
