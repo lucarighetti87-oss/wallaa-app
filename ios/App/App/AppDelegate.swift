@@ -618,6 +618,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private var mokoAuthenticated = false
     private var mokoAuthenticationBlocked = false
     private var mokoStatus = "disabled"
+    private var sosClickGate = WallaaSOSClickGate()
     private var mokoLastCount: Int?
     private var mokoLastEventAt = Date.distantPast
     private var mokoStreamStartedAt = Date.distantPast
@@ -680,7 +681,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private var mokoConnectionWanted: Bool {
         guard !mokoSetupConnectionPaused, let config, config.armed, !(config.identity.authToken ?? "").isEmpty,
               let hardwareId = config.hardwareId, hardwareId.hasPrefix("MOKO:"),
-              ["press", "any_press"].contains(config.trigger) else { return false }
+              ["press", "double_press", "any_press"].contains(config.trigger) else { return false }
         return UserDefaults.standard.bool(forKey: "wallaa.moko.continuous.\(hardwareId)")
     }
 
@@ -1154,6 +1155,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     }
 
     private func synchronizeMokoEventStream() {
+        sosClickGate.reset()
         mokoStatus = "synchronizing"
         // The vendor's dismiss command clears the latched click quantity and
         // produces an AA08 zero. Wait for that actual baseline, not a time guess.
@@ -1240,7 +1242,8 @@ private var scanRearmWorkItem: DispatchWorkItem?
             mokoAuthenticated = true
             mokoStreamStartedAt = Date()
             mokoLastEventAt = .distantPast
-            mokoStatus = "synchronizing"
+            sosClickGate.reset()
+        mokoStatus = "synchronizing"
             if let hardwareId = config?.hardwareId {
                 mokoLastCount = UserDefaults.standard.object(forKey: "wallaa.moko.gatt.counter.\(hardwareId)") as? Int
             }
@@ -1280,7 +1283,12 @@ private var scanRearmWorkItem: DispatchWorkItem?
         mokoStatus = "ready"; mokoHandshakeTimeout?.cancel(); mokoDisconnectedAt = nil;updateNativeConnectionGuard()
         NSLog("[WALLAA][MOKO] event count=\(count) previous=\(previous.map(String.init) ?? "none") setup=\(mokoSetupInProgress)")
         guard WallaaMokoGATT.shouldEmit(previous: previous, count: count, initialRead: false, quietGap: quietGap), mokoConnectionWanted,
-              let config, triggerMatches(config.trigger, event: "press") else { return }
+              let config, ["press","double_press","any_press"].contains(config.trigger) else { return }
+        let clicks = previous.map { count > $0 ? count - $0 : count } ?? 1
+        guard sosClickGate.accept(mode:config.trigger,quantity:clicks,at:now) else {
+            acknowledgeMokoPress()
+            return
+        }
         // AA08 is a click quantity, NOT a unique lifetime event counter. Allocate
         // a separate id so two later single presses are not deduplicated by the API.
         let sequenceKey = "wallaa.moko.gatt.sequence.\(hardwareId)"
@@ -1301,6 +1309,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         guard peripheral == mokoPeripheral else { return }
+        sosClickGate.reset()
         mokoAuthenticated = false; mokoRssi=nil;mokoRssiMeasuredAt=nil;mokoHandshakeTimeout?.cancel()
         mokoDisconnectReason=error?.localizedDescription ?? "Il collegamento Bluetooth è stato interrotto. Wallaa riprova automaticamente."
         healthPhoneMotionStreak=0
@@ -1365,6 +1374,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
             communityPaused=false;communityNextAttempt = .distantPast
         }
         let previousHealth=nativeHealthEnabled
+        if config?.trigger != decoded.trigger || config?.deviceId != decoded.deviceId || config?.armed != decoded.armed || config?.identity.authToken != decoded.identity.authToken {sosClickGate.reset()}
         config = decoded
         reconcileHealthPhoneMotion()
         updateNativeConnectionGuard()
@@ -1497,6 +1507,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
             NSLog("[WALLAA][BLE] target advertisement without supported button event")
             return
         }
+        guard config.hardwareId?.hasPrefix("MOKO:") != true else { return }
         guard triggerMatches(config.trigger, event: button.event) else {
             NSLog("[WALLAA][BLE] button event ignored event=\(button.event) configured=\(config.trigger)")
             return
@@ -2665,4 +2676,18 @@ public class WallaaStorePlugin: CAPPlugin, CAPBridgedPlugin {
 @objc(WallaaBridgeViewController)
 class WallaaBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() { bridge?.registerPluginInstance(WallaaMokoPlugin()); bridge?.registerPluginInstance(WallaaStorePlugin()) }
+}
+
+// Consumes distinct AA08 increments only, after authentication/baseline checks.
+// Zero acknowledgements do not clear the first click; reconnect/config changes do.
+private struct WallaaSOSClickGate {
+    private var firstAt:Date?
+    mutating func reset(){firstAt=nil}
+    mutating func accept(mode:String,quantity:Int,at:Date)->Bool {
+        guard quantity>0 else{return false}
+        guard mode=="double_press" else{reset();return true}
+        if quantity>=2 {reset();return true}
+        if let firstAt,at.timeIntervalSince(firstAt)>=0,at.timeIntervalSince(firstAt)<=2 {reset();return true}
+        firstAt=at;return false
+    }
 }

@@ -28,7 +28,7 @@ export default function DeviceScreen({ onDisconnectDevice,onRefreshDevice, pairi
     {setupBusy && <button type="button" className="aa-secondary-back" onClick={onCancelPair}>{"" + uiText("Annulla collegamento") + ""}</button>}
   </>;
 
-  const mokoLabels = {disabled:uiText("Trasmissione Bluetooth"), searching:uiText("Ricerca del pulsante"), connecting:uiText("Collegamento in corso"), authenticating:uiText("Verifica del pulsante"), synchronizing:uiText("Premi una volta per sincronizzare, senza inviare SOS"), ready:uiText("Pronto: un click invia SOS"), disconnected:uiText("Pulsante scollegato"), password_required:uiText("Inserisci la password del pulsante"), password_error:uiText("Password del pulsante non corretta"), connection_failed:uiText("Collegamento non riuscito"), unsupported:uiText("Modalità non supportata"), unavailable:uiText("Connessione continua non disponibile in questa versione"), bluetooth_disabled:uiText("Bluetooth disattivato")};
+  const mokoLabels = {disabled:uiText("Trasmissione Bluetooth"), searching:uiText("Ricerca del pulsante"), connecting:uiText("Collegamento in corso"), authenticating:uiText("Verifica del pulsante"), synchronizing:uiText("Premi una volta per sincronizzare, senza inviare SOS"), ready:uiText(trigger==='double_press'?"Pronto: due click inviano SOS":"Pronto: un click invia SOS"), disconnected:uiText("Pulsante scollegato"), password_required:uiText("Inserisci la password del pulsante"), password_error:uiText("Password del pulsante non corretta"), connection_failed:uiText("Collegamento non riuscito"), unsupported:uiText("Modalità non supportata"), unavailable:uiText("Connessione continua non disponibile in questa versione"), bluetooth_disabled:uiText("Bluetooth disattivato")};
 
   if(!device||setupBusy||needsSetup)return <ButtonPairingGuide state={pairingState} error={pairingError} candidates={pairingCandidates} password={mokoPassword} onPassword={setMokoPassword} onCancel={onCancelPair} onBack={onBack} onSelect={onSelectCandidate} onStart={()=>needsSetup?onMokoSetup?.({password:mokoPassword||undefined}):onPair?.({password:mokoPassword||undefined})}/>;
 
@@ -84,8 +84,11 @@ export default function DeviceScreen({ onDisconnectDevice,onRefreshDevice, pairi
     <section className="aa-trigger-card aa-trigger-card-v41">
       <div className="aa-trigger-watermark" aria-hidden="true"><i/><i/><i/><span>SOS</span></div>
       <span>{"" + uiText("COMANDO SOS") + ""}</span>
-      <h2>{"" + uiText("Premi per inviare SOS") + ""}</h2>
-      <p>{"" + uiText("La prima pressione del pulsante può attivare l’SOS. Non serve premere più volte.") + ""}</p>
+      <h2>{uiText("Scegli come inviare SOS")}</h2>
+      <div className="wb-sos-click-options" role="group" aria-label={uiText("Pressioni per inviare SOS")}>
+        {[['press','Un click','L’SOS parte alla prima pressione.'],['double_press','Due click','Premi due volte entro 2 secondi. Un solo click non invia SOS.']].map(([value,label,help])=><button type="button" key={value} aria-pressed={trigger===value} onClick={()=>onTrigger?.(value)}><strong>{uiText(label)}</strong><small>{uiText(help)}</small>{trigger===value&&<Check aria-hidden="true"/>}</button>)}
+      </div>
+      <p>{uiText("La scelta resta salvata e vale anche con l’iPhone bloccato. Il collegamento del pulsante non invia SOS.")}</p>
       <div className="aa-trigger-footer"><i/><span>{"" + uiText("PROTEZIONE IN UN GESTO") + ""}</span><i/></div>
     </section>
 

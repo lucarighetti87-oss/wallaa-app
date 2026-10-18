@@ -8405,3 +8405,9 @@ html.ios-keyboard-open .wallaa-new-chat-backdrop .wallaa-new-chat-results {
 .v454-sentinel-marker:has(.state-stale) img{filter:grayscale(1);opacity:.55}
 .v454-sentinel-marker .state-stale{background:#8b9ca6!important;box-shadow:none!important}
 .sentinel-map-detail .sentinel-last-known{font-size:11px;color:#bbc9d1}
+
+.wb-sos-click-options{display:grid;gap:12px;position:relative;z-index:1;margin:20px 0}
+.wb-sos-click-options button{position:relative;display:grid;gap:6px;width:100%;padding:18px 48px 18px 18px;text-align:left;border:1px solid #27718a;border-radius:16px;background:#062334;color:#eaf7ff;font:inherit;cursor:pointer}
+.wb-sos-click-options button[aria-pressed=true]{border-color:#43d9f9;background:#0a3e53;box-shadow:inset 0 0 0 1px #43d9f9}
+.wb-sos-click-options small{font-size:14px;line-height:1.5;color:#abc7d5}
+.wb-sos-click-options svg{position:absolute;right:16px;top:20px;color:#43d9f9}
