@@ -1,3 +1,5 @@
+import {getCachedLocation,getSentinelLocation} from '../services/location';
+import {updateSentinelAvailability} from '../services/sentinelActivation.mjs';
 import {uiText,uiLocale} from '../uiText.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import SentinelApplicationScreen from './SentinelApplicationScreen';
@@ -325,19 +327,9 @@ export default function SentinelScreen({ networkIdentity, profile, currentLocati
 
   async function toggleAvailability() {
     await run(async () => {
-      if (!currentLocation) await onRefreshLocation?.();
-      const nextAvailable = !available;
-      await setSentinelAvailability(networkIdentity, nextAvailable);
-      await storage.setNativeSentinel({
-        active: nextAvailable,
-        available: nextAvailable,
-        status: nextAvailable ? 'available' : 'offline',
-        syncedAt: new Date().toISOString()
-      });
-      if (nextAvailable) {
-        const loc = currentLocation || await onRefreshLocation?.();
-        if (loc) await sendSentinelPresence(networkIdentity, loc);
-      }
+      await updateSentinelAvailability({available:!available,cached:getCachedLocation(60000),
+        setAvailability:value=>setSentinelAvailability(networkIdentity,value),saveNative:storage.setNativeSentinel,
+        locate:getSentinelLocation,publish:loc=>sendSentinelPresence(networkIdentity,loc)});
     });
   }
 

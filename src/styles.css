@@ -8411,3 +8411,27 @@ html.ios-keyboard-open .wallaa-new-chat-backdrop .wallaa-new-chat-results {
 .wb-sos-click-options button[aria-pressed=true]{border-color:#43d9f9;background:#0a3e53;box-shadow:inset 0 0 0 1px #43d9f9}
 .wb-sos-click-options small{font-size:14px;line-height:1.5;color:#abc7d5}
 .wb-sos-click-options svg{position:absolute;right:16px;top:20px;color:#43d9f9}
+
+/* Sentinel network: light moves only through compositor-friendly transforms and opacity. */
+.sentinel-network-meter{position:relative;isolation:isolate;overflow:hidden;padding:18px 18px 24px;border:1px solid #215268;border-radius:22px;background:linear-gradient(135deg,#0b293c,#03121f 75%);box-shadow:inset 0 1px 0 #d5f9ff14,0 14px 28px #0004;margin-bottom:8px}
+.sentinel-network-heading{display:flex;align-items:center;gap:12px;margin-bottom:20px;color:#e8f8ff}
+.sentinel-network-heading b{font-size:17px;letter-spacing:.015em}
+.sentinel-network-emblem{position:relative;width:38px;height:42px;flex:none;display:grid;place-items:center}
+.sentinel-network-emblem img{width:35px;height:39px;object-fit:contain;filter:drop-shadow(0 0 8px #5cdcff45)}
+.sentinel-network-emblem:before{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px solid #65dbff35;border-top-color:#8eeaff;animation:sentinelNetworkOrbit 9s linear infinite}
+.sentinel-network-beacon{margin-left:auto;width:6px;height:6px;border-radius:50%;background:hsl(var(--coverage-hue) 88% 62%);box-shadow:0 0 12px 2px hsl(var(--coverage-hue) 88% 55% / .45)}
+.sentinel-network-track{height:18px;position:relative;border-radius:999px;box-shadow:0 0 0 5px #010c16,0 0 0 6px #37647b88,inset 0 1px 2px #fff4;background:#041420}
+.sentinel-network-spectrum{position:absolute;inset:0;border-radius:inherit;background:linear-gradient(90deg,#ff3558 0%,#ff784b 26%,#ffd86b 49%,#a9ec79 73%,#23e4a0 100%);box-shadow:inset 0 2px 3px #fff5,inset 0 -4px 6px #0003;opacity:.62}
+.sentinel-network-grid{position:absolute;inset:0;border-radius:inherit;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(10% - 1px),#031523bb calc(10% - 1px),#031523bb 10%);opacity:.65}
+.sentinel-network-flow{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none}
+.sentinel-network-flow:after{content:"";position:absolute;inset:0;width:35%;border-radius:inherit;background:linear-gradient(90deg,transparent,#eaffff9c,transparent);transform:translateX(-110%);animation:sentinelNetworkFlow 5s ease-in-out infinite}
+.sentinel-network-lens{position:absolute;top:50%;left:var(--coverage-position);height:34px;width:14px;transform:translate(-50%,-50%);border:1px solid #f1ffffb0;border-radius:7px;background:linear-gradient(90deg,#ffffffe0,#ffffff4d 45%,#ffffffe0);box-shadow:0 0 0 3px #061827bb,0 0 18px 4px hsl(var(--coverage-hue) 88% 60% / .75);transition:left 1.2s cubic-bezier(.2,.8,.2,1)}
+.sentinel-network-lens i{position:absolute;inset:6px 4px;border-radius:4px;background:#f6ffff;animation:sentinelNetworkBreathe 3s ease-in-out infinite}
+.sentinel-network-reflection{position:absolute;z-index:-1;bottom:-24px;left:5%;right:5%;height:40px;background:linear-gradient(90deg,#ff355833,#ffd86b22,#23e4a033);filter:blur(18px);pointer-events:none}
+.sentinel-network-meter:not(.is-animating) *,.sentinel-network-meter:not(.is-animating) :before,.sentinel-network-meter:not(.is-animating) :after{animation-play-state:paused!important}
+.sentinel-network-meter.is-unknown .sentinel-network-spectrum{background:linear-gradient(90deg,#315168,#6c8a9d,#315168);opacity:.6}
+.sentinel-network-meter.is-unknown .sentinel-network-beacon{background:#829eaf;box-shadow:none}
+@keyframes sentinelNetworkOrbit{to{transform:rotate(360deg)}}
+@keyframes sentinelNetworkFlow{0%,15%{transform:translateX(-110%);opacity:0}25%{opacity:.6}75%{opacity:.6}90%,100%{transform:translateX(390%);opacity:0}}
+@keyframes sentinelNetworkBreathe{50%{opacity:.4;transform:scaleY(.75)}}
+@media(prefers-reduced-motion:reduce){.sentinel-network-meter *,.sentinel-network-meter :before,.sentinel-network-meter :after{animation:none!important;transition:none!important}}
