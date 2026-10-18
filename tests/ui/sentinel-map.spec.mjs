@@ -4,8 +4,20 @@ test('normalized private Sentinel bearings occupy four distinct map edges',async
 test('last-known Sentinel indicators remain visible without being presented as available',async({page},testInfo)=>{
  await page.goto('/tests/ui/index.html?screen=map&staleSentinels=1');
  await expect(page.locator('.state-stale')).toHaveCount(2);await expect(page.locator('.edge-marker')).toHaveCount(4);
- await expect(page.getByText('2 disponibili · 2 da aggiornare · 1 senza posizione')).toBeVisible();
+ await expect(page.locator('.sentinel-network-meter')).toBeVisible();await expect(page.locator('.sentinel-network-meter')).not.toContainText(/disponibili|abilitate|senza posizione|offline|intervento/);
  await page.getByRole('button',{name:'1 Sentinel da aggiornare · Nord',exact:true}).click();
  await expect(page.getByRole('dialog')).toContainText('Ultimo riferimento noto: disponibilità da confermare.');
  await page.screenshot({path:testInfo.outputPath('sentinel-stale-reference.png')});
+});
+
+test('network meter contains no counts, reflects service level, and pauses offscreen or with reduced motion',async({page},testInfo)=>{
+ await page.goto('/tests/ui/index.html?screen=meter-preview&level=4');
+ const card=page.locator('.sentinel-network-meter');await expect(card).toHaveClass(/is-animating/);await expect(card).toHaveText('Rete Sentinel');
+ await expect(card.getByRole('img',{name:'Copertura Sentinel elevata'})).toBeVisible();
+ await page.screenshot({path:testInfo.outputPath('network-green.png')});
+ await page.emulateMedia({reducedMotion:'reduce'});await expect(card.locator('.sentinel-network-lens i')).toHaveCSS('animation-name','none');
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ await page.evaluate(()=>{document.querySelector('.sentinel-network-meter').style.marginTop='200vh';});await expect(card).not.toHaveClass(/is-animating/);
+ await page.goto('/tests/ui/index.html?screen=meter-preview&level=0');await expect(page.getByRole('img',{name:'Copertura Sentinel limitata'})).toBeVisible();
+ await page.goto('/tests/ui/index.html?screen=meter-preview&unknown');await expect(page.locator('.sentinel-network-meter')).toHaveClass(/is-unknown/);await expect(page.locator('.sentinel-network-lens')).toHaveCount(0);
 });

@@ -1,6 +1,6 @@
 import {uiText,uiLocale} from '../uiText.js';
 import { useEffect } from 'react';
-import { CircleUserRound, Home, Link2, MapPin, MessageCircle, Settings, Shield, UsersRound, X } from 'lucide-react';
+import { CircleHelp, CircleUserRound, Home, Link2, MapPin, MessageCircle, Settings, Shield, UsersRound, X } from 'lucide-react';
 import WallaaButton3D from './WallaaButton3D';
 
 const items = [
@@ -9,7 +9,8 @@ const items = [
   ['network', 'v4.menu.safetyNetwork', Shield],
   ['map', 'v4.menu.location', MapPin],
   ['messages', 'messages.title', MessageCircle],
-  ['settings', 'nav.settings', Settings]
+  ['settings', 'nav.settings', Settings],
+  ['help', 'Aiuto', CircleHelp]
 ];
 
 export default function SideMenu({ open, onClose, onNavigate, active, profile, device, telemetry, connectionStatus, t }) {
@@ -56,7 +57,7 @@ export default function SideMenu({ open, onClose, onNavigate, active, profile, d
           <button type="button" className={`${active === 'sentinel' ? 'active' : ''} side-sentinel-item`.trim()} onClick={() => navigate('sentinel')}><img src="/sentinel-shield.png" alt="" className="side-sentinel-icon"/><span>Sentinel</span>{profile?.plan === 'pro' ? <em>PRO</em> : null}</button>
           {items.map(([id,key,Icon]) => (
             <button type="button" key={id} className={active===id?'active':''} onClick={() => navigate(id)}>
-              <Icon size={19}/><span>{id==='network'?uiText('Rete di Sicurezza'):t(key)}</span>
+              <Icon size={19}/><span>{id==='network'?uiText('Rete di Sicurezza'):id==='help'?uiText('Aiuto'):t(key)}</span>
             </button>
           ))}
         </nav>

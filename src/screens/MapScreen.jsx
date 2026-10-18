@@ -1,3 +1,4 @@
+import SentinelNetworkMeter from '../components/SentinelNetworkMeter';
 import {uiText,uiLocale} from '../uiText.js';
 import {sentinelMapOffset,clusterSentinelMarkers,sentinelDirection} from '../services/sentinelMap';
 // WALLAA_V4_0_63_SENTINEL_MAP_ALL_USERS — nearby markers are visible to every authenticated plan; dispatch remains backend Pro-only.
@@ -68,22 +69,22 @@ export default function MapScreen({ activeAlert, currentLocation, locationStatus
   const [coverage,setCoverage]=useState(null);
   useEffect(()=>{ if(!isEmergency&&!valid&&locationStatus!=='checking') onRefreshLocation?.().catch(()=>{}); },[isEmergency,valid,locationStatus,onRefreshLocation]);
   useEffect(()=>{
-    if (!networkIdentity?.authToken || !valid) { setSentinels([]); return undefined; }
+    if (!networkIdentity?.authToken || !valid) { setSentinels([]);setCoverage(null); return undefined; }
     let alive=true; let running=false;
     const load=async()=>{
-      if(!alive||running) return; running=true;
-      try { const r=await getNearbySentinels(networkIdentity,{latitude:lat,longitude:lng}); if(alive){setSentinels(r?.sentinels||[]);setCoverage(r?.summary||null);} }
-      catch(error) { console.warn('[WALLAA][SENTINEL] nearby map', error?.message||error); }
+      if(!alive||running||document.visibilityState!=='visible') return; running=true;
+      try { const r=await getNearbySentinels(networkIdentity,{latitude:lat,longitude:lng}); if(alive){setSentinels(r?.sentinels||[]);setCoverage(Number.isInteger(r?.coverageLevel)?r.coverageLevel:null);} }
+      catch(error) {if(alive)setCoverage(null); console.warn('[WALLAA][SENTINEL] nearby map', error?.message||error); }
       finally { running=false; }
     };
     const wake=()=>{ if(document.visibilityState==='visible') load(); };
-    load(); const id=setInterval(load,10000);
+    load(); const id=setInterval(load,isEmergency?10000:30000);
     document.addEventListener('visibilitychange',wake); window.addEventListener('focus',load); window.addEventListener('online',load);
     return()=>{alive=false;clearInterval(id);document.removeEventListener('visibilitychange',wake);window.removeEventListener('focus',load);window.removeEventListener('online',load)};
-  }, [networkIdentity?.authToken,lat,lng,valid]);
+  }, [networkIdentity?.authToken,lat,lng,valid,isEmergency]);
   return <div className="screen v4-generic-screen v402-map-screen"><header className="v402-screen-intro v402-map-intro"><div><span>{t('v4.map.eyebrow')}</span><h1>{t('v4.map.title')}</h1><p>{isEmergency?(isPro?t('v412.map.livePro'):t('v412.map.basicAlert')):t('v402.map.privateBody')}</p></div><button className="v402-add-button" onClick={()=>onRefreshLocation?.().catch(()=>{})} disabled={locationStatus==='checking'} aria-label={t('v402.map.refresh')}><RefreshCw size={20} className={locationStatus==='checking'?'spin':''}/></button></header>
     {location?.approximate && <p className="v402-privacy-note">{"" + uiText("Zona indicativa rilevata da un telefono della rete Wallaa.") + ""}</p>}
     <section className={`v402-location-status ${isEmergency?'emergency':'ready'}`}><div className="v402-location-status-icon">{isEmergency?<ShieldCheck size={20}/>:<LocateFixed size={20}/>}</div><div><strong>{isEmergency?(isPro?t('v402.map.liveTracking'):t('v412.map.positionSent')):valid?t('v402.map.currentPosition'):t('v402.map.acquiring')}</strong><span>{isEmergency?(isPro?t('v402.map.sharedDuringAlert'):t('v412.map.basicNoTracking')):t('v402.map.notSharedNow')}</span></div><i/></section>
-    <section className="v402-map-card v412-map-card"><LiveMap lat={valid?lat:NaN} lng={valid?lng:NaN} emergency={isEmergency} sentinels={sentinels}/>{<div className="v454-sentinel-overlay"><div className="v454-sentinel-legend"><img src="/sentinel-shield.png" alt=""/><span><b>{"" + uiText("Rete Sentinel") + ""}</b><small>{coverage?uiText('{available} disponibili · {stale} da aggiornare · {missing} senza posizione',{available:coverage.available||0,stale:coverage.stale||0,missing:coverage.unlocated||0}):sentinels.length?uiText('{count} disponibili · indicatori per direzione',{count:sentinels.filter(s=>s.status==='available').length}):uiText("Nessuna Sentinel disponibile rilevata")}</small>{coverage&&<small>{uiText('{enabled} abilitate · {offline} offline · {busy} in intervento',{enabled:coverage.enabled||0,offline:coverage.offline||0,busy:coverage.busy||0})}</small>}</span></div></div>}
+    <section className="v402-map-card v412-map-card"><LiveMap lat={valid?lat:NaN} lng={valid?lng:NaN} emergency={isEmergency} sentinels={sentinels}/><div className="v454-sentinel-overlay"><SentinelNetworkMeter level={coverage}/></div>
         <div className="v402-location-details"><div className="v402-coordinate-row"><div><small>{t('v402.map.latitude')}</small><strong>{valid?lat.toFixed(6):'—'}</strong></div><div><small>{t('v402.map.longitude')}</small><strong>{valid?lng.toFixed(6):'—'}</strong></div></div><div className="v402-location-meta"><span><Navigation size={14}/>{Number.isFinite(accuracy)?`± ${Math.round(accuracy)} m`:t('v402.map.accuracyUnknown')}</span><span>{capturedAt?new Date(capturedAt).toLocaleTimeString(language||undefined,{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—'}</span></div>{valid&&<a className="v402-open-maps" href={appleMapsUrl(lat,lng)} target="_blank" rel="noreferrer"><ExternalLink size={16}/>{t('v402.map.openAppleMaps')}</a>}</div></section><section className="v402-privacy-note"><ShieldCheck size={17}/><div><strong>{t('v402.map.privacyTitle')}</strong><p>{t('v412.map.privacyText')}</p></div></section></div>;
 }
