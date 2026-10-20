@@ -13,6 +13,7 @@ function LiveMap({ lat, lng, emergency, sentinels = [], showUserPin = true, sent
   const mapRef = useRef(null);
   const [selectedCluster,setSelectedCluster]=useState(null);
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+  const mapReady = Number.isFinite(lat) && Number.isFinite(lng);
 
   useEffect(() => {
     const element = mapRef.current;
@@ -26,7 +27,7 @@ function LiveMap({ lat, lng, emergency, sentinels = [], showUserPin = true, sent
     observer?.observe(element);
     window.addEventListener('resize', updateSize);
     return () => { observer?.disconnect(); window.removeEventListener('resize', updateSize); };
-  }, []);
+  }, [mapReady]);
 
   const map = useMemo(() => {
     if(!Number.isFinite(lat)||!Number.isFinite(lng)) return null;

@@ -29,6 +29,17 @@ export default function SettingsScreen({onPermissions, networkReceiverStatus={},
   networkIdentity, onSubscriptionChanged, networkState, systemHealth, onRefreshSystemHealth, onTestEmail, onTestAlarmSound, onNavigate, connectionStatus, t
 }) {
   const [showSafetyWord, setShowSafetyWord] = useState(false);
+  const [safetyWordDraft, setSafetyWordDraft] = useState(profile.safetyWord || '');
+  const [savingSafetyWord, setSavingSafetyWord] = useState(false);
+  const [safetyWordError, setSafetyWordError] = useState('');
+  useEffect(() => { setSafetyWordDraft(profile.safetyWord || ''); }, [profile.safetyWord]);
+  async function saveSafetyWord() {
+    if (savingSafetyWord) return;
+    setSavingSafetyWord(true); setSafetyWordError('');
+    try { await onSaveProfile({...profile, safetyWord:safetyWordDraft}); }
+    catch (error) { setSafetyWordError(error.message || uiText('Salvataggio non riuscito.')); }
+    finally { setSavingSafetyWord(false); }
+  }
   const [editingProfile, setEditingProfile] = useState(false);
   const [draftProfile, setDraftProfile] = useState(profile);
   const checking = systemHealth?.status === 'checking';
@@ -134,9 +145,11 @@ export default function SettingsScreen({onPermissions, networkReceiverStatus={},
           <span className="v404-private-badge">{t('v404.safetyWord.private')}</span>
         </div>
         <div className="v404-secret-input">
-          <input type={showSafetyWord ? 'text' : 'password'} value={profile.safetyWord || ''} maxLength={32} autoCapitalize="words" autoCorrect="off" autoComplete="off" spellCheck="false" onChange={(e)=>onSaveProfile({...profile,safetyWord:e.target.value})} placeholder={t('v404.safetyWord.placeholder')} aria-label={t('v404.safetyWord.title')}/>
+          <input type={showSafetyWord ? 'text' : 'password'} value={safetyWordDraft} disabled={savingSafetyWord} maxLength={32} autoCapitalize="words" autoCorrect="off" autoComplete="off" spellCheck="false" onChange={(e)=>setSafetyWordDraft(e.target.value)} placeholder={t('v404.safetyWord.placeholder')} aria-label={t('v404.safetyWord.title')}/>
           <button type="button" onClick={()=>setShowSafetyWord((value)=>!value)} aria-label={showSafetyWord ? t('v404.safetyWord.hide') : t('v404.safetyWord.show')}>{showSafetyWord ? <EyeOff size={18}/> : <Eye size={18}/>}</button>
         </div>
+        <div className="v412-profile-actions"><button className="save" type="button" onClick={saveSafetyWord} disabled={savingSafetyWord || safetyWordDraft===(profile.safetyWord || '')}>{t('common.save')}</button></div>
+        {safetyWordError&&<p role="alert">{safetyWordError}</p>}
         <div className="v404-safety-word-note"><ShieldCheck size={16}/><p>{t('v404.safetyWord.body')}</p></div>
       </section>
 

@@ -1,4 +1,11 @@
 import {test,expect} from '@playwright/test';
+test('Sentinel markers appear when GPS arrives after opening the map',async({page})=>{
+ await page.goto('/tests/ui/index.html?screen=map&delayedLocation');
+ await expect(page.locator('.v412-real-map.empty')).toBeVisible();
+ await page.getByRole('button',{name:'Fornisci posizione di prova'}).click();
+ await expect(page.getByRole('img',{name:'Copertura Sentinel elevata'})).toBeVisible();
+ await expect(page.locator('.edge-marker')).toHaveCount(4,{timeout:5000});
+});
 test('normalized private Sentinel bearings occupy four distinct map edges',async({page},testInfo)=>{await page.goto('/tests/ui/index.html?screen=map');const map=page.locator('.v412-real-map');await expect(page.locator('.edge-marker')).toHaveCount(4);const rect=await map.boundingBox();for(const [name,direction] of [['Nord','top'],['Est','right'],['Sud','bottom'],['Ovest','left']]){const marker=page.getByRole('button',{name:`1 Sentinel disponibile · ${name}`,exact:true});const box=await marker.boundingBox();if(direction==='top')expect(box.y).toBeLessThan(rect.y+60);if(direction==='right')expect(box.x).toBeGreaterThan(rect.x+rect.width-70);if(direction==='bottom')expect(box.y).toBeGreaterThan(rect.y+rect.height-70);if(direction==='left')expect(box.x).toBeLessThan(rect.x+60);}await page.getByRole('button',{name:'1 Sentinel disponibile · Nord',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('Direzione: Nord');await page.screenshot({path:testInfo.outputPath('sentinel-directions.png')});});
 
 test('last-known Sentinel indicators remain visible without being presented as available',async({page},testInfo)=>{
