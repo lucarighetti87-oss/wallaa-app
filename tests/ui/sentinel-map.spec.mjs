@@ -1,4 +1,9 @@
 import {test,expect} from '@playwright/test';
+test('one verified fresh local Sentinel sets the meter to two fifths',async({page})=>{
+ await page.goto('/tests/ui/index.html?screen=meter-preview&level=1');
+ await expect(page.locator('.sentinel-network-meter')).toHaveCSS('--coverage-position','40%');
+ await expect(page.locator('.sentinel-network-meter')).not.toContainText('2/5');
+});
 test('Sentinel markers appear when GPS arrives after opening the map',async({page})=>{
  await page.goto('/tests/ui/index.html?screen=map&delayedLocation');
  await expect(page.locator('.v412-real-map.empty')).toBeVisible();

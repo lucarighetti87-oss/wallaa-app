@@ -32,29 +32,30 @@ class Manager {
  var sentinelLastAttemptAt=Date.distantPast,sentinelLastSentAt=Date.distantPast,sentinelLastLocationRequestAt=Date.distantPast
  var sentinelRefreshTimeout:DispatchWorkItem?
  var config:Config?=Config(),nativeSentinelState:Bool?=true,sentinelTask:UIBackgroundTaskIdentifier = .invalid
- let locationManager=LocationManager();var stops=0,finishes=0
+ let locationManager=LocationManager(),sentinelFixManager=LocationManager();var stops=0,finishes=0
  func reconcileSentinelHeartbeat(){stops+=1};func reconcileLocationTracking(){}
+ func applySentinelServerStatus(_ status:String){}
  func finishSentinelTask(){sentinelTask = .invalid;finishes+=1}
 '''+methods+r'''
 }
 let m=Manager(),network=URLSession.shared
-m.sentinelHeartbeatTick();assert(network.requests.isEmpty && m.locationManager.requests==1)
+m.sentinelHeartbeatTick();assert(network.requests.isEmpty && m.sentinelFixManager.requests==1)
 m.sentinelRefreshTimeout?.perform();assert(network.requests.count==1)
 let first=try! JSONSerialization.jsonObject(with:network.requests[0].httpBody!) as! [String:Any];assert(first["location"]==nil)
 // Configuration bursts and radio callbacks cannot create GPS or HTTP storms.
-for _ in 0..<100 {m.sentinelHeartbeatTick()};assert(network.requests.count==1 && m.locationManager.requests==1)
-m.clock=m.clock.addingTimeInterval(60);m.sentinelHeartbeatTick();assert(network.requests.count==2 && m.locationManager.requests==1)
-m.clock=m.clock.addingTimeInterval(60);m.sentinelHeartbeatTick();assert(network.requests.count==2 && m.locationManager.requests==2)
+for _ in 0..<100 {m.sentinelHeartbeatTick()};assert(network.requests.count==1 && m.sentinelFixManager.requests==1)
+m.clock=m.clock.addingTimeInterval(60);m.sentinelHeartbeatTick();assert(network.requests.count==2 && m.sentinelFixManager.requests==1)
+m.clock=m.clock.addingTimeInterval(60);m.sentinelHeartbeatTick();assert(network.requests.count==2 && m.sentinelFixManager.requests==2)
 m.locationManager.location=CLLocation(timestamp:m.clock);m.publishNativeSentinelHeartbeat(m.locationManager.location);assert(network.requests.count==3 && m.sentinelRefreshTimeout==nil)
 m.clock=m.clock.addingTimeInterval(60);m.locationManager.location=CLLocation(timestamp:m.clock.addingTimeInterval(-30));m.sentinelHeartbeatTick()
 let payload=try! JSONSerialization.jsonObject(with:network.requests.last!.httpBody!) as! [String:Any]
-let fix=payload["location"] as! [String:Any];assert(fix["capturedAt"] as? String==ISO8601DateFormatter().string(from:m.locationManager.location!.timestamp));assert(m.locationManager.requests==2)
+let fix=payload["location"] as! [String:Any];assert(fix["capturedAt"] as? String==ISO8601DateFormatter().string(from:m.locationManager.location!.timestamp));assert(m.sentinelFixManager.requests==2)
 // Failed network attempts are bounded too.
 network.fail=true;m.clock=m.clock.addingTimeInterval(60);m.sentinelHeartbeatTick();m.sentinelRefreshTimeout?.perform();let count=network.requests.count
 for _ in 0..<100 {m.sentinelHeartbeatTick()};assert(network.requests.count==count)
 m.nativeSentinelShouldTrack=false;m.sentinelHeartbeatTick();assert(m.stops==1)
 m.nativeSentinelShouldTrack=true;m.locationManager.authorizationStatus = .denied;m.sentinelHeartbeatTick();assert(m.stops==2)
-m.locationManager.authorizationStatus = .authorizedAlways;m.clock=m.clock.addingTimeInterval(300);m.liveAlertId="SOS";let gps=m.locationManager.requests;m.sentinelHeartbeatTick();assert(m.locationManager.requests==gps)
+m.locationManager.authorizationStatus = .authorizedAlways;m.clock=m.clock.addingTimeInterval(300);m.liveAlertId="SOS";let gps=m.sentinelFixManager.requests;m.sentinelHeartbeatTick();assert(m.sentinelFixManager.requests==gps)
 network.fail=false;network.status=401;m.clock=m.clock.addingTimeInterval(60);m.sentinelHeartbeatTick();assert(m.nativeSentinelState==nil)
 assert(m.finishes>0)
 print("PASS: native presence without GPS, minute HTTP limit, two-minute moderate refresh limit, true GPS age, network failure backoff, opt-out/permission cancellation and SOS separation")
