@@ -2173,16 +2173,18 @@ private var scanRearmWorkItem: DispatchWorkItem?
         }
         guard sentinelHeartbeatTimer == nil else{return}
         let timer=DispatchSource.makeTimerSource(queue:.main)
-        timer.schedule(deadline:.now(),repeating:60,leeway:.seconds(10))
+        timer.schedule(deadline:.now(),repeating:300,leeway:.seconds(30))
         timer.setEventHandler{[weak self] in self?.sentinelHeartbeatTick()}
         sentinelHeartbeatTimer=timer;timer.resume()
     }
     private func sentinelHeartbeatTick(){
+        // iOS may suspend this timer. Significant-change callbacks remain the
+        // background movement source; this timer is not a freshness guarantee.
         guard nativeSentinelShouldTrack,locationManager.authorizationStatus == .authorizedAlways else {reconcileSentinelHeartbeat();return}
         guard sentinelRefreshTimeout == nil else{return}
         let now=Date(),location=[locationManager.location,sentinelFixManager.location].compactMap{$0}.filter{$0.horizontalAccuracy>=0}.max{$0.timestamp<$1.timestamp}
         let fresh=location.map{$0.horizontalAccuracy>=0 && abs($0.timestamp.timeIntervalSince(now))<=60} ?? false
-        if !fresh,liveAlertId.isEmpty,now.timeIntervalSince(sentinelLastLocationRequestAt)>=120 {
+        if !fresh,liveAlertId.isEmpty,now.timeIntervalSince(sentinelLastLocationRequestAt)>=300 {
             // Coalesce contact and the requested fix into one upload. Sending contact
             // first would rate-limit the fresh fix that arrives a few seconds later.
             sentinelLastLocationRequestAt=now
@@ -2205,6 +2207,7 @@ private var scanRearmWorkItem: DispatchWorkItem?
     private func reconcileSentinelBackgroundSession() {
         guard #available(iOS 17.0, *) else { return }
         let enabled = nativeSentinelShouldTrack && locationManager.authorizationStatus == .authorizedAlways
+            && (nativeSentinelState?.status == "busy" || sentinelWakeID != nil)
         if !enabled {
             #if DEBUG
             if sentinelBackgroundSession != nil { wallaaDiagnosticRecord("sentinel-background-session-stopped") }
@@ -2302,7 +2305,10 @@ private var scanRearmWorkItem: DispatchWorkItem?
         }
 
         let intervention = sentinelTracking && nativeSentinelState?.status == "busy"
-        let mode = !liveAlertId.isEmpty || intervention ? "emergency" : sentinelWakeID != nil ? "sentinel-refresh" : sentinelTracking ? "sentinel" : "passive"
+        // Ordinary background presence follows system movement events rather than
+        // retaining a continuous GPS/background activity session while stationary.
+        let sentinelMode = UIApplication.shared.applicationState == .active ? "sentinel" : "sentinel-standby"
+        let mode = !liveAlertId.isEmpty || intervention ? "emergency" : sentinelWakeID != nil ? "sentinel-refresh" : sentinelTracking ? sentinelMode : "passive"
         if mode != locationTrackingMode {
             locationTrackingMode=mode
             locationManager.stopUpdatingLocation()
@@ -2313,8 +2319,8 @@ private var scanRearmWorkItem: DispatchWorkItem?
                 locationManager.startUpdatingLocation()
             } else if mode == "sentinel" {
                 locationManager.desiredAccuracy=kCLLocationAccuracyHundredMeters
-                locationManager.distanceFilter=50
-                locationManager.pausesLocationUpdatesAutomatically=false
+                locationManager.distanceFilter=100
+                locationManager.pausesLocationUpdatesAutomatically=true
                 locationManager.startUpdatingLocation()
             } else {
                 // Ordinary readiness does not need a continuously running high-accuracy GPS.
@@ -2347,7 +2353,10 @@ private var scanRearmWorkItem: DispatchWorkItem?
 
         let now = Date()
 
-        if !force && now.timeIntervalSince(sentinelLastAttemptAt) < 60 {
+        // Movement callbacks and opportunistic timer ticks share one radio budget.
+        // Explicit SOS refreshes bypass this ordinary five-minute cadence.
+        let interval: TimeInterval = nativeSentinelState?.status == "busy" ? 60 : 300
+        if !force && now.timeIntervalSince(sentinelLastAttemptAt) < interval {
             completion?(false)
             return
         }

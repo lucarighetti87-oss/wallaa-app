@@ -5,10 +5,13 @@ start=source.index('    private var significantMonitoringActive=')
 end=source.index('    private func publishNativeSentinelHeartbeat',start)
 # Only exercise the policy, not the following heartbeat helper.
 end=source.index('\n    private func ',source.index('    private func reconcileLocationTracking()',start)+20)
+a=source.index('    private func reconcileSentinelBackgroundSession()');b=source.index('    private func applySentinelServerStatus(',a)
+session=source[a:b].replace('private func','func')
 method='var locationTrackingMode=""\n'+source[start:end].replace('private var','var').replace('private func','func')
 harness=r"""
 import Foundation
 let kCLLocationAccuracyBest=1.0,kCLDistanceFilterNone = -1.0,kCLLocationAccuracyHundredMeters=100.0
+class CLBackgroundActivitySession {var invalidated=false;func invalidate(){invalidated=true}}
 class UIApplication {static let shared=UIApplication();var applicationState=AppState.active}
 enum AppState{case active,background}
 enum Authorization:Int{case authorizedAlways,authorizedWhenInUse,denied,notDetermined}
@@ -25,13 +28,23 @@ class CLLocationManager {
 struct SentinelState {var status="available"}
 class Manager {
  var nativeSentinelState:SentinelState?,sentinelWakeID:UUID?
+ var sentinelBackgroundSession:AnyObject?
  var nativeSentinelShouldTrack=false,nativeGuardianShouldTrack=false,liveAlertId="",communityRequestedAlways=false
  func publishNativeSentinelHeartbeat(_ location:CLLocation){}
  func reconcileSentinelHeartbeat(){}
  let locationManager=CLLocationManager()
-"""+method+r"""
+"""+session+method+r"""
 }
 let m=Manager()
+m.nativeSentinelShouldTrack=true
+m.reconcileSentinelBackgroundSession();assert(m.sentinelBackgroundSession==nil)
+m.nativeSentinelState=SentinelState(status:"busy")
+m.reconcileSentinelBackgroundSession();let held=m.sentinelBackgroundSession as! CLBackgroundActivitySession
+m.nativeSentinelState=SentinelState(status:"available")
+m.reconcileSentinelBackgroundSession();assert(held.invalidated && m.sentinelBackgroundSession==nil)
+m.sentinelWakeID=UUID();m.reconcileSentinelBackgroundSession();assert(m.sentinelBackgroundSession != nil)
+m.sentinelWakeID=nil;m.reconcileSentinelBackgroundSession();assert(m.sentinelBackgroundSession==nil)
+m.nativeSentinelShouldTrack=false;m.nativeSentinelState=nil
 m.reconcileLocationTracking();assert(m.locationManager.starts==0)
 m.nativeGuardianShouldTrack=true;m.reconcileLocationTracking()
 assert(m.locationTrackingMode=="passive");assert(m.locationManager.starts==0);assert(m.locationManager.requests==1)
@@ -39,9 +52,18 @@ let significantStarts=m.locationManager.significant,stopCount=m.locationManager.
 for _ in 0..<100 {m.reconcileLocationTracking()}
 assert(m.locationManager.requests==1);assert(m.locationManager.significant==significantStarts);assert(m.locationManager.stops==stopCount)
 m.nativeSentinelShouldTrack=true;m.reconcileLocationTracking()
-assert(m.locationTrackingMode=="sentinel");assert(m.locationManager.desiredAccuracy==100);assert(m.locationManager.distanceFilter==50)
+assert(m.locationTrackingMode=="sentinel");assert(m.locationManager.desiredAccuracy==100);assert(m.locationManager.distanceFilter==100)
+assert(m.locationManager.pausesLocationUpdatesAutomatically)
+UIApplication.shared.applicationState = .background
+let foregroundStarts=m.locationManager.starts
+m.reconcileLocationTracking()
+assert(m.locationTrackingMode=="sentinel-standby")
+assert(m.locationManager.starts==foregroundStarts && m.locationManager.pausesLocationUpdatesAutomatically)
+let requests=m.locationManager.requests
+for _ in 0..<100 {m.reconcileLocationTracking()}
+assert(m.locationManager.requests==requests && m.locationManager.starts==foregroundStarts)
 m.sentinelWakeID=UUID();m.reconcileLocationTracking();assert(m.locationTrackingMode=="sentinel-refresh" && m.locationManager.desiredAccuracy==1)
-m.sentinelWakeID=nil;m.reconcileLocationTracking();assert(m.locationManager.desiredAccuracy==100)
+m.sentinelWakeID=nil;m.reconcileLocationTracking();assert(m.locationTrackingMode=="sentinel-standby" && m.locationManager.desiredAccuracy==100)
 m.nativeSentinelState=SentinelState(status:"busy");m.reconcileLocationTracking();assert(m.locationTrackingMode=="emergency")
 m.nativeSentinelState=nil;
 m.liveAlertId="sos";m.reconcileLocationTracking()

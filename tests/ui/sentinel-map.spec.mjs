@@ -33,3 +33,14 @@ test('network meter contains no counts, reflects service level, and pauses offsc
  await page.goto('/tests/ui/index.html?screen=meter-preview&level=0');await expect(page.getByRole('img',{name:'Copertura Sentinel limitata'})).toBeVisible();
  await page.goto('/tests/ui/index.html?screen=meter-preview&unknown');await expect(page.locator('.sentinel-network-meter')).toHaveClass(/is-unknown/);await expect(page.locator('.sentinel-network-lens')).toHaveCount(0);
 });
+
+test('map explains the two real Sentinel states without implying rescue acceptance',async({page},testInfo)=>{
+ await page.goto('/tests/ui/index.html?screen=map&staleSentinels=1');
+ const legend=page.locator('.sentinel-map-legend');
+ await legend.locator('summary').click();
+ await expect(legend).toContainText('Logo colorato e pallino verde');
+ await expect(legend).toContainText('Logo offuscato e pallino grigio');
+ await expect(legend).toContainText('Non indica un intervento accettato.');
+ await legend.scrollIntoViewIfNeeded();
+ await page.screenshot({path:testInfo.outputPath('sentinel-legend.png')});
+});

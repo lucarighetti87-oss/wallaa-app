@@ -532,7 +532,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       if(stopped||running||document.visibilityState!=='visible') return; running=true;
       try {
         const heartbeat=await pollSentinelMembership({identity:networkIdentityRef.current,native:supportsMokoConnection(),
-          send:sendUniversalSentinelHeartbeat,cached:getCachedLocation(60000),locate:async()=>{if(Date.now()<nextLocationAttempt)return null;nextLocationAttempt=Date.now()+120000;return getSentinelLocation();}});
+          send:sendUniversalSentinelHeartbeat,cached:getCachedLocation(60000),locate:async()=>{if(Date.now()<nextLocationAttempt)return null;nextLocationAttempt=Date.now()+300000;return getSentinelLocation();}});
         if(!stopped) {
             const activeSentinel = heartbeat?.ignored !== true;
             const status = String(heartbeat?.status || 'offline').toLowerCase();
@@ -547,7 +547,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       finally { running=false; }
     };
     ping();
-    const timer=setInterval(ping,60000);
+    const timer=setInterval(ping,300000);
     const wake=()=>ping();
     const visible=()=>{if(document.visibilityState==='visible')ping();};
     document.addEventListener('visibilitychange',visible);
@@ -557,7 +557,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
   }, [loaded, networkIdentity?.authToken]);
 
   // Legacy 45s Sentinel presence loop removed in v4.0.68.
-  // The universal 30s heartbeat above is now the single source of Sentinel liveness.
+  // Visible membership polling is five-minute; native movement events own background presence.
 
 
   // WALLAA_ADMIN_LOCATION_REQUEST_HANDLER_V1

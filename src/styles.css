@@ -8447,3 +8447,9 @@ html.ios-keyboard-open .wallaa-new-chat-backdrop .wallaa-new-chat-results {
 .help-contact{display:flex;align-items:center;gap:16px;padding:20px;border-radius:18px;background:#072334;border:1px solid #22536a;margin-top:32px}.help-contact>svg{color:#66dff5;flex:none}.help-contact h2{font-size:15px;color:#e4f5ff;margin:0 0 8px}.help-contact a{color:#8fe2fa;font-size:13px;overflow-wrap:anywhere}.help-no-results{color:#adc6d4;line-height:1.6;padding:20px 0}
 @media(min-width:650px){.help-logos{grid-template-columns:1fr 1fr}.help-logos article{align-items:flex-start}}
 @media(prefers-reduced-motion:reduce){.help-topic-chevron{transition:none}}
+
+/* Compact, explicit key for Sentinel readiness, without exposing network counts. */
+.sentinel-map-legend{margin:12px 16px;border:1px solid #19536a;border-radius:16px;background:#061e2b;color:#bdd4df;font:inherit;font-size:13px;line-height:1.5}
+.sentinel-map-legend summary{padding:14px 16px;cursor:pointer;color:#e7f7ff;font-weight:650}
+.sentinel-map-legend>div{padding:0 16px 16px}.sentinel-map-legend p{display:flex;gap:12px;align-items:center;margin:10px 0 16px}.sentinel-map-legend strong{display:block;color:#effaff;font-size:14px;margin-bottom:3px}.sentinel-map-legend small{display:block;font-size:12px;line-height:1.5;color:#91b1c2}
+.legend-shield{position:relative;flex:0 0 36px;width:36px;height:42px}.legend-shield img{width:36px;height:36px;object-fit:contain}.legend-shield i{position:absolute;right:0;bottom:3px;width:10px;height:10px;border-radius:50%;background:#20db9a;border:2px solid #061e2b}.legend-shield.is-stale img{filter:grayscale(1);opacity:.55}.legend-shield.is-stale i{background:#8b9ca6}
