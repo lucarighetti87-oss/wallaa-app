@@ -1,3 +1,5 @@
+import {Capacitor} from '@capacitor/core';
+import {platformText} from './platformText.mjs';
 import english from './locales/ui-en.json' with {type:'json'};
 import {detectDeviceLanguage,normalizeLanguage,translate,dictionaryEntries} from './i18n.js';
 let language=detectDeviceLanguage();
@@ -9,5 +11,5 @@ export function uiText(source,vars={}){
  const key=aliases.get(source);
  if(key)return translate(language,key,vars);
  const value=language==='en'?english[source]??source:source;
- return String(value).replace(/\{(\w+)\}/g,(_,name)=>vars[name]??`{${name}}`);
+ return platformText(String(value).replace(/\{(\w+)\}/g,(_,name)=>vars[name]??`{${name}}`),Capacitor.getPlatform());
 }

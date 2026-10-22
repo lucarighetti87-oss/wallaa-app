@@ -99,7 +99,7 @@ if (fs.existsSync(androidManifest)) {
   let manifest = fs.readFileSync(androidManifest, 'utf8');
   const marker = '<application';
   const permissions = [
-    '<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />',
+    '<uses-permission android:name="android.permission.BLUETOOTH_SCAN" />',
     '<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />',
     '<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />',
     '<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />',

@@ -9,3 +9,11 @@ xcuserdata/
 
 test-results/
 playwright-report/
+
+# Android local credentials and generated outputs
+android/local.properties
+android/app/google-services.json
+android/keystore.properties
+*.jks
+*.keystore
+.android-toolchain/

@@ -2,7 +2,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 const native = registerPlugin('WallaaMoko');
 let diagnosticMode=false;
 export function isMokoDiagnosticRun(){return diagnosticMode;}
-export function supportsMokoConnection() { return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'; }
+export function supportsMokoConnection() { return Capacitor.isNativePlatform() && ['ios','android'].includes(Capacitor.getPlatform()); }
 export async function configureMokoConnection({ hardwareId, enabled, password, useExistingPassword = false }) {
   if (!supportsMokoConnection()) return { supported: false };
   return native.configure({ hardwareId, enabled, ...(password ? { password } : {}), useExistingPassword });

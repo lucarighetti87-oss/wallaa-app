@@ -58,6 +58,10 @@ export async function initWallaaPush({ onToken, onAlert, onAlertClosed, onSentin
   if (!Capacitor.isNativePlatform()) return { supported: false, permission: 'web' };
 
   await stopPushListeners();
+  if(Capacitor.getPlatform()==='android'){
+    const configuration=await wallaaAudio.pushAvailable().catch(()=>({configured:false}));
+    if(!configuration.configured)return {supported:true,permission:'unconfigured',configured:false};
+  }
 
   let permission = await PushNotifications.checkPermissions();
   if (permission.receive === 'prompt') permission = await PushNotifications.requestPermissions();

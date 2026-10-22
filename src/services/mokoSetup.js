@@ -107,7 +107,7 @@ export async function prepareMokoButton({device,ble,password=MOKO_FACTORY_PASSWO
   onProgress('verifying');ensure();
   return {...claimed,mokoProfileVersion:MOKO_PROFILE_VERSION,mokoSetupVerifiedAt:new Date().toISOString(),mokoConnectionBaseline:lastCounter,softwareVersion:software,firmwareVersion:firmware};
  }catch(error){
-  if(/Characteristic not found/i.test(error.message||''))throw new Error(`Collegamento Bluetooth incompleto (${stage}). Tieni il pulsante vicino all’iPhone e riprova.`);
+  if(/Characteristic not found/i.test(error.message||''))throw new Error(`Collegamento Bluetooth incompleto (${stage}). Tieni il pulsante vicino al telefono e riprova.`);
   throw error;
  }finally{
   ending=true;clearTimeout(overall);signal?.removeEventListener('abort',cancel);controller.signal.removeEventListener('abort',abort);
