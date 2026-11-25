@@ -37,3 +37,5 @@ After the user reported accepting the required agreement, export succeeded. The 
 Xcode reported successful upload at 13:08:34 Europe/Rome (`Upload succeeded`, `Uploaded Wallaa Safe Button`, `EXPORT SUCCEEDED`). Apple started package processing. No App Store review submission or public release was performed. Tester-group availability still requires verification in TestFlight.
 
 Apple emitted a nonblocking SDK notice: uploads starting April 2027 require iOS 27 SDK / Xcode 27 or later. This upload was accepted with SDK 26.5; the current host/toolchain update remains a separate follow-up for newer SDK validation and the Duo hardware.
+
+TestFlight availability verified in App Store Connect: the existing internal group “Safe button Prova” (9 testers, automatic Xcode build distribution) lists build 4.0.146 (146) as `Test in corso`, expiring in 90 days. No new testers were added, no external beta review was requested, and no App Store review/public release was performed. The normal copy on the physical test iPhone had already been confirmed ready/connected by the user. Long-duration reconnection and battery measurement remain follow-up validation, not claimed results.
