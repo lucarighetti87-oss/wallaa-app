@@ -1537,7 +1537,7 @@ const defaultLanguage = useMemo(() => detectDeviceLanguage(), []);
       });}});
       if(controller.signal.aborted)throw controller.signal.reason;
       if(target.protocol==='moko-button'||target.hardwareId?.startsWith('MOKO:')){
-        if(!supportsMokoConnection())throw new Error('La configurazione WB-001 richiede l’app Wallaa per iPhone.');
+        if(!supportsMokoConnection())throw new Error('La configurazione WB-001 richiede l’app Wallaa sul telefono.');
         await beginMokoSetup(); // Renew suppression after a potentially long device selection.
         const prepared=await prepareMokoButton({device:target,ble:BleClient,initializeBle:initializeWallaaBle,password,allowVerifiedUpgrade:upgrade,signal:controller.signal,onProgress:setPairingState,onCounter:count=>{lastCounter=count;},checkOwnership:device=>checkWallaaDeviceClaim(networkIdentityRef.current,device),claim:(device,eligibility)=>existingDevice?.claimToken&&eligibility.claimTokenValid?Promise.resolve({hardwareId:device.hardwareId,claimToken:existingDevice.claimToken}):claimWallaaDevice(networkIdentityRef.current,device),onClaim:async next=>{
           claimed=next;setDevice(next);deviceRef.current=next;await storage.setDevice(next);await nativeSnapshot(next);

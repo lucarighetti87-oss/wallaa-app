@@ -1,3 +1,4 @@
+import {Capacitor} from '@capacitor/core';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { LocalNotifications } from '@capacitor/local-notifications';
 
@@ -50,7 +51,7 @@ export async function showLocalSafetyNotification({ title, body, extra = null, i
         title,
         body,
         schedule: { at: new Date(Date.now() + 250) },
-        sound: sound || null,
+        sound: Capacitor.getPlatform()==='android'?sound?.replaceAll('-','_')||null:sound||null,
         attachments: null,
         actionTypeId: '',
         extra
