@@ -6,8 +6,8 @@
 
 APK compilato e firma verificata. Non pubblicato su Google Play. Nessun Android fisico disponibile: Luca organizzerà il collaudo con un’altra persona. Nessun invio SOS reale eseguito. Il backend Android è preparato localmente e non è stato rilasciato; il backend iPhone 4.0.89 e TestFlight 145 restano il rilascio esistente.
 
-File: `../artifacts/android/Wallaa-Android-preview-1.apk` (circa 79 MB).
-SHA-256: `c5afa8a576c880f487ac6b7df9a96b27a902d5b3cd974c50d4a0d41973891d16`.
+File aggiornato: `../artifacts/android/Wallaa-Android-preview-1-firebase.apk` (circa 79 MB).
+SHA-256: `befa8eee5089f7320f71a1b7b1d1d909b9c28be6bb3f6f7b8e696c8686b19753`.
 
 ## Preparato
 
@@ -17,7 +17,7 @@ SHA-256: `c5afa8a576c880f487ac6b7df9a96b27a902d5b3cd974c50d4a0d41973891d16`.
 - Password del pulsante cifrata con Android Keystore. Backup/trasferimento dei dati privati disabilitati.
 - Pressione singola o doppia entro 2 secondi; raffiche di pressioni gestite come evento valido dopo la soglia. Deduplicazione di un SOS già attivo/in invio.
 - Servizio Android visibile per collegamento e posizione; posizione ordinaria a consumo ridotto, GPS più preciso durante richiesta/intervento/emergenza. Nessuna promessa di consumo reale senza misurazione.
-- Predisposizione FCM nel telefono e nel backend, mantenendo separato il percorso APNs iPhone. Mancano configurazione Firebase e prova consegna reale.
+- Predisposizione FCM nel telefono e nel backend, mantenendo separato il percorso APNs iPhone. Configurazione Firebase client integrata; credenziale server creata e validata con Google senza invio reale. Segreto FCM salvato su Render il 25 novembre 2026. Restano rilascio backend e prova consegna reale.
 - Nessuna pressione o allerta simulata viene spacciata per prova hardware.
 
 ## Verifiche concluse
@@ -31,8 +31,8 @@ SHA-256: `c5afa8a576c880f487ac6b7df9a96b27a902d5b3cd974c50d4a0d41973891d16`.
 
 ## Mancanze che impediscono il lancio
 
-1. Progetto Firebase, configurazione Android e credenziale server FCM; senza questi non arrivano notifiche push Android. La preview gestisce l’assenza senza richiamare Firebase non configurato.
-2. Account Google Play Console organizzazione, verifica società, scheda app e dichiarazioni su dati/localizzazione/servizio in primo piano.
+1. Rilasciare il backend Android; la credenziale FCM è salvata su Render. Progetto Firebase e configurazione client sono presenti; autenticazione e permesso di invio validati con Google (validate_only). Nessuna consegna reale ancora provata.
+2. Account Google Play organizzazione creato, pagamento comunicato dal titolare e console accessibile. Il documento precedente è stato rifiutato e il titolare ha inviato un nuovo documento il 25 novembre 2026: verifica Google in corso. Dichiarazione commerciante salvata con consenso esplicito. Restano verifica sito e telefoni, scheda app e dichiarazioni su dati/localizzazione/servizio in primo piano.
 3. Chiave di upload e configurazione firma di produzione, pacchetto AAB di rilascio.
 4. Collaudo su Android reale con WB-001, inclusi blocco schermo, restrizioni del produttore, recupero dopo perdita di connessione e consumi.
 5. Parità ancora da completare e collaudare: Health Check basato sul movimento in background, promemoria/escalation Connection Guard nativi, rilevamenti comunitari dei pulsanti in background. Non considerarli già equivalenti a iOS.
@@ -42,8 +42,8 @@ Lo script `android:check-release` controlla alcuni prerequisiti locali; non cert
 
 ## Azioni account di Luca
 
-- Creare Google Play Console come organizzazione ARABELL GROUP SRL, D-U-N-S 302561641: https://play.google.com/console/signup . Identità, pagamento e termini vanno completati dal titolare.
-- Creare un progetto in https://console.firebase.google.com/ e aggiungere Android con package esatto `it.wallaa.safebutton`. Salvare il file scaricato in `android/app/google-services.json`, escluso dal repository.
+- Attendere la verifica Google dei documenti caricati per ARABELL GROUP SRL e completare sito/telefoni. Console: https://play.google.com/console/u/4/developers/5772502287566660300/home .
+- Firebase `wallaa-safety` creato sul piano Spark gratuito. App `it.wallaa.safebutton` registrata e configurazione locale integrata, esclusa dal repository.
 - La credenziale server Firebase va conservata come segreto del backend (`FIREBASE_SERVICE_ACCOUNT_JSON`), mai in chat, APK o Git. Configurazione e rilascio vanno verificati prima di testare la consegna.
 - Organizzare un collaudatore con telefono Android e pulsante vicino. Non sono stati contattati terzi.
 
