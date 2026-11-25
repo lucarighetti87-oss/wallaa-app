@@ -1,0 +1,41 @@
+# App 4.0.146 — recover stalled iPhone Bluetooth sessions
+
+A native connection could remain indefinitely in `connecting` or `disconnecting` after a radio-service reset or a cancellation without its delegate callback. The app retained peripheral/characteristic references from the old session, so ordinary reconciliation returned early instead of reconnecting.
+
+The native manager now discards volatile transport state on radio changes and reconnects through the existing stored device identifier. Connection attempts have a 20-second deadline, followed by an 8-second cancellation watchdog. A cancellation that never finishes recreates the app central manager with the same restoration identifier; this recovery is limited to once per minute. Generation and central/peripheral identity guards reject obsolete callbacks and timers. GATT service invalidation triggers reauthorization, and a missing event subscription cannot count as ready. Restored connecting/disconnecting states receive the same deadlines; configuration reconciliation waits until restored peripherals are adopted.
+
+Fallback discovery includes the AA00 service and stops on foreground device discovery. Account ownership, accessory authorization and the stored password remain intact. Incorrect/missing passwords still block retries. Recovery clears partial SOS click sequences and preserves the existing synchronization baseline, single/double-click gate and disconnection reminder policy. The device screen labels recovery without claiming readiness.
+
+No new periodic healthy-connection scans, GPS requests, background activity sessions or heartbeat timers are introduced. Existing reconnection backoff remains. This is not a measured battery-savings claim.
+
+Validation: 87 JavaScript tests; production-method Swift recovery harness covering radio reset, missing cancellation callback, obsolete timer/callback isolation, normal disconnect cleanup, password/opt-out, recovery cooldown and service invalidation. Existing native protocol, SOS-click, reminder, accessory-pairing, location-energy and configuration-observer harnesses pass. Unsigned iPhone build passes with Xcode 26.6 / iOS SDK 26.5; updated web assets build against the production API.
+
+Physical verification pending. The connected iPhone Duo reports iOS 27.3 beta. Developer Mode was enabled by the user, but CoreDevice cannot mount the installed developer image (missing board/chip variant, error 0xe800010f), and Xcode does not list it as a build destination. The Mac has macOS 26.5.2, Xcode 26.6 and approximately 6.5 GiB free. Apple lists macOS 26.6 or later for Xcode 27.2 / 27.3 beta; a host update and sufficient disk space are required before that verification can proceed. See https://developer.apple.com/xcode/system-requirements/ . No sustained locked-screen or overnight recovery test has passed yet; current SDK compilation does not establish complete iOS 27 compatibility. No SOS was sent. Not published to TestFlight or App Store.
+
+## Physical check — 25 November 2026
+
+A second device (iPhone Air) is now reachable with Developer Mode enabled. It reports iOS 27.2.1. The signed Debug build 146 compiled, installed over 145 and launched successfully using the existing Xcode 26.6 toolchain. Thus this older phone can be tested despite its updated OS; the Duo blocker is specifically the unavailable matching developer-image variant, not proof that all iOS 27 devices are unreachable.
+
+At initial launch the Bluetooth state was powered off and continuous button monitoring was disabled. The user confirmed that no button is associated on this phone; pairing with the existing owner account is required before measuring reconnection. No physical reconnection or locked-screen pass is recorded yet. Debug hardware alert dispatch is suppressed for this test build.
+
+Remaining physical checks: authenticated readiness with AA08 subscription; two Bluetooth off/on recovery cycles without restarting the phone; a locked-screen interval followed by readiness verification without keeping a debugger attached. A short pass cannot validate the reported many-hour failure or establish battery consumption.
+
+Two deliberate Bluetooth power cycles recovered successfully on the iPhone Air without a phone restart or a new association. The first returned to authenticated/event-subscribed readiness about four seconds after power-on; the second about six seconds after power-on, with no intervening Wallaa foreground entry. Logs show background entry at 12:52:36, power-on at 12:52:53 and authenticated event-stream readiness at 12:52:58 (Europe/Rome). No additional disconnections or reauthentication loops appeared during the following observation interval. Hardware click receipt after the locked interval is still awaiting the user's physical action. A console stream was attached; this is a short functional check, not an overnight suspension/energy qualification.
+
+The signed Release build and archive also succeed; archive metadata is version 4.0.146 / build 146 and its main executable does not contain the Debug hardware-alert suppression string. The archive is retained locally under artifacts/ios/Wallaa-146.xcarchive. The phone still has the Debug test copy until the click check is completed; it must be replaced with Release before normal SOS use. No TestFlight upload has occurred.
+
+Locked-screen hardware receipt confirmed: after the second radio recovery at 12:52:58, the native manager received a real AA08 event (`count=1`, `previous=0`, `setup=false`) at 12:58:45, without an intervening foreground entry. The stored-click baseline was acknowledged at 12:58:46. This demonstrates receipt after approximately 5 minutes 47 seconds in background. No real SOS delivery was attempted; this is not an end-to-end notification/dispatch test.
+
+The normal signed Release build 146 subsequently installed successfully over the diagnostic copy on the test iPhone. The user subsequently confirmed that the normal Release copy displays ready/connected. Hardware SOS dispatch is operative again; no real SOS was used to verify it.
+
+Distribution attempt: archive export for App Store Connect was attempted with destination `export`, not upload. Apple rejected provisioning with `Unable to process request - PLA Update available`; no usable iOS Distribution certificate was found. Export failed and no IPA was uploaded. The user was asked to review/accept the updated Apple developer agreement personally. The existing signed development Release copy remains installed and the user confirmed it ready/connected.
+
+## App Store Connect upload — 25 November 2026
+
+After the user reported accepting the required agreement, export succeeded. The distributable IPA reports version 4.0.146, build 146, bundle it.wallaa.safebutton; SHA-256 is 2108183449de20630d25d9388a985afd83cba3883613be458ccb1c5213c8b523.
+
+Xcode reported successful upload at 13:08:34 Europe/Rome (`Upload succeeded`, `Uploaded Wallaa Safe Button`, `EXPORT SUCCEEDED`). Apple started package processing. No App Store review submission or public release was performed. Tester-group availability still requires verification in TestFlight.
+
+Apple emitted a nonblocking SDK notice: uploads starting April 2027 require iOS 27 SDK / Xcode 27 or later. This upload was accepted with SDK 26.5; the current host/toolchain update remains a separate follow-up for newer SDK validation and the Duo hardware.
+
+TestFlight availability verified in App Store Connect: the existing internal group “Safe button Prova” (9 testers, automatic Xcode build distribution) lists build 4.0.146 (146) as `Test in corso`, expiring in 90 days. No new testers were added, no external beta review was requested, and no App Store review/public release was performed. The normal copy on the physical test iPhone had already been confirmed ready/connected by the user. Long-duration reconnection and battery measurement remain follow-up validation, not claimed results.
