@@ -29,3 +29,11 @@ Locked-screen hardware receipt confirmed: after the second radio recovery at 12:
 The normal signed Release build 146 subsequently installed successfully over the diagnostic copy on the test iPhone. The user subsequently confirmed that the normal Release copy displays ready/connected. Hardware SOS dispatch is operative again; no real SOS was used to verify it.
 
 Distribution attempt: archive export for App Store Connect was attempted with destination `export`, not upload. Apple rejected provisioning with `Unable to process request - PLA Update available`; no usable iOS Distribution certificate was found. Export failed and no IPA was uploaded. The user was asked to review/accept the updated Apple developer agreement personally. The existing signed development Release copy remains installed and the user confirmed it ready/connected.
+
+## App Store Connect upload — 25 November 2026
+
+After the user reported accepting the required agreement, export succeeded. The distributable IPA reports version 4.0.146, build 146, bundle it.wallaa.safebutton; SHA-256 is 2108183449de20630d25d9388a985afd83cba3883613be458ccb1c5213c8b523.
+
+Xcode reported successful upload at 13:08:34 Europe/Rome (`Upload succeeded`, `Uploaded Wallaa Safe Button`, `EXPORT SUCCEEDED`). Apple started package processing. No App Store review submission or public release was performed. Tester-group availability still requires verification in TestFlight.
+
+Apple emitted a nonblocking SDK notice: uploads starting April 2027 require iOS 27 SDK / Xcode 27 or later. This upload was accepted with SDK 26.5; the current host/toolchain update remains a separate follow-up for newer SDK validation and the Duo hardware.
